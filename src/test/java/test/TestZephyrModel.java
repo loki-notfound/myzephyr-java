@@ -2,6 +2,7 @@ package test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -23,6 +24,7 @@ import zephyr.wallet.model.ZephyrDestination;
 import zephyr.wallet.model.ZephyrIncomingTransfer;
 import zephyr.wallet.model.ZephyrReserveInfo;
 import zephyr.wallet.model.ZephyrSubaddress;
+import zephyr.wallet.model.ZephyrTxConfig;
 
 /**
  * Tests the Zephyr model classes against the exact JSON shapes of the core and the native bridge.
@@ -145,6 +147,34 @@ public class TestZephyrModel {
     assertNotSame(output, outputCopy);
     assertEquals(ZephyrAssets.ZYS, outputCopy.getAssetType());
     assertEquals(output, outputCopy);
+  }
+
+  // 6. the currency pair on the tx config, camelCase keys as the core deserializes them
+  @Test
+  public void testTxConfigCurrencies() {
+    ZephyrTxConfig config = new ZephyrTxConfig()
+        .setAccountIndex(0)
+        .setAddress("ZEPHYR_DEST")
+        .setAmount(new BigInteger("1000000000000"))
+        .setSourceCurrency(ZephyrAssets.ZPH)
+        .setDestinationCurrency(ZephyrAssets.ZSD);
+    assertEquals(ZephyrAssets.ZPH, config.getSourceCurrency());
+    assertEquals(ZephyrAssets.ZSD, config.getDestinationCurrency());
+    String json = JsonUtils.serialize(ZephyrRpcConnection.MAPPER, config);
+    assertTrue(json.contains("\"sourceCurrency\":\"ZPH\""));
+    assertTrue(json.contains("\"destinationCurrency\":\"ZSD\""));
+    ZephyrTxConfig config2 = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, json, ZephyrTxConfig.class);
+    assertEquals(config, config2);
+    assertEquals(config.hashCode(), config2.hashCode());
+    ZephyrTxConfig copy = config.copy();
+    assertNotSame(config, copy);
+    assertEquals(config, copy);
+    assertNotEquals(config, copy.setDestinationCurrency(ZephyrAssets.ZPH));
+
+    // a config without the pair has no such keys
+    String plain = JsonUtils.serialize(ZephyrRpcConnection.MAPPER, new ZephyrTxConfig().setAccountIndex(0).setAddress("ZEPHYR_DEST").setAmount(BigInteger.ONE));
+    assertFalse(plain.contains("sourceCurrency"));
+    assertFalse(plain.contains("destinationCurrency"));
   }
 
   // 7. the reserve info as the bridge emits it
