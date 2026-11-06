@@ -2,18 +2,18 @@
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
-	<groupId>io.github.monero-ecosystem</groupId>
-	<artifactId>monero-java</artifactId>
-	<version>0.7.16</version>
-	<name>Monero Java Library</name>
-	<description>A Java library for using Monero</description>
-	<url>https://github.com/monero-ecosystem/monero-java</url>
+	<groupId>io.github.loki-notfound</groupId>
+	<artifactId>zephyr-java</artifactId>
+	<version>2.3.0-sec.1-java.1-SNAPSHOT</version>
+	<name>Zephyr Java Library</name>
+	<description>Java bindings for the Zephyr wallet core (zephyr-cpp), for Android and the JVM</description>
+	<url>https://github.com/loki-notfound/zephyr-java</url>
 	<properties>
 		<java-version>1.8</java-version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<apachelog-version>2.11.0</apachelog-version>
-		<jackson-version>[2.13.1, 2.13.2.2]</jackson-version>
-		<maven.test.skip>true</maven.test.skip>
+		<jackson-version>2.13.5</jackson-version>
+		<maven.test.skip>false</maven.test.skip>
 	</properties>
 
 	<dependencies>
@@ -72,9 +72,9 @@
 	</dependencies>
 
 	<scm>
-		<connection>scm:git:git://github.com/monero-ecosystem/monero-java.git</connection>
-		<developerConnection>scm:git:ssh://github.com/monero-ecosystem/monero-java.git</developerConnection>
-		<url>http://github.com/monero-ecosystem/monero-java/tree/master</url>
+		<connection>scm:git:git://github.com/loki-notfound/zephyr-java.git</connection>
+		<developerConnection>scm:git:ssh://github.com/loki-notfound/zephyr-java.git</developerConnection>
+		<url>https://github.com/loki-notfound/zephyr-java/tree/main</url>
 	</scm>
 
 	<licenses>
@@ -90,8 +90,9 @@
 
 	<developers>
 		<developer>
-			<name>woodser</name>
-			<email>woodser@protonmail.com</email>
+			<name>loki-notfound</name>
+			<email>loki@lateo.dev</email>
+			<url>https://github.com/loki-notfound</url>
 		</developer>
 	</developers>
 
@@ -106,6 +107,15 @@
 		</repository>
 	</distributionManagement>
 
+	<build>
+		<resources>
+			<resource>
+				<directory>src/main/resources</directory>
+				<filtering>true</filtering>
+			</resource>
+		</resources>
+	</build>
+
 	<profiles>
 		<profile>
 			<id>default</id>
@@ -114,6 +124,19 @@
 			</activation>
 			<build>
 				<plugins>
+					<plugin>
+						<!-- force the JUnit 5 provider: auto-detection picks JUnit 4 via junit-platform-runner and silently runs zero tests -->
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-surefire-plugin</artifactId>
+						<version>3.2.5</version>
+						<dependencies>
+							<dependency>
+								<groupId>org.apache.maven.surefire</groupId>
+								<artifactId>surefire-junit-platform</artifactId>
+								<version>3.2.5</version>
+							</dependency>
+						</dependencies>
+					</plugin>
 					<plugin>
 						<groupId>org.apache.maven.plugins</groupId>
 						<artifactId>maven-compiler-plugin</artifactId>
