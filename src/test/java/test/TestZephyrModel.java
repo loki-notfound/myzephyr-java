@@ -1,8 +1,11 @@
 package test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.math.BigDecimal;
@@ -11,10 +14,13 @@ import java.util.Arrays;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import zephyr.common.ZephyrRpcConnection;
+import zephyr.daemon.model.ZephyrOutput;
 import zephyr.lib.utils.JsonUtils;
 import zephyr.wallet.model.ZephyrAccount;
 import zephyr.wallet.model.ZephyrAssets;
 import zephyr.wallet.model.ZephyrBalance;
+import zephyr.wallet.model.ZephyrDestination;
+import zephyr.wallet.model.ZephyrIncomingTransfer;
 import zephyr.wallet.model.ZephyrReserveInfo;
 import zephyr.wallet.model.ZephyrSubaddress;
 
@@ -94,6 +100,51 @@ public class TestZephyrModel {
     assertEquals(BigInteger.ZERO, balances.get(0).get(ZephyrAssets.ZSD));
     assertEquals(BigInteger.valueOf(2), balances.get(1).get(ZephyrAssets.ZSD));
     assertEquals(new ZephyrBalance().set(ZephyrAssets.ZSD, BigInteger.valueOf(2)), balances.get(1));
+  }
+
+  // 4. a destination with and without the core's asset_type key
+  @Test
+  public void testDestinationAssetType() {
+    String json = "{\"amount\":250000000000,\"address\":\"ZEPHYR_DEST\",\"asset_type\":\"ZSD\"}";
+    ZephyrDestination destination = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, json, ZephyrDestination.class);
+    assertEquals("ZEPHYR_DEST", destination.getAddress());
+    assertEquals(new BigInteger("250000000000"), destination.getAmount());
+    assertEquals(ZephyrAssets.ZSD, destination.getAssetType());
+    String json2 = JsonUtils.serialize(ZephyrRpcConnection.MAPPER, destination);
+    assertTrue(json2.contains("\"asset_type\":\"ZSD\""));
+    assertFalse(json2.contains("assetType"));
+    assertEquals(destination, JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, json2, ZephyrDestination.class));
+    assertEquals(destination, destination.copy());
+
+    // without the key
+    ZephyrDestination plain = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, "{\"amount\":1,\"address\":\"ZEPHYR_DEST\"}", ZephyrDestination.class);
+    assertNull(plain.getAssetType());
+    String json3 = JsonUtils.serialize(ZephyrRpcConnection.MAPPER, plain);
+    assertFalse(json3.contains("asset_type"));
+    assertFalse(json3.contains("assetType"));
+  }
+
+  // 5. an incoming transfer and an output with the asset; copy keeps it
+  @Test
+  public void testTransferAndOutputAssetType() {
+    String json = "{\"amount\":1000000000000,\"accountIndex\":0,\"asset_type\":\"ZRS\",\"subaddressIndex\":1,\"address\":\"ZEPHYR_SUB1\",\"numSuggestedConfirmations\":1}";
+    ZephyrIncomingTransfer transfer = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, json, ZephyrIncomingTransfer.class);
+    assertEquals(ZephyrAssets.ZRS, transfer.getAssetType());
+    assertEquals(new BigInteger("1000000000000"), transfer.getAmount());
+    assertEquals(Integer.valueOf(1), transfer.getSubaddressIndex());
+    ZephyrIncomingTransfer transferCopy = transfer.copy();
+    assertNotSame(transfer, transferCopy);
+    assertEquals(ZephyrAssets.ZRS, transferCopy.getAssetType());
+    assertEquals(transfer, transferCopy);
+    assertTrue(JsonUtils.serialize(ZephyrRpcConnection.MAPPER, transfer).contains("\"asset_type\":\"ZRS\""));
+
+    ZephyrOutput output = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, "{\"amount\":5,\"index\":42,\"asset_type\":\"ZYS\"}", ZephyrOutput.class);
+    assertEquals(ZephyrAssets.ZYS, output.getAssetType());
+    assertEquals(Long.valueOf(42), output.getIndex());
+    ZephyrOutput outputCopy = output.copy();
+    assertNotSame(output, outputCopy);
+    assertEquals(ZephyrAssets.ZYS, outputCopy.getAssetType());
+    assertEquals(output, outputCopy);
   }
 
   // 7. the reserve info as the bridge emits it

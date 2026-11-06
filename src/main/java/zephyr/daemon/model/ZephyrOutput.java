@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import zephyr.lib.utils.GenUtils;
 
@@ -19,6 +20,7 @@ public class ZephyrOutput {
   private Long index;
   private List<Long> ringOutputIndices;
   private String stealthPublicKey;
+  private String assetType;
   
   public ZephyrOutput() {
     // nothing to build
@@ -30,6 +32,7 @@ public class ZephyrOutput {
     this.index = output.index;
     if (output.ringOutputIndices != null) this.ringOutputIndices = new ArrayList<Long>(output.ringOutputIndices);
     this.stealthPublicKey = output.stealthPublicKey;
+    this.assetType = output.assetType;
   }
   
   public ZephyrOutput copy() {
@@ -91,6 +94,30 @@ public class ZephyrOutput {
     return this;
   }
   
+  /**
+   * Returns the asset of this output.
+   * 
+   * The core does not serialize the asset of an output; the wallet listener callbacks set it.
+   * 
+   * @return the asset name (see zephyr.wallet.model.ZephyrAssets), null if not known
+   */
+  @JsonProperty("asset_type")
+  public String getAssetType() {
+    return assetType;
+  }
+  
+  /**
+   * Sets the asset of this output.
+   * 
+   * @param assetType is the asset name
+   * @return this output for chaining
+   */
+  @JsonProperty("asset_type")
+  public ZephyrOutput setAssetType(String assetType) {
+    this.assetType = assetType;
+    return this;
+  }
+  
   @Override
   public String toString() {
     return toString(0);
@@ -109,6 +136,7 @@ public class ZephyrOutput {
       else if (output.getKeyImage() != null) this.getKeyImage().merge(output.getKeyImage());
       this.setAmount(GenUtils.reconcile(this.getAmount(), output.getAmount()));
       this.setIndex(GenUtils.reconcile(this.getIndex(), output.getIndex()));
+      this.setAssetType(GenUtils.reconcile(this.getAssetType(), output.getAssetType()));
     }
 
     return this;
@@ -124,6 +152,7 @@ public class ZephyrOutput {
     sb.append(GenUtils.kvLine("Index", getIndex(), indent));
     sb.append(GenUtils.kvLine("Ring output indices", getRingOutputIndices(), indent));
     sb.append(GenUtils.kvLine("Stealth public key", getStealthPublicKey(), indent));
+    sb.append(GenUtils.kvLine("Asset type", getAssetType(), indent));
     String str = sb.toString();
     return str.isEmpty() ? str : str.substring(0, str.length() - 1);  // strip newline
   }
@@ -133,6 +162,7 @@ public class ZephyrOutput {
     final int prime = 31;
     int result = 1;
     result = prime * result + ((amount == null) ? 0 : amount.hashCode());
+    result = prime * result + ((assetType == null) ? 0 : assetType.hashCode());
     result = prime * result + ((index == null) ? 0 : index.hashCode());
     result = prime * result + ((keyImage == null) ? 0 : keyImage.hashCode());
     result = prime * result + ((ringOutputIndices == null) ? 0 : ringOutputIndices.hashCode());
@@ -149,6 +179,9 @@ public class ZephyrOutput {
     if (amount == null) {
       if (other.amount != null) return false;
     } else if (!amount.equals(other.amount)) return false;
+    if (assetType == null) {
+      if (other.assetType != null) return false;
+    } else if (!assetType.equals(other.assetType)) return false;
     if (index == null) {
       if (other.index != null) return false;
     } else if (!index.equals(other.index)) return false;

@@ -19,6 +19,7 @@ public abstract class ZephyrTransfer {
   private ZephyrTxWallet tx;
   private BigInteger amount;
   private Integer accountIndex;
+  private String assetType;
   
   public ZephyrTransfer() {
     // nothing to initialize
@@ -27,6 +28,7 @@ public abstract class ZephyrTransfer {
   public ZephyrTransfer(final ZephyrTransfer transfer) {
     this.amount = transfer.amount;
     this.accountIndex = transfer.accountIndex;
+    this.assetType = transfer.assetType;
     validate();
   }
   
@@ -70,6 +72,28 @@ public abstract class ZephyrTransfer {
   }
   
   /**
+   * Returns the asset of this transfer as the core reports it.
+   * 
+   * @return the asset name (see {@link ZephyrAssets}; V1 names pass through unchanged), null if not reported
+   */
+  @JsonProperty("asset_type")
+  public String getAssetType() {
+    return assetType;
+  }
+  
+  /**
+   * Sets the asset of this transfer.
+   * 
+   * @param assetType is the asset name (see {@link ZephyrAssets})
+   * @return this transfer for chaining
+   */
+  @JsonProperty("asset_type")
+  public ZephyrTransfer setAssetType(String assetType) {
+    this.assetType = assetType;
+    return this;
+  }
+  
+  /**
    * Updates this transfer by merging the latest information from the given
    * transfer.
    * 
@@ -91,6 +115,7 @@ public abstract class ZephyrTransfer {
     
     // otherwise merge transfer fields
     this.setAccountIndex(GenUtils.reconcile(this.getAccountIndex(), transfer.getAccountIndex()));
+    this.setAssetType(GenUtils.reconcile(this.getAssetType(), transfer.getAssetType()));
     
     // TODO zephyr: failed tx in pool (after testUpdateLockedDifferentAccounts()) causes non-originating saved wallets to return duplicate incoming transfers but one has amount of 0
     if (this.getAmount() != null && transfer.getAmount() != null && !this.getAmount().equals(transfer.getAmount()) && (BigInteger.valueOf(0).equals(this.getAmount()) || BigInteger.valueOf(0).equals(transfer.getAmount()))) {
@@ -111,6 +136,7 @@ public abstract class ZephyrTransfer {
     sb.append(GenUtils.kvLine("Is incoming", this.isIncoming(), indent));
     sb.append(GenUtils.kvLine("Amount", this.getAmount() != null ? this.getAmount().toString() : null, indent));
     sb.append(GenUtils.kvLine("Account index", this.getAccountIndex(), indent));
+    sb.append(GenUtils.kvLine("Asset type", this.getAssetType(), indent));
     String str = sb.toString();
     return str.isEmpty() ? str :  str.substring(0, str.length() - 1);	  // strip last newline
   }
@@ -121,6 +147,7 @@ public abstract class ZephyrTransfer {
     int result = 1;
     result = prime * result + ((accountIndex == null) ? 0 : accountIndex.hashCode());
     result = prime * result + ((amount == null) ? 0 : amount.hashCode());
+    result = prime * result + ((assetType == null) ? 0 : assetType.hashCode());
     return result;
   }
 
@@ -136,6 +163,9 @@ public abstract class ZephyrTransfer {
     if (amount == null) {
       if (other.amount != null) return false;
     } else if (!amount.equals(other.amount)) return false;
+    if (assetType == null) {
+      if (other.assetType != null) return false;
+    } else if (!assetType.equals(other.assetType)) return false;
     return true;
   }
   

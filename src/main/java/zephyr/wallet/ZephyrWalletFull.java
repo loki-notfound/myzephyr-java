@@ -1622,11 +1622,12 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       for (ZephyrWalletListenerI listener : getListeners()) listener.onBalancesChanged(new BigInteger(newBalanceStr), new BigInteger(newUnlockedBalanceStr));
     }
     
-    public void onOutputReceived(long height, String txHash, String amountStr, String assetType, int accountIdx, int subaddressIdx, int version, long unlockHeight, boolean isLocked) { // assetType: temporary until R4, which adds assetType to the output model
+    public void onOutputReceived(long height, String txHash, String amountStr, String assetType, int accountIdx, int subaddressIdx, int version, long unlockHeight, boolean isLocked) {
       
       // build output to announce
       ZephyrOutputWallet output = new ZephyrOutputWallet();
       output.setAmount(new BigInteger(amountStr));
+      output.setAssetType(assetType);
       output.setAccountIndex(accountIdx);
       output.setSubaddressIndex(subaddressIdx);
       ZephyrTxWallet tx = new ZephyrTxWallet();
@@ -1653,11 +1654,12 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       for (ZephyrWalletListenerI listener : getListeners()) listener.onOutputReceived((ZephyrOutputWallet) tx.getOutputs().get(0));
     }
     
-    public void onOutputSpent(long height, String txHash, String amountStr, String assetType, String accountIdxStr, String subaddressIdxStr, int version, long unlockHeight, boolean isLocked) { // assetType: temporary until R4, which adds assetType to the output model
+    public void onOutputSpent(long height, String txHash, String amountStr, String assetType, String accountIdxStr, String subaddressIdxStr, int version, long unlockHeight, boolean isLocked) {
       
       // build spent output
       ZephyrOutputWallet output = new ZephyrOutputWallet();
       output.setAmount(new BigInteger(amountStr));
+      output.setAssetType(assetType);
       if (accountIdxStr.length() > 0) output.setAccountIndex(Integer.parseInt(accountIdxStr));
       if (subaddressIdxStr.length() > 0) output.setSubaddressIndex(Integer.parseInt(subaddressIdxStr));
       ZephyrTxWallet tx = new ZephyrTxWallet();
