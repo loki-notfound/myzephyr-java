@@ -1378,7 +1378,7 @@ public class TestZephyrWalletFull extends TestZephyrWalletCommon {
     }
     
     @Override
-    public void onBalancesChanged(BigInteger newBalance, BigInteger newUnlockedBalance) {
+    public void onBalancesChanged(BigInteger newBalance, BigInteger newUnlockedBalance, String assetType) {
       if (this.prevBalance != null) assertTrue(!newBalance.equals(this.prevBalance) || !newUnlockedBalance.equals(this.prevUnlockedBalance));
       this.prevBalance = newBalance;
       this.prevUnlockedBalance = newUnlockedBalance;

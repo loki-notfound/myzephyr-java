@@ -2475,7 +2475,7 @@ public class ZephyrWalletRpc extends ZephyrWalletDefault {
       BigInteger[] balances = getBalances(null, null);
       if (!balances[0].equals(prevBalances[0]) || !balances[1].equals(prevBalances[1])) {
         prevBalances = balances;
-        for (ZephyrWalletListenerI listener : wallet.getListeners()) listener.onBalancesChanged(balances[0], balances[1]);
+        for (ZephyrWalletListenerI listener : wallet.getListeners()) listener.onBalancesChanged(balances[0], balances[1], ZephyrAssets.ZPH); // temporary until R7
         return true;
       }
       return false;
@@ -2659,7 +2659,7 @@ public class ZephyrWalletRpc extends ZephyrWalletDefault {
       if (!balance.equals(prevBalance) || !unlockedBalance.equals(prevUnlockedBalance)) {
         prevBalance =  balance;
         prevUnlockedBalance = unlockedBalance;
-        for (ZephyrWalletListenerI listener : getListeners()) listener.onBalancesChanged(balance, unlockedBalance);
+        for (ZephyrWalletListenerI listener : getListeners()) listener.onBalancesChanged(balance, unlockedBalance, ZephyrAssets.ZPH); // temporary until R7
         return true;
       }
       return false;

@@ -1618,8 +1618,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     }
     
     public void onBalancesChanged(String newBalanceStr, String newUnlockedBalanceStr, String assetType) {
-      if (!"ZPH".equals(assetType)) return; // temporary until R5, which gives the listener interface the asset
-      for (ZephyrWalletListenerI listener : getListeners()) listener.onBalancesChanged(new BigInteger(newBalanceStr), new BigInteger(newUnlockedBalanceStr));
+      for (ZephyrWalletListenerI listener : getListeners()) listener.onBalancesChanged(new BigInteger(newBalanceStr), new BigInteger(newUnlockedBalanceStr), assetType);
     }
     
     public void onOutputReceived(long height, String txHash, String amountStr, String assetType, int accountIdx, int subaddressIdx, int version, long unlockHeight, boolean isLocked) {

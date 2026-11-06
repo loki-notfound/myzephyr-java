@@ -5951,7 +5951,7 @@ public abstract class TestZephyrWalletCommon {
     }
     
     @Override
-    public void onBalancesChanged(BigInteger newBalance, BigInteger newUnlockedBalance) {
+    public void onBalancesChanged(BigInteger newBalance, BigInteger newUnlockedBalance, String assetType) {
       assertTrue(listening);
       if (!balanceNotifications.isEmpty()) {
         Pair<BigInteger, BigInteger> lastNotification = balanceNotifications.get(balanceNotifications.size() - 1);

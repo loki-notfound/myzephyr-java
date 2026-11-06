@@ -14,7 +14,11 @@ public class ZephyrWalletListener implements ZephyrWalletListenerI {
   public void onNewBlock(long height) { }
   
   @Override
-  public void onBalancesChanged(BigInteger newBalance, BigInteger newUnlockedBalance) { }
+  public void onBalancesChanged(BigInteger newBalance, BigInteger newUnlockedBalance, String assetType) { }
+  
+  /** Not called by zephyr-java: balances change per asset. Kept final so that a listener ported from monero-java fails to compile here instead of never being notified. */
+  @Deprecated
+  public final void onBalancesChanged(BigInteger newBalance, BigInteger newUnlockedBalance) { }
 
   @Override
   public void onOutputReceived(ZephyrOutputWallet output) { }

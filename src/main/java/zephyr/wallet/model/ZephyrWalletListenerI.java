@@ -26,12 +26,13 @@ public interface ZephyrWalletListenerI {
   public void onNewBlock(long height);
 
   /**
-   * Invoked when the wallet's balances change.
+   * Invoked when the wallet's balances change, once per asset whose balance changed.
    * 
-   * @param newBalance - new wallet balance
-   * @param newUnlockedBalance - new unlocked wallet balance
+   * @param newBalance - new wallet balance of the asset in atomic units
+   * @param newUnlockedBalance - new unlocked wallet balance of the asset in atomic units
+   * @param assetType - the asset whose balance changed (an open string, see ZephyrAssets)
    */
-  public void onBalancesChanged(BigInteger newBalance, BigInteger newUnlockedBalance);
+  public void onBalancesChanged(BigInteger newBalance, BigInteger newUnlockedBalance, String assetType);
   
   /**
    * Invoked 3 times per received output: once when unconfirmed, once when confirmed, and
