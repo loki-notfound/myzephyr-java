@@ -12,9 +12,11 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import zephyr.common.ZephyrRpcConnection;
 import zephyr.lib.utils.JsonUtils;
+import zephyr.wallet.model.ZephyrAccount;
 import zephyr.wallet.model.ZephyrAssets;
 import zephyr.wallet.model.ZephyrBalance;
 import zephyr.wallet.model.ZephyrReserveInfo;
+import zephyr.wallet.model.ZephyrSubaddress;
 
 /**
  * Tests the Zephyr model classes against the exact JSON shapes of the core and the native bridge.
@@ -37,6 +39,49 @@ public class TestZephyrModel {
     assertNotSame(balance, copy);
     assertEquals(balance, copy);
     assertEquals(balance.hashCode(), copy.hashCode());
+  }
+
+  // 2. an account as the core emits it, with balance objects on the account and its subaddresses
+  @Test
+  public void testAccountJson() {
+    String json = "{"
+        + "\"index\":0,"
+        + "\"balance\":{\"ZPH\":3000000000000,\"ZSD\":500000000000},"
+        + "\"unlockedBalance\":{\"ZPH\":2000000000000,\"ZSD\":500000000000},"
+        + "\"primaryAddress\":\"ZEPHYR_PRIMARY\","
+        + "\"tag\":\"main\","
+        + "\"subaddresses\":["
+        + "{\"accountIndex\":0,\"index\":0,\"numUnspentOutputs\":2,\"numBlocksToUnlock\":0,"
+        + "\"balance\":{\"ZPH\":1000000000000,\"ZSD\":500000000000},\"unlockedBalance\":{\"ZPH\":1000000000000,\"ZSD\":500000000000},"
+        + "\"address\":\"ZEPHYR_PRIMARY\",\"label\":\"Primary account\",\"isUsed\":true},"
+        + "{\"accountIndex\":0,\"index\":1,\"numUnspentOutputs\":1,\"numBlocksToUnlock\":7,"
+        + "\"balance\":{\"ZPH\":2000000000000},\"unlockedBalance\":{\"ZPH\":1000000000000},"
+        + "\"address\":\"ZEPHYR_SUB1\",\"label\":\"\",\"isUsed\":true}"
+        + "]}";
+    ZephyrAccount account = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, json, ZephyrAccount.class);
+    assertEquals(Integer.valueOf(0), account.getIndex());
+    assertEquals("ZEPHYR_PRIMARY", account.getPrimaryAddress());
+    assertEquals(new BigInteger("3000000000000"), account.getBalance().get(ZephyrAssets.ZPH));
+    assertEquals(new BigInteger("500000000000"), account.getBalance().get(ZephyrAssets.ZSD));
+    assertEquals(new BigInteger("2000000000000"), account.getUnlockedBalance().get(ZephyrAssets.ZPH));
+    assertEquals(new BigInteger("500000000000"), account.getUnlockedBalance().get(ZephyrAssets.ZSD));
+    assertEquals(BigInteger.ZERO, account.getBalance().get(ZephyrAssets.ZRS));
+    assertEquals(2, account.getSubaddresses().size());
+    ZephyrSubaddress sub0 = account.getSubaddresses().get(0);
+    ZephyrSubaddress sub1 = account.getSubaddresses().get(1);
+    assertEquals(new BigInteger("1000000000000"), sub0.getBalance().get(ZephyrAssets.ZPH));
+    assertEquals(new BigInteger("500000000000"), sub0.getBalance().get(ZephyrAssets.ZSD));
+    assertEquals(new BigInteger("500000000000"), sub0.getUnlockedBalance().get(ZephyrAssets.ZSD));
+    assertEquals(Integer.valueOf(1), sub1.getIndex());
+    assertEquals(Integer.valueOf(0), sub1.getAccountIndex());
+    assertEquals(new BigInteger("2000000000000"), sub1.getBalance().get(ZephyrAssets.ZPH));
+    assertEquals(new BigInteger("1000000000000"), sub1.getUnlockedBalance().get(ZephyrAssets.ZPH));
+    assertEquals(BigInteger.ZERO, sub1.getBalance().get(ZephyrAssets.ZSD));
+    assertEquals(Long.valueOf(7), sub1.getNumBlocksToUnlock());
+
+    // round trip through the mapper
+    String json2 = JsonUtils.serialize(ZephyrRpcConnection.MAPPER, account);
+    assertEquals(account, JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, json2, ZephyrAccount.class));
   }
 
   // 3. the per-account bridge shape, keyed by subaddress index

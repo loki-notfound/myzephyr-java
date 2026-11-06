@@ -1,6 +1,5 @@
 package zephyr.wallet.model;
 
-import java.math.BigInteger;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -15,8 +14,8 @@ public class ZephyrSubaddress {
   private Integer index;
   private String address;
   private String label;
-  private BigInteger balance;
-  private BigInteger unlockedBalance;
+  private ZephyrBalance balance;
+  private ZephyrBalance unlockedBalance;
   private Long numUnspentOutputs;
   private Boolean isUsed;
   private Long numBlocksToUnlock;
@@ -70,20 +69,20 @@ public class ZephyrSubaddress {
     return this;
   }
   
-  public BigInteger getBalance() {
+  public ZephyrBalance getBalance() {
     return balance;
   }
   
-  public ZephyrSubaddress setBalance(BigInteger balance) {
+  public ZephyrSubaddress setBalance(ZephyrBalance balance) {
     this.balance = balance;
     return this;
   }
   
-  public BigInteger getUnlockedBalance() {
+  public ZephyrBalance getUnlockedBalance() {
     return unlockedBalance;
   }
   
-  public ZephyrSubaddress setUnlockedBalance(BigInteger unlockedBalance) {
+  public ZephyrSubaddress setUnlockedBalance(ZephyrBalance unlockedBalance) {
     this.unlockedBalance = unlockedBalance;
     return this;
   }
@@ -126,8 +125,14 @@ public class ZephyrSubaddress {
     sb.append(GenUtils.kvLine("Subaddress index", this.getIndex(), indent));
     sb.append(GenUtils.kvLine("Address", this.getAddress(), indent));
     sb.append(GenUtils.kvLine("Label", this.getLabel(), indent));
-    sb.append(GenUtils.kvLine("Balance", this.getBalance(), indent));
-    sb.append(GenUtils.kvLine("Unlocked balance", this.getUnlockedBalance(), indent));
+    if (this.getBalance() != null) {
+      sb.append(GenUtils.kvLine("Balance", "", indent));
+      if (!this.getBalance().isEmpty()) sb.append(this.getBalance().toString(indent + 1) + "\n");
+    }
+    if (this.getUnlockedBalance() != null) {
+      sb.append(GenUtils.kvLine("Unlocked balance", "", indent));
+      if (!this.getUnlockedBalance().isEmpty()) sb.append(this.getUnlockedBalance().toString(indent + 1) + "\n");
+    }
     sb.append(GenUtils.kvLine("Num unspent outputs", this.getNumUnspentOutputs(), indent));
     sb.append(GenUtils.kvLine("Is used", this.isUsed(), indent));
     sb.append(GenUtils.kvLine("Num blocks to unlock", this.getNumBlocksToUnlock(), indent));

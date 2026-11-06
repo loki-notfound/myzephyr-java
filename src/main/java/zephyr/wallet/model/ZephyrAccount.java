@@ -1,6 +1,5 @@
 package zephyr.wallet.model;
 
-import java.math.BigInteger;
 import java.util.List;
 
 import zephyr.lib.utils.GenUtils;
@@ -12,8 +11,8 @@ public class ZephyrAccount {
 
   private Integer index;
   private String primaryAddress;
-  private BigInteger balance;
-  private BigInteger unlockedBalance;
+  private ZephyrBalance balance;
+  private ZephyrBalance unlockedBalance;
   private String tag;
   private List<ZephyrSubaddress> subaddresses;
   
@@ -21,7 +20,7 @@ public class ZephyrAccount {
     super();
   }
   
-  public ZephyrAccount(int index, String primaryAddress, BigInteger balance, BigInteger unlockedBalance, List<ZephyrSubaddress> subaddresses) {
+  public ZephyrAccount(int index, String primaryAddress, ZephyrBalance balance, ZephyrBalance unlockedBalance, List<ZephyrSubaddress> subaddresses) {
     super();
     this.index = index;
     this.primaryAddress = primaryAddress;
@@ -46,19 +45,19 @@ public class ZephyrAccount {
     this.primaryAddress = primaryAddress;
   }
   
-  public BigInteger getBalance() {
+  public ZephyrBalance getBalance() {
     return balance;
   }
   
-  public void setBalance(BigInteger balance) {
+  public void setBalance(ZephyrBalance balance) {
     this.balance = balance;
   }
   
-  public BigInteger getUnlockedBalance() {
+  public ZephyrBalance getUnlockedBalance() {
     return unlockedBalance;
   }
   
-  public void setUnlockedBalance(BigInteger unlockedBalance) {
+  public void setUnlockedBalance(ZephyrBalance unlockedBalance) {
     this.unlockedBalance = unlockedBalance;
   }
   
@@ -91,8 +90,14 @@ public class ZephyrAccount {
     StringBuilder sb = new StringBuilder();
     sb.append(GenUtils.kvLine("Index", this.getIndex(), indent));
     sb.append(GenUtils.kvLine("Primary address", this.getPrimaryAddress(), indent));
-    sb.append(GenUtils.kvLine("Balance", this.getBalance(), indent));
-    sb.append(GenUtils.kvLine("Unlocked balance", this.getUnlockedBalance(), indent));
+    if (this.getBalance() != null) {
+      sb.append(GenUtils.kvLine("Balance", "", indent));
+      if (!this.getBalance().isEmpty()) sb.append(this.getBalance().toString(indent + 1) + "\n");
+    }
+    if (this.getUnlockedBalance() != null) {
+      sb.append(GenUtils.kvLine("Unlocked balance", "", indent));
+      if (!this.getUnlockedBalance().isEmpty()) sb.append(this.getUnlockedBalance().toString(indent + 1) + "\n");
+    }
     sb.append(GenUtils.kvLine("Tag", this.getTag(), indent));
     if (this.getSubaddresses() != null) {
       sb.append(GenUtils.kvLine("Subaddresses", "", indent));
