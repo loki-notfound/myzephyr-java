@@ -252,7 +252,7 @@ struct wallet_jni_listener : public monero_wallet_listener {
     detachJVM(env, envStat);
   }
 
-  void on_balances_changed(uint64_t new_balance, uint64_t new_unlocked_balance) override {
+  void on_balances_changed(uint64_t new_balance, uint64_t new_unlocked_balance, const std::string& asset_type) override {
     std::lock_guard<std::mutex> lock(_listenerMutex);
     if (jlistener == nullptr) return;
     JNIEnv *env;
@@ -262,8 +262,9 @@ struct wallet_jni_listener : public monero_wallet_listener {
     // invoke Java listener's onBalancesChanged()
     jstring jbalance_str = env->NewStringUTF(to_string(new_balance).c_str());
     jstring junlocked_balance_str = env->NewStringUTF(to_string(new_unlocked_balance).c_str());
-    jmethodID listenerClass_onBalanceChanged = env->GetMethodID(class_WalletListener, "onBalancesChanged", "(Ljava/lang/String;Ljava/lang/String;)V");
-    env->CallVoidMethod(jlistener, listenerClass_onBalanceChanged, jbalance_str, junlocked_balance_str);
+    jstring jasset_type = env->NewStringUTF(asset_type.c_str());
+    jmethodID listenerClass_onBalanceChanged = env->GetMethodID(class_WalletListener, "onBalancesChanged", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
+    env->CallVoidMethod(jlistener, listenerClass_onBalanceChanged, jbalance_str, junlocked_balance_str, jasset_type);
 
     // check for and rethrow Java exception
     jthrowable jexception = env->ExceptionOccurred();
@@ -283,12 +284,13 @@ struct wallet_jni_listener : public monero_wallet_listener {
     boost::optional<uint64_t> height = output.m_tx->get_height();
     jstring jtx_hash = env->NewStringUTF(output.m_tx->m_hash.get().c_str());
     jstring jamount_str = env->NewStringUTF(to_string(*output.m_amount).c_str());
+    jstring jasset_type = env->NewStringUTF(output.m_asset_type.c_str());
     int version = output.m_tx->m_version == boost::none ? 2 : *output.m_tx->m_version; // TODO: version not present in unlocked output notification, defaulting to 2
     bool is_locked = std::static_pointer_cast<monero_tx_wallet>(output.m_tx)->m_is_locked.get();
 
     // invoke Java listener's onOutputReceived()
-    jmethodID listenerClass_onOutputReceived = env->GetMethodID(class_WalletListener, "onOutputReceived", "(JLjava/lang/String;Ljava/lang/String;IIIJZ)V");
-    env->CallVoidMethod(jlistener, listenerClass_onOutputReceived, height == boost::none ? 0 : *height, jtx_hash, jamount_str, *output.m_account_index, *output.m_subaddress_index, version, *output.m_tx->m_unlock_height, is_locked);
+    jmethodID listenerClass_onOutputReceived = env->GetMethodID(class_WalletListener, "onOutputReceived", "(JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;IIIJZ)V");
+    env->CallVoidMethod(jlistener, listenerClass_onOutputReceived, height == boost::none ? 0 : *height, jtx_hash, jamount_str, jasset_type, *output.m_account_index, *output.m_subaddress_index, version, *output.m_tx->m_unlock_height, is_locked);
 
     // check for and rethrow Java exception
     jthrowable jexception = env->ExceptionOccurred();
@@ -308,14 +310,15 @@ struct wallet_jni_listener : public monero_wallet_listener {
     boost::optional<uint64_t> height = output.m_tx->get_height();
     jstring jtx_hash = env->NewStringUTF(output.m_tx->m_hash.get().c_str());
     jstring jamount_str = env->NewStringUTF(to_string(*output.m_amount).c_str());
+    jstring jasset_type = env->NewStringUTF(output.m_asset_type.c_str());
     jstring jaccount_idx_str = env->NewStringUTF(output.m_account_index == boost::none ? "" : to_string(*output.m_account_index).c_str()); // TODO: subaddress indices not known for some inputs (e.g. after tx creation)
     jstring jsubaddress_idx_str = env->NewStringUTF(output.m_subaddress_index == boost::none ? "" : to_string(*output.m_subaddress_index).c_str());
     int version = output.m_tx->m_version == boost::none ? 2 : *output.m_tx->m_version; // TODO: version not present in unlocked output notification, defaulting to 2
     bool is_locked = std::static_pointer_cast<monero_tx_wallet>(output.m_tx)->m_is_locked.get();
 
     // invoke Java listener's onOutputSpent()
-    jmethodID listenerClass_onOutputSpent = env->GetMethodID(class_WalletListener, "onOutputSpent", "(JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IJZ)V");
-    env->CallVoidMethod(jlistener, listenerClass_onOutputSpent, height == boost::none ? 0 : *height, jtx_hash, jamount_str, jaccount_idx_str, jsubaddress_idx_str, version, *output.m_tx->m_unlock_height, is_locked);
+    jmethodID listenerClass_onOutputSpent = env->GetMethodID(class_WalletListener, "onOutputSpent", "(JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IJZ)V");
+    env->CallVoidMethod(jlistener, listenerClass_onOutputSpent, height == boost::none ? 0 : *height, jtx_hash, jamount_str, jasset_type, jaccount_idx_str, jsubaddress_idx_str, version, *output.m_tx->m_unlock_height, is_locked);
 
     // check for and rethrow Java exception
     jthrowable jexception = env->ExceptionOccurred();

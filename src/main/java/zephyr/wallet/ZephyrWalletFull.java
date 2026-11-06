@@ -1613,11 +1613,12 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       for (ZephyrWalletListenerI listener : getListeners()) listener.onNewBlock(height);
     }
     
-    public void onBalancesChanged(String newBalanceStr, String newUnlockedBalanceStr) {
+    public void onBalancesChanged(String newBalanceStr, String newUnlockedBalanceStr, String assetType) {
+      if (!"ZPH".equals(assetType)) return; // temporary until R5, which gives the listener interface the asset
       for (ZephyrWalletListenerI listener : getListeners()) listener.onBalancesChanged(new BigInteger(newBalanceStr), new BigInteger(newUnlockedBalanceStr));
     }
     
-    public void onOutputReceived(long height, String txHash, String amountStr, int accountIdx, int subaddressIdx, int version, long unlockHeight, boolean isLocked) {
+    public void onOutputReceived(long height, String txHash, String amountStr, String assetType, int accountIdx, int subaddressIdx, int version, long unlockHeight, boolean isLocked) { // assetType: temporary until R4, which adds assetType to the output model
       
       // build output to announce
       ZephyrOutputWallet output = new ZephyrOutputWallet();
@@ -1648,7 +1649,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       for (ZephyrWalletListenerI listener : getListeners()) listener.onOutputReceived((ZephyrOutputWallet) tx.getOutputs().get(0));
     }
     
-    public void onOutputSpent(long height, String txHash, String amountStr, String accountIdxStr, String subaddressIdxStr, int version, long unlockHeight, boolean isLocked) {
+    public void onOutputSpent(long height, String txHash, String amountStr, String assetType, String accountIdxStr, String subaddressIdxStr, int version, long unlockHeight, boolean isLocked) { // assetType: temporary until R4, which adds assetType to the output model
       
       // build spent output
       ZephyrOutputWallet output = new ZephyrOutputWallet();
