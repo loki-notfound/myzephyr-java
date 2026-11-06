@@ -916,42 +916,98 @@ JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_rescanBlockchainJni(J
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getBalanceWalletJni(JNIEnv *env, jobject instance) {
   MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getBalanceWalletJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
-  uint64_t balance = wallet->get_balance();
-  return env->NewStringUTF(boost::lexical_cast<std::string>(balance).c_str());
+
+  // serialize the balance per asset as the document's root object {asset: amount}
+  std::map<std::string, uint64_t> balances = wallet->get_balance();
+  rapidjson::Document doc;
+  doc.CopyFrom(monero_utils::to_rapidjson_val(doc.GetAllocator(), balances), doc.GetAllocator());
+  string balances_json = monero_utils::serialize(doc);
+  return env->NewStringUTF(balances_json.c_str());
 }
 
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getBalanceAccountJni(JNIEnv *env, jobject instance, jint account_idx) {
   MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getBalanceAccountJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
-  uint64_t balance = wallet->get_balance(account_idx);
+
+  // serialize the balances of the account's subaddresses keyed by subaddress index {"0": {asset: amount}, ...}
+  std::map<uint32_t, std::map<std::string, uint64_t>> balances = wallet->get_balance(account_idx);
+  rapidjson::Document doc;
+  doc.SetObject();
+  for (const auto& subaddress_balances : balances) {
+    rapidjson::Value key(std::to_string(subaddress_balances.first).c_str(), doc.GetAllocator());
+    rapidjson::Value value = monero_utils::to_rapidjson_val(doc.GetAllocator(), subaddress_balances.second);
+    doc.AddMember(key, value, doc.GetAllocator());
+  }
+  string balances_json = monero_utils::serialize(doc);
+  return env->NewStringUTF(balances_json.c_str());
+}
+
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getBalanceAssetAccountJni(JNIEnv *env, jobject instance, jstring jasset_type, jint account_idx) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getBalanceAssetAccountJni");
+  monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
+  const char* _asset_type = jasset_type ? env->GetStringUTFChars(jasset_type, NULL) : nullptr;
+  string asset_type = string(_asset_type ? _asset_type : "");
+  env->ReleaseStringUTFChars(jasset_type, _asset_type);
+  uint64_t balance = wallet->get_balance(asset_type, account_idx);
   return env->NewStringUTF(boost::lexical_cast<std::string>(balance).c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getBalanceSubaddressJni(JNIEnv *env, jobject instance, jint account_idx, jint subaddress_idx) {
-  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getBalanceSubaddressJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getBalanceAssetSubaddressJni(JNIEnv *env, jobject instance, jstring jasset_type, jint account_idx, jint subaddress_idx) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getBalanceAssetSubaddressJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
-  uint64_t balance = wallet->get_balance(account_idx, subaddress_idx);
+  const char* _asset_type = jasset_type ? env->GetStringUTFChars(jasset_type, NULL) : nullptr;
+  string asset_type = string(_asset_type ? _asset_type : "");
+  env->ReleaseStringUTFChars(jasset_type, _asset_type);
+  uint64_t balance = wallet->get_balance(asset_type, account_idx, subaddress_idx);
   return env->NewStringUTF(boost::lexical_cast<std::string>(balance).c_str());
 }
 
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getUnlockedBalanceWalletJni(JNIEnv *env, jobject instance) {
   MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getUnlockedBalanceWalletJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
-  uint64_t balance = wallet->get_unlocked_balance();
-  return env->NewStringUTF(boost::lexical_cast<std::string>(balance).c_str());
+
+  // serialize the balance per asset as the document's root object {asset: amount}
+  std::map<std::string, uint64_t> balances = wallet->get_unlocked_balance();
+  rapidjson::Document doc;
+  doc.CopyFrom(monero_utils::to_rapidjson_val(doc.GetAllocator(), balances), doc.GetAllocator());
+  string balances_json = monero_utils::serialize(doc);
+  return env->NewStringUTF(balances_json.c_str());
 }
 
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getUnlockedBalanceAccountJni(JNIEnv *env, jobject instance, jint account_idx) {
   MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getUnlockedBalanceAccountJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
-  uint64_t balance = wallet->get_unlocked_balance(account_idx);
+
+  // serialize the balances of the account's subaddresses keyed by subaddress index {"0": {asset: amount}, ...}
+  std::map<uint32_t, std::map<std::string, uint64_t>> balances = wallet->get_unlocked_balance(account_idx);
+  rapidjson::Document doc;
+  doc.SetObject();
+  for (const auto& subaddress_balances : balances) {
+    rapidjson::Value key(std::to_string(subaddress_balances.first).c_str(), doc.GetAllocator());
+    rapidjson::Value value = monero_utils::to_rapidjson_val(doc.GetAllocator(), subaddress_balances.second);
+    doc.AddMember(key, value, doc.GetAllocator());
+  }
+  string balances_json = monero_utils::serialize(doc);
+  return env->NewStringUTF(balances_json.c_str());
+}
+
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getUnlockedBalanceAssetAccountJni(JNIEnv *env, jobject instance, jstring jasset_type, jint account_idx) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getUnlockedBalanceAssetAccountJni");
+  monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
+  const char* _asset_type = jasset_type ? env->GetStringUTFChars(jasset_type, NULL) : nullptr;
+  string asset_type = string(_asset_type ? _asset_type : "");
+  env->ReleaseStringUTFChars(jasset_type, _asset_type);
+  uint64_t balance = wallet->get_unlocked_balance(asset_type, account_idx);
   return env->NewStringUTF(boost::lexical_cast<std::string>(balance).c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getUnlockedBalanceSubaddressJni(JNIEnv *env, jobject instance, jint account_idx, jint subaddress_idx) {
-  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getUnlockedBalanceSubaddressJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getUnlockedBalanceAssetSubaddressJni(JNIEnv *env, jobject instance, jstring jasset_type, jint account_idx, jint subaddress_idx) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getUnlockedBalanceAssetSubaddressJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
-  uint64_t balance = wallet->get_unlocked_balance(account_idx, subaddress_idx);
+  const char* _asset_type = jasset_type ? env->GetStringUTFChars(jasset_type, NULL) : nullptr;
+  string asset_type = string(_asset_type ? _asset_type : "");
+  env->ReleaseStringUTFChars(jasset_type, _asset_type);
+  uint64_t balance = wallet->get_unlocked_balance(asset_type, account_idx, subaddress_idx);
   return env->NewStringUTF(boost::lexical_cast<std::string>(balance).c_str());
 }
 

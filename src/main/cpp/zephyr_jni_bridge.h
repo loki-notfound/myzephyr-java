@@ -141,13 +141,17 @@ JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getBalanceWalletJn
 
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getBalanceAccountJni(JNIEnv *, jobject, jint);
 
-JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getBalanceSubaddressJni(JNIEnv *, jobject, jint, jint);
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getBalanceAssetAccountJni(JNIEnv *, jobject, jstring, jint);
+
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getBalanceAssetSubaddressJni(JNIEnv *, jobject, jstring, jint, jint);
 
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getUnlockedBalanceWalletJni(JNIEnv *, jobject);
 
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getUnlockedBalanceAccountJni(JNIEnv *, jobject, jint);
 
-JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getUnlockedBalanceSubaddressJni(JNIEnv *, jobject, jint, jint);
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getUnlockedBalanceAssetAccountJni(JNIEnv *, jobject, jstring, jint);
+
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getUnlockedBalanceAssetSubaddressJni(JNIEnv *, jobject, jstring, jint, jint);
 
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getAccountsJni(JNIEnv *, jobject, jboolean, jstring);
 

@@ -734,10 +734,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     try {
       if (accountIdx == null) {
         if (subaddressIdx != null) throw new ZephyrError("Must provide account index with subaddress index");
-        return new BigInteger(getBalanceWalletJni());
+        return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, getBalanceWalletJni(), new TypeReference<Map<String, BigInteger>>(){}).getOrDefault("ZPH", BigInteger.ZERO); // temporary until R5
       } else {
-        if (subaddressIdx == null) return new BigInteger(getBalanceAccountJni(accountIdx));
-        else return new BigInteger(getBalanceSubaddressJni(accountIdx, subaddressIdx));
+        if (subaddressIdx == null) return new BigInteger(getBalanceAssetAccountJni("ZPH", accountIdx)); // temporary until R5
+        else return new BigInteger(getBalanceAssetSubaddressJni("ZPH", accountIdx, subaddressIdx)); // temporary until R5
       }
     } catch (ZephyrError e) {
       throw new ZephyrError(e.getMessage());
@@ -750,10 +750,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     try {
       if (accountIdx == null) {
         if (subaddressIdx != null) throw new ZephyrError("Must provide account index with subaddress index");
-        return new BigInteger(getUnlockedBalanceWalletJni());
+        return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, getUnlockedBalanceWalletJni(), new TypeReference<Map<String, BigInteger>>(){}).getOrDefault("ZPH", BigInteger.ZERO); // temporary until R5
       } else {
-        if (subaddressIdx == null) return new BigInteger(getUnlockedBalanceAccountJni(accountIdx));
-        else return new BigInteger(getUnlockedBalanceSubaddressJni(accountIdx, subaddressIdx));
+        if (subaddressIdx == null) return new BigInteger(getUnlockedBalanceAssetAccountJni("ZPH", accountIdx)); // temporary until R5
+        else return new BigInteger(getUnlockedBalanceAssetSubaddressJni("ZPH", accountIdx, subaddressIdx)); // temporary until R5
       }
     } catch (ZephyrError e) {
       throw new ZephyrError(e.getMessage());
@@ -1461,13 +1461,17 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   
   private native String getBalanceAccountJni(int accountIdx);
   
-  private native String getBalanceSubaddressJni(int accountIdx, int subaddressIdx);
+  private native String getBalanceAssetAccountJni(String assetType, int accountIdx);
+  
+  private native String getBalanceAssetSubaddressJni(String assetType, int accountIdx, int subaddressIdx);
   
   private native String getUnlockedBalanceWalletJni();
   
   private native String getUnlockedBalanceAccountJni(int accountIdx);
   
-  private native String getUnlockedBalanceSubaddressJni(int accountIdx, int subaddressIdx);
+  private native String getUnlockedBalanceAssetAccountJni(String assetType, int accountIdx);
+  
+  private native String getUnlockedBalanceAssetSubaddressJni(String assetType, int accountIdx, int subaddressIdx);
   
   private native String getAccountsJni(boolean includeSubaddresses, String tag);
   
