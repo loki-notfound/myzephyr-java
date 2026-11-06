@@ -4,11 +4,11 @@ import java.math.BigInteger;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import monero.daemon.MoneroDaemon;
-import monero.daemon.model.MoneroMiningStatus;
-import monero.daemon.model.MoneroTx;
-import monero.wallet.MoneroWallet;
-import monero.wallet.model.MoneroTxWallet;
+import zephyr.daemon.ZephyrDaemon;
+import zephyr.daemon.model.ZephyrMiningStatus;
+import zephyr.daemon.model.ZephyrTx;
+import zephyr.wallet.ZephyrWallet;
+import zephyr.wallet.model.ZephyrTxWallet;
 
 /**
  * Tracks wallets which are in sync with the tx pool and therefore whose txs in the pool
@@ -17,14 +17,14 @@ import monero.wallet.model.MoneroTxWallet;
  * This is only necessary because txs relayed outside wallets are not fully incorporated
  * into the wallet state until confirmed.
  * 
- * TODO monero-project: sync txs relayed outside wallet so this class is unecessary
+ * TODO zephyr: sync txs relayed outside wallet so this class is unecessary
  */
 public class WalletTxTracker {
 
-  private Set<MoneroWallet> clearedWallets;
+  private Set<ZephyrWallet> clearedWallets;
   
   public WalletTxTracker() {
-    clearedWallets = new HashSet<MoneroWallet>();
+    clearedWallets = new HashSet<ZephyrWallet>();
   }
   
   public void reset() {
@@ -37,7 +37,7 @@ public class WalletTxTracker {
 //   * 
 //   * @param sendingWallet is the wallet which sent the tx and therefore should not cause txs to be waited on
 //   */
-//  public void resetExcept(MoneroWallet sendingWallet) {
+//  public void resetExcept(ZephyrWallet sendingWallet) {
 //    boolean found = clearedWallets.contains(sendingWallet);
 //    clearedWallets.clear();
 //    if (found) clearedWallets.add(sendingWallet);
@@ -48,14 +48,14 @@ public class WalletTxTracker {
    * 
    * @param wallets have transactions to wait on if in the pool
    */
-  public void waitForWalletTxsToClearPool(MoneroWallet... wallets) {
+  public void waitForWalletTxsToClearPool(ZephyrWallet... wallets) {
     
     // get wallet tx hashes
     Set<String> txHashesWallet = new HashSet<String>();
-    for (MoneroWallet wallet : wallets) {
+    for (ZephyrWallet wallet : wallets) {
       if (!clearedWallets.contains(wallet)) {
         wallet.sync();
-        for (MoneroTxWallet tx : wallet.getTxs()) {
+        for (ZephyrTxWallet tx : wallet.getTxs()) {
           txHashesWallet.add(tx.getHash());
         }
       }
@@ -64,12 +64,12 @@ public class WalletTxTracker {
     // loop until all wallet txs clear from pool
     boolean isFirst = true;
     boolean miningStarted = false;
-    MoneroDaemon daemon = TestUtils.getDaemonRpc();
+    ZephyrDaemon daemon = TestUtils.getDaemonRpc();
     while (true) {
       
       // get hashes of relayed, non-failed txs in the pool
       Set<String> txHashesPool = new HashSet<String>();
-      for (MoneroTx tx : daemon.getTxPool()) {
+      for (ZephyrTx tx : daemon.getTxPool()) {
         if (!tx.isRelayed()) continue;
         else if (tx.isFailed()) daemon.flushTxPool(tx.getHash());  // flush tx if failed
         else txHashesPool.add(tx.getHash());
@@ -85,7 +85,7 @@ public class WalletTxTracker {
       if (isFirst) {
         isFirst = false;
         System.out.println("Waiting for wallet txs to clear from the pool in order to fully sync and avoid double spend attempts (known issue)");
-        MoneroMiningStatus miningStatus = daemon.getMiningStatus();
+        ZephyrMiningStatus miningStatus = daemon.getMiningStatus();
         if (!miningStatus.isActive()) {
           try {
             StartMining.startMining();
@@ -103,13 +103,13 @@ public class WalletTxTracker {
     if (miningStarted) daemon.stopMining();
     
     // sync wallets with the pool
-    for (MoneroWallet wallet : wallets) {
+    for (ZephyrWallet wallet : wallets) {
       wallet.sync();
       clearedWallets.add(wallet);
     }
   }
   
-  public BigInteger waitForUnlockedBalance(MoneroWallet wallet, Integer accountIndex, Integer subaddressIndex, BigInteger minAmount) {
+  public BigInteger waitForUnlockedBalance(ZephyrWallet wallet, Integer accountIndex, Integer subaddressIndex, BigInteger minAmount) {
     if (minAmount == null) minAmount = new BigInteger("0");
     
     // check if wallet has balance
@@ -120,7 +120,7 @@ public class WalletTxTracker {
     if (unlockedBalance.compareTo(minAmount) > 0) return unlockedBalance;
    
     // start mining
-    MoneroDaemon daemon = TestUtils.getDaemonRpc();
+    ZephyrDaemon daemon = TestUtils.getDaemonRpc();
     boolean miningStarted = false;
     if (!daemon.getMiningStatus().isActive()) {
       try {
@@ -129,7 +129,7 @@ public class WalletTxTracker {
       } catch (Exception err) { }
     }
     
-    // wait for unlocked balance // TODO: promote to MoneroWallet interface?
+    // wait for unlocked balance // TODO: promote to ZephyrWallet interface?
     System.out.println("Waiting for unlocked balance");
     while (unlockedBalance.compareTo(minAmount) < 0) {
       unlockedBalance = wallet.getUnlockedBalance(accountIndex, subaddressIndex);

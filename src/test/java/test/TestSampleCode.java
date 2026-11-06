@@ -7,20 +7,20 @@ import java.math.BigInteger;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import monero.common.MoneroConnectionManager;
-import monero.common.MoneroConnectionManagerListener;
-import monero.common.MoneroRpcConnection;
-import monero.daemon.MoneroDaemon;
-import monero.daemon.MoneroDaemonRpc;
-import monero.daemon.model.MoneroNetworkType;
-import monero.daemon.model.MoneroTx;
-import monero.wallet.MoneroWalletFull;
-import monero.wallet.MoneroWalletRpc;
-import monero.wallet.model.MoneroOutputWallet;
-import monero.wallet.model.MoneroTxConfig;
-import monero.wallet.model.MoneroTxWallet;
-import monero.wallet.model.MoneroWalletConfig;
-import monero.wallet.model.MoneroWalletListener;
+import zephyr.common.ZephyrConnectionManager;
+import zephyr.common.ZephyrConnectionManagerListener;
+import zephyr.common.ZephyrRpcConnection;
+import zephyr.daemon.ZephyrDaemon;
+import zephyr.daemon.ZephyrDaemonRpc;
+import zephyr.daemon.model.ZephyrNetworkType;
+import zephyr.daemon.model.ZephyrTx;
+import zephyr.wallet.ZephyrWalletFull;
+import zephyr.wallet.ZephyrWalletRpc;
+import zephyr.wallet.model.ZephyrOutputWallet;
+import zephyr.wallet.model.ZephyrTxConfig;
+import zephyr.wallet.model.ZephyrTxWallet;
+import zephyr.wallet.model.ZephyrWalletConfig;
+import zephyr.wallet.model.ZephyrWalletListener;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import utils.TestUtils;
@@ -39,7 +39,7 @@ public class TestSampleCode {
     TestUtils.WALLET_TX_TRACKER.reset();
     
     // pre-create test wallet
-    MoneroWalletRpc wallet = TestUtils.getWalletRpc();
+    ZephyrWalletRpc wallet = TestUtils.getWalletRpc();
     wallet.close();
 
     // create directory for test wallets if it doesn't exist
@@ -53,22 +53,22 @@ public class TestSampleCode {
   public void testSampleCode() throws InterruptedException {
     
     // connect to daemon
-    MoneroDaemon daemon = new MoneroDaemonRpc("http://localhost:28081", "", "");
+    ZephyrDaemon daemon = new ZephyrDaemonRpc("http://localhost:28081", "", "");
     long height = daemon.getHeight();                       // 1523651
-    List<MoneroTx> txsInPool = daemon.getTxPool();          // get transactions in the pool
+    List<ZephyrTx> txsInPool = daemon.getTxPool();          // get transactions in the pool
     
-    // open wallet on monero-wallet-rpc
-    MoneroWalletRpc walletRpc = new MoneroWalletRpc(TestUtils.WALLET_RPC_URI, TestUtils.WALLET_RPC_USERNAME, TestUtils.WALLET_RPC_PASSWORD); // *** REPLACE WITH CONSTANTS IN README ***
+    // open wallet on zephyr-wallet-rpc
+    ZephyrWalletRpc walletRpc = new ZephyrWalletRpc(TestUtils.WALLET_RPC_URI, TestUtils.WALLET_RPC_USERNAME, TestUtils.WALLET_RPC_PASSWORD); // *** REPLACE WITH CONSTANTS IN README ***
     walletRpc.openWallet("test_wallet_1", "supersecretpassword123");  // *** CHANGE README TO "sample_wallet_rpc" ***
     String primaryAddress = walletRpc.getPrimaryAddress();  // 555zgduFhmKd2o8rPUz...
     BigInteger balance = walletRpc.getBalance();            // 533648366742
-    List<MoneroTxWallet> txs = walletRpc.getTxs();          // get transactions containing transfers to/from the wallet
+    List<ZephyrTxWallet> txs = walletRpc.getTxs();          // get transactions containing transfers to/from the wallet
     
-    // create wallet from mnemonic phrase using JNI bindings to monero-project
-    MoneroWalletFull walletFull = MoneroWalletFull.createWallet(new MoneroWalletConfig()
+    // create wallet from mnemonic phrase using JNI bindings to zephyr
+    ZephyrWalletFull walletFull = ZephyrWalletFull.createWallet(new ZephyrWalletConfig()
             .setPath("./test_wallets/" + UUID.randomUUID().toString())  // *** CHANGE README TO "sample_wallet_full" ***
             .setPassword("supersecretpassword123")
-            .setNetworkType(MoneroNetworkType.TESTNET)
+            .setNetworkType(ZephyrNetworkType.TESTNET)
             .setServerUri("http://localhost:28081")
             .setServerUsername("superuser")
             .setServerPassword("abctesting123")
@@ -76,7 +76,7 @@ public class TestSampleCode {
             .setRestoreHeight(TestUtils.FIRST_RECEIVE_HEIGHT)); // *** REPLACE WITH FIRST RECEIVE HEIGHT IN README ***
     
     // synchronize the wallet and receive progress notifications
-    walletFull.sync(new MoneroWalletListener() {
+    walletFull.sync(new ZephyrWalletListener() {
       @Override
       public void onSyncProgress(long height, long startHeight, long endHeight, double percentDone, String message) {
         // feed a progress bar?
@@ -87,9 +87,9 @@ public class TestSampleCode {
     walletFull.startSyncing(5000l);
     
     // receive notifications when funds are received, confirmed, and unlocked
-    walletFull.addListener(new MoneroWalletListener() {
+    walletFull.addListener(new ZephyrWalletListener() {
       @Override
-      public void onOutputReceived(MoneroOutputWallet output) {
+      public void onOutputReceived(ZephyrOutputWallet output) {
         BigInteger amount = output.getAmount();
         String txHash = output.getTx().getHash();
         Boolean isConfirmed = output.getTx().isConfirmed();
@@ -101,10 +101,10 @@ public class TestSampleCode {
     // send funds from RPC wallet to full wallet
     TestUtils.WALLET_TX_TRACKER.waitForWalletTxsToClearPool(walletRpc);                                     // *** REMOVE FROM README SAMPLE ***
     TestUtils.WALLET_TX_TRACKER.waitForUnlockedBalance(walletRpc, 0, null, new BigInteger("250000000000")); // *** REMOVE FROM README SAMPLE ***
-    MoneroTxWallet createdTx = walletRpc.createTx(new MoneroTxConfig()
+    ZephyrTxWallet createdTx = walletRpc.createTx(new ZephyrTxConfig()
             .setAccountIndex(0)
             .setAddress(walletFull.getAddress(1, 0))
-            .setAmount("250000000000") // send 0.25 XMR (denominated in atomic units)
+            .setAmount("250000000000") // send 0.25 coins (denominated in atomic units)
             .setRelay(false)); // create transaction and relay to the network if true
     BigInteger fee = createdTx.getFee(); // "Are you sure you want to send... ?"
     walletRpc.relayTx(createdTx); // relay the transaction
@@ -123,14 +123,14 @@ public class TestSampleCode {
   public void testConnectionManagerDemo() {
     
     // create connection manager
-    MoneroConnectionManager connectionManager = new MoneroConnectionManager();
+    ZephyrConnectionManager connectionManager = new ZephyrConnectionManager();
     
     // add managed connections with priorities
-    connectionManager.addConnection(new MoneroRpcConnection("http://localhost:28081").setPriority(1)); // use localhost as first priority
-    connectionManager.addConnection(new MoneroRpcConnection("http://example.com")); // default priority is prioritized last
+    connectionManager.addConnection(new ZephyrRpcConnection("http://localhost:28081").setPriority(1)); // use localhost as first priority
+    connectionManager.addConnection(new ZephyrRpcConnection("http://example.com")); // default priority is prioritized last
     
     // set current connection
-    connectionManager.setConnection(new MoneroRpcConnection("http://foo.bar", "admin", "password")); // connection is added if new
+    connectionManager.setConnection(new ZephyrRpcConnection("http://foo.bar", "admin", "password")); // connection is added if new
     
     // check connection status
     connectionManager.checkConnection();
@@ -139,9 +139,9 @@ public class TestSampleCode {
     System.out.println("Connection is authenticated: " + connectionManager.getConnection().isAuthenticated());
     
     // receive notifications of any changes to current connection
-    connectionManager.addListener(new MoneroConnectionManagerListener() {
+    connectionManager.addListener(new ZephyrConnectionManagerListener() {
       @Override
-      public void onConnectionChanged(MoneroRpcConnection connection) {
+      public void onConnectionChanged(ZephyrRpcConnection connection) {
         System.out.println("Connection changed to: " + connection);
       }
     });
@@ -153,13 +153,13 @@ public class TestSampleCode {
     connectionManager.setAutoSwitch(true);
     
     // get best available connection in order of priority then response time
-    MoneroRpcConnection bestConnection = connectionManager.getBestAvailableConnection();
+    ZephyrRpcConnection bestConnection = connectionManager.getBestAvailableConnection();
     
     // check status of all connections
     connectionManager.checkConnections();
     
     // get connections in order of current connection, online status from last check, priority, and name
-    List<MoneroRpcConnection> connections = connectionManager.getConnections();
+    List<ZephyrRpcConnection> connections = connectionManager.getConnections();
     
     // clear connection manager
     connectionManager.clear();

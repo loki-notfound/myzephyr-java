@@ -6,9 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
-import monero.wallet.MoneroWallet;
-import monero.wallet.model.MoneroAccount;
-import monero.wallet.model.MoneroSubaddress;
+import zephyr.wallet.ZephyrWallet;
+import zephyr.wallet.model.ZephyrAccount;
+import zephyr.wallet.model.ZephyrSubaddress;
 
 /**
  * Prints the balances of the wallet.
@@ -23,7 +23,7 @@ public class PrintBalances {
     printBalances(null);
   }
   
-  public static void printBalances(MoneroWallet wallet) {
+  public static void printBalances(ZephyrWallet wallet) {
     
     // collect info about subaddresses
     List<Pair<String, List<Object>>> pairs = new ArrayList<Pair<String, List<Object>>>();
@@ -31,17 +31,17 @@ public class PrintBalances {
     //if (wallet == null) wallet = TestUtils.getWalletFull();
     BigInteger balance = wallet.getBalance();
     BigInteger unlockedBalance = wallet.getUnlockedBalance();
-    List<MoneroAccount> accounts = wallet.getAccounts(true);
+    List<ZephyrAccount> accounts = wallet.getAccounts(true);
     System.out.println("Wallet balance: " + balance);
     System.out.println("Wallet unlocked balance: " + unlockedBalance);
-    for (MoneroAccount account : accounts) {
+    for (ZephyrAccount account : accounts) {
       add(pairs, "ACCOUNT", account.getIndex());
       add(pairs, "SUBADDRESS", "");
       add(pairs, "LABEL", "");
       add(pairs, "ADDRESS", "");
       add(pairs, "BALANCE", account.getBalance());
       add(pairs, "UNLOCKED", account.getUnlockedBalance());
-      for (MoneroSubaddress subaddress : account.getSubaddresses()) {
+      for (ZephyrSubaddress subaddress : account.getSubaddresses()) {
         add(pairs, "ACCOUNT", account.getIndex());
         add(pairs, "SUBADDRESS", subaddress.getIndex());
         add(pairs, "LABEL", subaddress.getLabel());

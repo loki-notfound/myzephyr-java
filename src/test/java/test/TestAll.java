@@ -11,10 +11,10 @@ import org.junit.runner.RunWith;
 @SelectClasses({
   TestSampleCode.class,
   TestSerialization.class,
-  TestMoneroUtils.class,
-  TestMoneroDaemonRpc.class,
-  TestMoneroWalletFull.class,
-  TestMoneroWalletRpc.class,
-  TestMoneroConnectionManager.class
+  TestZephyrUtils.class,
+  TestZephyrDaemonRpc.class,
+  TestZephyrWalletFull.class,
+  TestZephyrWalletRpc.class,
+  TestZephyrConnectionManager.class
 })
 public class TestAll {}

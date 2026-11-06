@@ -2,10 +2,10 @@ package utils;
 
 import java.util.UUID;
 
-import monero.daemon.model.MoneroNetworkType;
-import monero.wallet.MoneroWallet;
-import monero.wallet.MoneroWalletFull;
-import monero.wallet.model.MoneroWalletConfig;
+import zephyr.daemon.model.ZephyrNetworkType;
+import zephyr.wallet.ZephyrWallet;
+import zephyr.wallet.ZephyrWalletFull;
+import zephyr.wallet.model.ZephyrWalletConfig;
 
 /**
  * Scratchpad for quick scripting.
@@ -15,17 +15,17 @@ public class Scratchpad {
   public static void main(String[] args) {
     
     // initialize daemon, wallet, and direct rpc interface
-//    MoneroDaemon daemon = TestUtils.getDaemonRpc();
-//    MoneroWalletRpc walletRpc = TestUtils.getWalletRpc();
-//    MoneroWalletFull walletFull = TestUtils.getWalletFull();
+//    ZephyrDaemon daemon = TestUtils.getDaemonRpc();
+//    ZephyrWalletRpc walletRpc = TestUtils.getWalletRpc();
+//    ZephyrWalletFull walletFull = TestUtils.getWalletFull();
     
     // -------------------------------- SCRATCHPAD ----------------------------
     
     // create wallet from mnemonic
-    MoneroWallet walletFull = MoneroWalletFull.createWallet(new MoneroWalletConfig()
+    ZephyrWallet walletFull = ZephyrWalletFull.createWallet(new ZephyrWalletConfig()
       .setPath("./test_wallets/" + UUID.randomUUID().toString())  // leave blank for in-memory wallet
       .setPassword("abctesting123")
-      .setNetworkType(MoneroNetworkType.TESTNET)
+      .setNetworkType(ZephyrNetworkType.TESTNET)
       .setServerUri("http://localhost:38081")
       .setServerUsername("superuser")
       .setServerPassword("abctesting123")
@@ -35,7 +35,7 @@ public class Scratchpad {
     System.out.println("Full wallet daemon height: " + walletFull.getDaemonHeight());
     System.out.println("Full wallet mnemonic: " + walletFull.getMnemonic());
     
-//    walletFull.createTx(new MoneroTxConfig()
+//    walletFull.createTx(new ZephyrTxConfig()
 //            .addDestination("52FnB7ABUrKJzVQRpbMNrqDFWbcKLjFUq8Rgek7jZEuB6WE2ZggXaTf4FK6H8gQymvSrruHHrEuKhMN3qTMiBYzREKsmRKM", walletFull.getUnlockedBalance(0).divide(new BigInteger("8")).multiply(new BigInteger("1")))
 //            .addDestination("52aPELZwrwvVBNK4pvRZPNj4U5EEkZBsNTR2jozCLYyrhQySvYbWebTQEdt7RS9nFnRY9r88eFpt6UcsHKnVpCQDAFKu1Az", walletFull.getUnlockedBalance(0).divide(new BigInteger("8")).multiply(new BigInteger("1")))
 //            .setAccountIndex(0)

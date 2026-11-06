@@ -3,13 +3,13 @@ package test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import common.utils.JsonUtils;
+import zephyr.lib.utils.JsonUtils;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import monero.common.MoneroRpcConnection;
+import zephyr.common.ZephyrRpcConnection;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -29,10 +29,10 @@ public class TestSerialization {
     map1.put("null", null);
     
     // serialize
-    String json = JsonUtils.serialize(MoneroRpcConnection.MAPPER, map1);
+    String json = JsonUtils.serialize(ZephyrRpcConnection.MAPPER, map1);
     
     // deserialize
-    Map<String, Object> map2 = JsonUtils.deserialize(MoneroRpcConnection.MAPPER, json, new TypeReference<Map<String, Object>>(){});
+    Map<String, Object> map2 = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, json, new TypeReference<Map<String, Object>>(){});
     Object amt = map2.get("amount");
     assertEquals(BigInteger.class, amt.getClass());
     map1.remove("null");  // nulls should be removed during serialization
@@ -46,7 +46,7 @@ public class TestSerialization {
     for (int i = 0; i < 5; i++) strs.add("hello");
     map.put("strings", strs);
     String json = JsonUtils.serialize(map);
-    Map<String, Object> deserialized = JsonUtils.deserialize(MoneroRpcConnection.MAPPER, json, new TypeReference<Map<String, Object>>(){});
+    Map<String, Object> deserialized = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, json, new TypeReference<Map<String, Object>>(){});
     assertEquals(map, deserialized);
   }
   
@@ -72,7 +72,7 @@ public class TestSerialization {
     String json = JsonUtils.serialize(map1);
     
     // deserialize
-    Map<String, Object> map2 = JsonUtils.deserialize(MoneroRpcConnection.MAPPER, json, new TypeReference<Map<String, Object>>(){});
+    Map<String, Object> map2 = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, json, new TypeReference<Map<String, Object>>(){});
     map1.remove("null");  // nulls should be removed during serialization
     assertEquals(map1, map2);
   }

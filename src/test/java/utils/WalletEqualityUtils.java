@@ -11,20 +11,20 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import monero.daemon.model.MoneroOutput;
-import monero.daemon.model.MoneroTx;
-import monero.wallet.MoneroWallet;
-import monero.wallet.MoneroWalletRpc.IncomingTransferComparator;
-import monero.wallet.model.MoneroAccount;
-import monero.wallet.model.MoneroIncomingTransfer;
-import monero.wallet.model.MoneroOutgoingTransfer;
-import monero.wallet.model.MoneroOutputQuery;
-import monero.wallet.model.MoneroOutputWallet;
-import monero.wallet.model.MoneroSubaddress;
-import monero.wallet.model.MoneroTransfer;
-import monero.wallet.model.MoneroTransferQuery;
-import monero.wallet.model.MoneroTxQuery;
-import monero.wallet.model.MoneroTxWallet;
+import zephyr.daemon.model.ZephyrOutput;
+import zephyr.daemon.model.ZephyrTx;
+import zephyr.wallet.ZephyrWallet;
+import zephyr.wallet.ZephyrWalletRpc.IncomingTransferComparator;
+import zephyr.wallet.model.ZephyrAccount;
+import zephyr.wallet.model.ZephyrIncomingTransfer;
+import zephyr.wallet.model.ZephyrOutgoingTransfer;
+import zephyr.wallet.model.ZephyrOutputQuery;
+import zephyr.wallet.model.ZephyrOutputWallet;
+import zephyr.wallet.model.ZephyrSubaddress;
+import zephyr.wallet.model.ZephyrTransfer;
+import zephyr.wallet.model.ZephyrTransferQuery;
+import zephyr.wallet.model.ZephyrTxQuery;
+import zephyr.wallet.model.ZephyrTxWallet;
 
 /**
  * Utilities to deep compare wallets.
@@ -39,7 +39,7 @@ public class WalletEqualityUtils {
    * @param w1 a wallet to compare
    * @param w2 a wallet to compare
    */
-  public static void testWalletEqualityOnChain(MoneroWallet w1, MoneroWallet w2) {
+  public static void testWalletEqualityOnChain(ZephyrWallet w1, ZephyrWallet w2) {
     TestUtils.WALLET_TX_TRACKER.reset(); // all wallets need to wait for txs to confirm to reliably sync
     
     // wait for relayed txs associated with wallets to clear pool
@@ -58,20 +58,20 @@ public class WalletEqualityUtils {
     assertEquals(w1.getPrimaryAddress(), w2.getPrimaryAddress());
     assertEquals(w1.getPrivateViewKey(), w2.getPrivateViewKey());
     assertEquals(w1.getPrivateSpendKey(), w2.getPrivateSpendKey());
-    MoneroTxQuery txQuery = new MoneroTxQuery().setIsConfirmed(true);
+    ZephyrTxQuery txQuery = new ZephyrTxQuery().setIsConfirmed(true);
     testTxWalletsEqualOnChain(w1.getTxs(txQuery), w2.getTxs(txQuery));
     txQuery.setIncludeOutputs(true);
     testTxWalletsEqualOnChain(w1.getTxs(txQuery), w2.getTxs(txQuery));  // fetch and compare outputs
     testAccountsEqualOnChain(w1.getAccounts(true), w2.getAccounts(true));
     assertEquals(w1.getBalance(), w2.getBalance());
     assertEquals(w1.getUnlockedBalance(), w2.getUnlockedBalance());
-    MoneroTransferQuery transferQuery = new MoneroTransferQuery().setTxQuery(new MoneroTxQuery().setIsConfirmed(true));
+    ZephyrTransferQuery transferQuery = new ZephyrTransferQuery().setTxQuery(new ZephyrTxQuery().setIsConfirmed(true));
     testTransfersEqualOnChain(w1.getTransfers(transferQuery), w2.getTransfers(transferQuery));
-    MoneroOutputQuery outputQuery = new MoneroOutputQuery().setTxQuery(new MoneroTxQuery().setIsConfirmed(true));
+    ZephyrOutputQuery outputQuery = new ZephyrOutputQuery().setTxQuery(new ZephyrTxQuery().setIsConfirmed(true));
     testOutputWalletsEqualOnChain(w1.getOutputs(outputQuery), w2.getOutputs(outputQuery));
   }
   
-  private static void testAccountsEqualOnChain(List<MoneroAccount> accounts1, List<MoneroAccount> accounts2) {
+  private static void testAccountsEqualOnChain(List<ZephyrAccount> accounts1, List<ZephyrAccount> accounts2) {
     for (int i = 0; i < Math.max(accounts1.size(), accounts2.size()); i++) {
       if (i < accounts1.size() && i < accounts2.size()) {
         testAccountEqualOnChain(accounts1.get(i), accounts2.get(i));
@@ -79,25 +79,25 @@ public class WalletEqualityUtils {
         for (int j = i; j < accounts2.size(); j++) {
           assertEquals(BigInteger.valueOf(0), accounts2.get(j).getBalance());
           assertTrue(accounts2.get(j).getSubaddresses().size() >= 1);
-          for (MoneroSubaddress subaddress : accounts2.get(j).getSubaddresses()) assertFalse(subaddress.isUsed());
+          for (ZephyrSubaddress subaddress : accounts2.get(j).getSubaddresses()) assertFalse(subaddress.isUsed());
         }
         return;
       } else {
         for (int j = i; j < accounts1.size(); j++) {
           assertEquals(BigInteger.valueOf(0), accounts1.get(j).getBalance());
           assertTrue(accounts1.get(j).getSubaddresses().size() >= 1);
-          for (MoneroSubaddress subaddress : accounts1.get(j).getSubaddresses()) assertFalse(subaddress.isUsed());
+          for (ZephyrSubaddress subaddress : accounts1.get(j).getSubaddresses()) assertFalse(subaddress.isUsed());
         }
         return;
       }
     }
   }
   
-  private static void testAccountEqualOnChain(MoneroAccount account1, MoneroAccount account2) {
+  private static void testAccountEqualOnChain(ZephyrAccount account1, ZephyrAccount account2) {
     
     // nullify off-chain data for comparison
-    List<MoneroSubaddress> subaddresses1 = account1.getSubaddresses();
-    List<MoneroSubaddress> subaddresses2 = account2.getSubaddresses();
+    List<ZephyrSubaddress> subaddresses1 = account1.getSubaddresses();
+    List<ZephyrSubaddress> subaddresses2 = account2.getSubaddresses();
     account1.setSubaddresses(null);
     account2.setSubaddresses(null);
     account1.setTag(null);
@@ -108,7 +108,7 @@ public class WalletEqualityUtils {
     testSubaddressesEqualOnChain(subaddresses1, subaddresses2);
   }
   
-  private static void testSubaddressesEqualOnChain(List<MoneroSubaddress> subaddresses1, List<MoneroSubaddress> subaddresses2) {
+  private static void testSubaddressesEqualOnChain(List<ZephyrSubaddress> subaddresses1, List<ZephyrSubaddress> subaddresses2) {
     for (int i = 0; i < Math.max(subaddresses1.size(), subaddresses2.size()); i++) {
       if (i < subaddresses1.size() && i < subaddresses2.size()) {
         testSubaddressesEqualOnChain(subaddresses1.get(i), subaddresses2.get(i));
@@ -128,18 +128,18 @@ public class WalletEqualityUtils {
     }
   }
   
-  private static void testSubaddressesEqualOnChain(MoneroSubaddress subaddress1, MoneroSubaddress subaddress2) {
+  private static void testSubaddressesEqualOnChain(ZephyrSubaddress subaddress1, ZephyrSubaddress subaddress2) {
     subaddress1.setLabel(null); // nullify off-chain data for comparison
     subaddress2.setLabel(null);
     assertEquals(subaddress1, subaddress2);
   }
   
-  private static void testTxWalletsEqualOnChain(List<MoneroTxWallet> txs1, List<MoneroTxWallet> txs2) {
+  private static void testTxWalletsEqualOnChain(List<ZephyrTxWallet> txs1, List<ZephyrTxWallet> txs2) {
     
     // nullify off-chain data for comparison
-    List<MoneroTxWallet> allTxs = new ArrayList<MoneroTxWallet>(txs1);
+    List<ZephyrTxWallet> allTxs = new ArrayList<ZephyrTxWallet>(txs1);
     allTxs.addAll(txs2);
-    for (MoneroTxWallet tx : allTxs) {
+    for (ZephyrTxWallet tx : allTxs) {
       tx.setNote(null);
       if (tx.getOutgoingTransfer() != null) {
         tx.getOutgoingTransfer().setAddresses(null);
@@ -148,9 +148,9 @@ public class WalletEqualityUtils {
     
     // compare txs
     assertEquals(txs1.size(), txs2.size());
-    for (MoneroTxWallet tx1 : txs1) {
+    for (ZephyrTxWallet tx1 : txs1) {
       boolean found = false;
-      for (MoneroTxWallet tx2 : txs2) {
+      for (ZephyrTxWallet tx2 : txs2) {
         if (tx1.getHash().equals(tx2.getHash())) {
           
           // transfer cached info if known for comparison
@@ -166,8 +166,8 @@ public class WalletEqualityUtils {
           found = true;
           
           // test block equality except txs to ignore order
-          List<MoneroTx> blockTxs1 = tx1.getBlock().getTxs();
-          List<MoneroTx> blockTxs2 = tx2.getBlock().getTxs();
+          List<ZephyrTx> blockTxs1 = tx1.getBlock().getTxs();
+          List<ZephyrTx> blockTxs2 = tx2.getBlock().getTxs();
           tx1.getBlock().setTxs();
           tx2.getBlock().setTxs();
           assertEquals(tx1.getBlock(), tx2.getBlock());
@@ -179,11 +179,11 @@ public class WalletEqualityUtils {
     }
   }
   
-  private static void transferCachedInfo(MoneroTxWallet src, MoneroTxWallet tgt) {
+  private static void transferCachedInfo(ZephyrTxWallet src, ZephyrTxWallet tgt) {
     
     // fill in missing incoming transfers when sending from/to the same account
     if (src.getIncomingTransfers() != null) {
-      for (MoneroIncomingTransfer inTransfer : src.getIncomingTransfers()) {
+      for (ZephyrIncomingTransfer inTransfer : src.getIncomingTransfers()) {
         if (inTransfer.getAccountIndex() == src.getOutgoingTransfer().getAccountIndex()) {
           tgt.getIncomingTransfers().add(inTransfer);
         }
@@ -202,18 +202,18 @@ public class WalletEqualityUtils {
     if (tgt.getOutgoingTransfer() != null) tgt.setPaymentId(src.getPaymentId());
   }
   
-  private static void testTransfersEqualOnChain(List<MoneroTransfer> transfers1, List<MoneroTransfer> transfers2) {
+  private static void testTransfersEqualOnChain(List<ZephyrTransfer> transfers1, List<ZephyrTransfer> transfers2) {
     assertEquals(transfers1.size(), transfers2.size());
     
     // test and collect transfers per transaction
-    Map<String, List<MoneroTransfer>> txsTransfers1 = new HashMap<String, List<MoneroTransfer>>();
-    Map<String, List<MoneroTransfer>> txsTransfers2 = new HashMap<String, List<MoneroTransfer>>();
+    Map<String, List<ZephyrTransfer>> txsTransfers1 = new HashMap<String, List<ZephyrTransfer>>();
+    Map<String, List<ZephyrTransfer>> txsTransfers2 = new HashMap<String, List<ZephyrTransfer>>();
     Long lastHeight = null;
-    MoneroTxWallet lastTx1 = null;
-    MoneroTxWallet lastTx2 = null;
+    ZephyrTxWallet lastTx1 = null;
+    ZephyrTxWallet lastTx2 = null;
     for (int i = 0; i < transfers1.size(); i++) {
-      MoneroTransfer transfer1 = transfers1.get(i);
-      MoneroTransfer transfer2 = transfers2.get(i);
+      ZephyrTransfer transfer1 = transfers1.get(i);
+      ZephyrTransfer transfer2 = transfers2.get(i);
       
       // transfers must have same height even if they don't belong to same tx (because tx ordering within blocks is not currently provided by wallet2)
       assertEquals((long) transfer1.getTx().getHeight(), (long) transfer2.getTx().getHeight());
@@ -233,17 +233,17 @@ public class WalletEqualityUtils {
       }
       
       // collect tx1 transfer
-      List<MoneroTransfer> txTransfers1 = txsTransfers1.get(transfer1.getTx().getHash());
+      List<ZephyrTransfer> txTransfers1 = txsTransfers1.get(transfer1.getTx().getHash());
       if (txTransfers1 == null) {
-        txTransfers1 = new ArrayList<MoneroTransfer>();
+        txTransfers1 = new ArrayList<ZephyrTransfer>();
         txsTransfers1.put(transfer1.getTx().getHash(), txTransfers1);
       }
       txTransfers1.add(transfer1);
       
       // collect tx2 transfer
-      List<MoneroTransfer> txTransfers2 = txsTransfers2.get(transfer2.getTx().getHash());
+      List<ZephyrTransfer> txTransfers2 = txsTransfers2.get(transfer2.getTx().getHash());
       if (txTransfers2 == null) {
-        txTransfers2 = new ArrayList<MoneroTransfer>();
+        txTransfers2 = new ArrayList<ZephyrTransfer>();
         txsTransfers2.put(transfer2.getTx().getHash(), txTransfers2);
       }
       txTransfers2.add(transfer2);
@@ -251,19 +251,19 @@ public class WalletEqualityUtils {
     
     // compare collected transfers per tx for equality
     for (String txHash : txsTransfers1.keySet()) {
-      List<MoneroTransfer> txTransfers1 = txsTransfers1.get(txHash);
-      List<MoneroTransfer> txTransfers2 = txsTransfers2.get(txHash);
+      List<ZephyrTransfer> txTransfers1 = txsTransfers1.get(txHash);
+      List<ZephyrTransfer> txTransfers2 = txsTransfers2.get(txHash);
       assertEquals(txTransfers1.size(), txTransfers2.size());
       
       // normalize and compare transfers
       for (int i = 0; i < txTransfers1.size(); i++) {
-        MoneroTransfer transfer1 = txTransfers1.get(i);
-        MoneroTransfer transfer2 = txTransfers2.get(i);
+        ZephyrTransfer transfer1 = txTransfers1.get(i);
+        ZephyrTransfer transfer2 = txTransfers2.get(i);
         
         // normalize outgoing transfers
-        if (transfer1 instanceof MoneroOutgoingTransfer) {
-          MoneroOutgoingTransfer ot1 = (MoneroOutgoingTransfer) transfer1;
-          MoneroOutgoingTransfer ot2 = (MoneroOutgoingTransfer) transfer2;
+        if (transfer1 instanceof ZephyrOutgoingTransfer) {
+          ZephyrOutgoingTransfer ot1 = (ZephyrOutgoingTransfer) transfer1;
+          ZephyrOutgoingTransfer ot2 = (ZephyrOutgoingTransfer) transfer2;
     
           // transfer destination info if known for comparison
           if (ot1.getDestinations() != null) {
@@ -279,8 +279,8 @@ public class WalletEqualityUtils {
         
         // normalize incoming transfers
         else {
-          MoneroIncomingTransfer it1 = (MoneroIncomingTransfer) transfer1;
-          MoneroIncomingTransfer it2 = (MoneroIncomingTransfer) transfer2;
+          ZephyrIncomingTransfer it1 = (ZephyrIncomingTransfer) transfer1;
+          ZephyrIncomingTransfer it2 = (ZephyrIncomingTransfer) transfer2;
           it1.setAddress(null);
           it2.setAddress(null);
         }
@@ -291,18 +291,18 @@ public class WalletEqualityUtils {
     }
   }
   
-  private static void testOutputWalletsEqualOnChain(List<MoneroOutputWallet> outputs1, List<MoneroOutputWallet> outputs2) {
+  private static void testOutputWalletsEqualOnChain(List<ZephyrOutputWallet> outputs1, List<ZephyrOutputWallet> outputs2) {
     assertEquals(outputs1.size(), outputs2.size());
     
     // test and collect outputs per transaction
-    Map<String, List<MoneroOutputWallet>> txsOutputs1 = new HashMap<String, List<MoneroOutputWallet>>();
-    Map<String, List<MoneroOutputWallet>> txsOutputs2 = new HashMap<String, List<MoneroOutputWallet>>();
+    Map<String, List<ZephyrOutputWallet>> txsOutputs1 = new HashMap<String, List<ZephyrOutputWallet>>();
+    Map<String, List<ZephyrOutputWallet>> txsOutputs2 = new HashMap<String, List<ZephyrOutputWallet>>();
     Long lastHeight = null;
-    MoneroTxWallet lastTx1 = null;
-    MoneroTxWallet lastTx2 = null;
+    ZephyrTxWallet lastTx1 = null;
+    ZephyrTxWallet lastTx2 = null;
     for (int i = 0; i < outputs1.size(); i++) {
-      MoneroOutputWallet output1 = outputs1.get(i);
-      MoneroOutputWallet output2 = outputs2.get(i);
+      ZephyrOutputWallet output1 = outputs1.get(i);
+      ZephyrOutputWallet output2 = outputs2.get(i);
       
       // outputs must have same height even if they don't belong to same tx (because tx ordering within blocks is not currently provided by wallet2)
       assertEquals((long) output1.getTx().getHeight(), (long) output2.getTx().getHeight());
@@ -322,17 +322,17 @@ public class WalletEqualityUtils {
       }
       
       // collect tx1 output
-      List<MoneroOutputWallet> txOutputs1 = txsOutputs1.get(output1.getTx().getHash());
+      List<ZephyrOutputWallet> txOutputs1 = txsOutputs1.get(output1.getTx().getHash());
       if (txOutputs1 == null) {
-        txOutputs1 = new ArrayList<MoneroOutputWallet>();
+        txOutputs1 = new ArrayList<ZephyrOutputWallet>();
         txsOutputs1.put(output1.getTx().getHash(), txOutputs1);
       }
       txOutputs1.add(output1);
       
       // collect tx2 output
-      List<MoneroOutputWallet> txOutputs2 = txsOutputs2.get(output2.getTx().getHash());
+      List<ZephyrOutputWallet> txOutputs2 = txsOutputs2.get(output2.getTx().getHash());
       if (txOutputs2 == null) {
-        txOutputs2 = new ArrayList<MoneroOutputWallet>();
+        txOutputs2 = new ArrayList<ZephyrOutputWallet>();
         txsOutputs2.put(output2.getTx().getHash(), txOutputs2);
       }
       txOutputs2.add(output2);
@@ -340,14 +340,14 @@ public class WalletEqualityUtils {
     
     // compare collected outputs per tx for equality
     for (String txHash : txsOutputs1.keySet()) {
-      List<MoneroOutputWallet> txOutputs1 = txsOutputs1.get(txHash);
-      List<MoneroOutputWallet> txOutputs2 = txsOutputs2.get(txHash);
+      List<ZephyrOutputWallet> txOutputs1 = txsOutputs1.get(txHash);
+      List<ZephyrOutputWallet> txOutputs2 = txsOutputs2.get(txHash);
       assertEquals(txOutputs1.size(), txOutputs2.size());
       
       // normalize and compare outputs
       for (int i = 0; i < txOutputs1.size(); i++) {
-        MoneroOutput output1 = txOutputs1.get(i);
-        MoneroOutput output2 = txOutputs2.get(i);
+        ZephyrOutput output1 = txOutputs1.get(i);
+        ZephyrOutput output2 = txOutputs2.get(i);
         assertEquals(output1.getTx().getHash(), output2.getTx().getHash());
         assertEquals(output1, output2);
       }

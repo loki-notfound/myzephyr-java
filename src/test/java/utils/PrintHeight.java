@@ -1,6 +1,6 @@
 package utils;
 
-import monero.wallet.MoneroWallet;
+import zephyr.wallet.ZephyrWallet;
 
 /**
  * Prints the height of the wallet.
@@ -8,7 +8,7 @@ import monero.wallet.MoneroWallet;
 public class PrintHeight {
 
   public static void main(String[] args) {
-    MoneroWallet wallet = TestUtils.getWalletRpc();
+    ZephyrWallet wallet = TestUtils.getWalletRpc();
     System.out.println("Height: " + wallet.getHeight());
   }
 }

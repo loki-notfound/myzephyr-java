@@ -1,11 +1,11 @@
 package utils;
 
-import monero.wallet.model.MoneroWalletListener;
+import zephyr.wallet.model.ZephyrWalletListener;
 
 /**
  * Print sync progress every X blocks.
  */
-public class WalletSyncPrinter extends MoneroWalletListener {
+public class WalletSyncPrinter extends ZephyrWalletListener {
   
   private double nextIncrement;
   private double syncResolution;

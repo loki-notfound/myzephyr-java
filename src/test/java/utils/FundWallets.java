@@ -7,13 +7,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import monero.daemon.model.MoneroNetworkType;
-import monero.wallet.MoneroWallet;
-import monero.wallet.MoneroWalletFull;
-import monero.wallet.model.MoneroDestination;
-import monero.wallet.model.MoneroTxConfig;
-import monero.wallet.model.MoneroTxWallet;
-import monero.wallet.model.MoneroWalletConfig;
+import zephyr.daemon.model.ZephyrNetworkType;
+import zephyr.wallet.ZephyrWallet;
+import zephyr.wallet.ZephyrWalletFull;
+import zephyr.wallet.model.ZephyrDestination;
+import zephyr.wallet.model.ZephyrTxConfig;
+import zephyr.wallet.model.ZephyrTxWallet;
+import zephyr.wallet.model.ZephyrWalletConfig;
 
 /**
  * Utility to fund test wallets.
@@ -36,14 +36,14 @@ public class FundWallets {
    * @param numAccounts is the number of accounts to fund in each test wallet
    * @param numSubaddressesPerAccount is the number of subaddresses to fund in each account (num accounts * num subaddresses must be less than or equal to 16) // TODO: support funding more subaddresses
    */
-  public static void fundWallets(MoneroWallet srcWallet, int numWallets, int numAccounts, int numSubaddressesPerAccount) {
+  public static void fundWallets(ZephyrWallet srcWallet, int numWallets, int numAccounts, int numSubaddressesPerAccount) {
     TestUtils.WALLET_TX_TRACKER.waitForWalletTxsToClearPool(srcWallet);
     for (int i = 0; i < NUM_WALLETS; i++) {
       
       // create wallet and create and collect subaddresses
       List<String> subaddresses = new ArrayList<String>();
       String path = TestUtils.TEST_WALLETS_DIR + "/funded_" + UUID.randomUUID().toString();
-      MoneroWalletFull fundedWallet = MoneroWalletFull.createWallet(new MoneroWalletConfig().setPath(path).setPassword(TestUtils.WALLET_PASSWORD).setNetworkType(MoneroNetworkType.STAGENET));
+      ZephyrWalletFull fundedWallet = ZephyrWalletFull.createWallet(new ZephyrWalletConfig().setPath(path).setPassword(TestUtils.WALLET_PASSWORD).setNetworkType(ZephyrNetworkType.STAGENET));
       for (int accountIdx = 0; accountIdx < NUM_ACCOUNTS; accountIdx++) {
         fundedWallet.createAccount();
         for (int subaddressIdx = 0; subaddressIdx < NUM_SUBADDRESSES_PER_ACCOUNT; subaddressIdx++) {
@@ -61,13 +61,13 @@ public class FundWallets {
       }
       
       // transfer funds to subaddresses
-      List<MoneroDestination> destinations = new ArrayList<MoneroDestination>();
-      for (String address : subaddresses) destinations.add(new MoneroDestination(address, TestUtils.MAX_FEE.multiply(BigInteger.valueOf(2))));
+      List<ZephyrDestination> destinations = new ArrayList<ZephyrDestination>();
+      for (String address : subaddresses) destinations.add(new ZephyrDestination(address, TestUtils.MAX_FEE.multiply(BigInteger.valueOf(2))));
       System.out.println("Transferring....");
-      List<MoneroTxWallet> txs = srcWallet.createTxs(new MoneroTxConfig().setDestinations(destinations).setAccountIndex(0).setRelay(true));
+      List<ZephyrTxWallet> txs = srcWallet.createTxs(new ZephyrTxConfig().setDestinations(destinations).setAccountIndex(0).setRelay(true));
       System.out.println("Tx set has " + txs.size() + " transactions");
       assertFalse(txs.isEmpty());
-      //for (MoneroTxWallet tx : txs) System.out.println(tx);
+      //for (ZephyrTxWallet tx : txs) System.out.println(tx);
     }
     
     System.out.println("Wallets funded successfully");
