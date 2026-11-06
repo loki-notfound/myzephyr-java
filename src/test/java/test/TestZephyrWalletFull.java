@@ -24,6 +24,7 @@ import zephyr.daemon.model.ZephyrNetworkType;
 import zephyr.wallet.ZephyrWallet;
 import zephyr.wallet.ZephyrWalletFull;
 import zephyr.wallet.ZephyrWalletRpc;
+import zephyr.wallet.model.ZephyrAssets;
 import zephyr.wallet.model.ZephyrMultisigInfo;
 import zephyr.wallet.model.ZephyrMultisigInitResult;
 import zephyr.wallet.model.ZephyrOutputWallet;
@@ -44,6 +45,8 @@ import utils.StartMining;
 import utils.TestUtils;
 import utils.WalletEqualityUtils;
 import utils.WalletSyncPrinter;
+
+// temporary until R8: wallet balance calls read the base coin ZPH until the tests cover assets
 
 /**
  * Tests specific to the fully client-side wallet.
@@ -388,7 +391,7 @@ public class TestZephyrWalletFull extends TestZephyrWalletCommon {
     ZephyrWalletRpc walletRpc = TestUtils.getWalletRpc();
     walletRpc.createWallet(new ZephyrWalletConfig().setPath(walletName).setPassword(TestUtils.WALLET_PASSWORD).setMnemonic(TestUtils.MNEMONIC).setRestoreHeight(TestUtils.FIRST_RECEIVE_HEIGHT));
     walletRpc.sync();
-    BigInteger balance = walletRpc.getBalance();
+    BigInteger balance = walletRpc.getBalance().get(ZephyrAssets.ZPH);
     String outputsHex = walletRpc.exportOutputs();
     walletRpc.close(true);
     
@@ -397,7 +400,7 @@ public class TestZephyrWalletFull extends TestZephyrWalletCommon {
     walletFull.sync();
     assertEquals(TestUtils.MNEMONIC, walletFull.getMnemonic());
     assertEquals(TestUtils.ADDRESS, walletFull.getPrimaryAddress());
-    assertEquals(balance, walletFull.getBalance());
+    assertEquals(balance, walletFull.getBalance().get(ZephyrAssets.ZPH));
     assertEquals(outputsHex.length(), walletFull.exportOutputs().length());
     walletFull.close(true);
     
@@ -406,7 +409,7 @@ public class TestZephyrWalletFull extends TestZephyrWalletCommon {
     String path = TestUtils.WALLET_RPC_LOCAL_WALLET_DIR + "/" + walletName;
     walletFull = ZephyrWalletFull.createWallet(new ZephyrWalletConfig().setPath(path).setPassword(TestUtils.WALLET_PASSWORD).setNetworkType(TestUtils.NETWORK_TYPE).setMnemonic(TestUtils.MNEMONIC).setRestoreHeight(TestUtils.FIRST_RECEIVE_HEIGHT).setServerUri(TestUtils.DAEMON_RPC_URI).setServerUsername(TestUtils.DAEMON_RPC_USERNAME).setServerPassword(TestUtils.DAEMON_RPC_PASSWORD));
     walletFull.sync();
-    balance = walletFull.getBalance();
+    balance = walletFull.getBalance().get(ZephyrAssets.ZPH);
     outputsHex = walletFull.exportOutputs();
     walletFull.close(true);
     
@@ -420,7 +423,7 @@ public class TestZephyrWalletFull extends TestZephyrWalletCommon {
     walletRpc.sync();
     assertEquals(TestUtils.MNEMONIC, walletRpc.getMnemonic());
     assertEquals(TestUtils.ADDRESS, walletRpc.getPrimaryAddress());
-    assertEquals(balance, walletRpc.getBalance());
+    assertEquals(balance, walletRpc.getBalance().get(ZephyrAssets.ZPH));
     assertEquals(outputsHex.length(), walletRpc.exportOutputs().length());
     walletRpc.close(true);
   }
@@ -759,7 +762,7 @@ public class TestZephyrWalletFull extends TestZephyrWalletCommon {
     try {
       assertNotNull(wallet.getMnemonic());
       assertEquals(1, wallet.getHeight());
-      assertEquals(BigInteger.valueOf(0), wallet.getBalance());
+      assertEquals(BigInteger.valueOf(0), wallet.getBalance().get(ZephyrAssets.ZPH));
       wallet.startSyncing();
     } catch (ZephyrError e) {
       assertEquals("Wallet is not connected to daemon", e.getMessage());
@@ -775,7 +778,7 @@ public class TestZephyrWalletFull extends TestZephyrWalletCommon {
       wallet.setDaemonConnection(daemon.getRpcConnection());
       assertEquals(1, wallet.getHeight());
       assertFalse(wallet.isSynced());
-      assertEquals(BigInteger.valueOf(0), wallet.getBalance());
+      assertEquals(BigInteger.valueOf(0), wallet.getBalance().get(ZephyrAssets.ZPH));
       long chainHeight = wallet.getDaemonHeight();
       wallet.setRestoreHeight(chainHeight - 3);
       wallet.startSyncing();
@@ -799,7 +802,7 @@ public class TestZephyrWalletFull extends TestZephyrWalletCommon {
       assertEquals(1, wallet.getHeight());
       assertEquals(restoreHeight, wallet.getRestoreHeight());
       assertFalse(wallet.isSynced());
-      assertEquals(BigInteger.valueOf(0), wallet.getBalance());
+      assertEquals(BigInteger.valueOf(0), wallet.getBalance().get(ZephyrAssets.ZPH));
       wallet.startSyncing(TestUtils.SYNC_PERIOD_IN_MS);
       
       // pause for sync to start
@@ -1445,9 +1448,9 @@ public class TestZephyrWalletFull extends TestZephyrWalletCommon {
       assertNotNull(prevOutputReceived);
       assertNotNull(prevOutputSpent);
       BigInteger balance = incomingTotal.subtract(outgoingTotal);
-      assertEquals(balance, wallet.getBalance());
-      assertEquals(prevBalance, wallet.getBalance());
-      assertEquals(prevUnlockedBalance, wallet.getUnlockedBalance());
+      assertEquals(balance, wallet.getBalance().get(ZephyrAssets.ZPH));
+      assertEquals(prevBalance, wallet.getBalance().get(ZephyrAssets.ZPH));
+      assertEquals(prevUnlockedBalance, wallet.getUnlockedBalance().get(ZephyrAssets.ZPH));
     }
     
     public Boolean getOnNewBlockAfterDone() {

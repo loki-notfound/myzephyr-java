@@ -16,6 +16,7 @@ import zephyr.daemon.model.ZephyrNetworkType;
 import zephyr.daemon.model.ZephyrTx;
 import zephyr.wallet.ZephyrWalletFull;
 import zephyr.wallet.ZephyrWalletRpc;
+import zephyr.wallet.model.ZephyrAssets;
 import zephyr.wallet.model.ZephyrOutputWallet;
 import zephyr.wallet.model.ZephyrTxConfig;
 import zephyr.wallet.model.ZephyrTxWallet;
@@ -24,6 +25,8 @@ import zephyr.wallet.model.ZephyrWalletListener;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import utils.TestUtils;
+
+// temporary until R8: wallet balance calls read the base coin ZPH until the tests cover assets
 
 /**
  * Test the sample code for README.md.
@@ -61,7 +64,7 @@ public class TestSampleCode {
     ZephyrWalletRpc walletRpc = new ZephyrWalletRpc(TestUtils.WALLET_RPC_URI, TestUtils.WALLET_RPC_USERNAME, TestUtils.WALLET_RPC_PASSWORD); // *** REPLACE WITH CONSTANTS IN README ***
     walletRpc.openWallet("test_wallet_1", "supersecretpassword123");  // *** CHANGE README TO "sample_wallet_rpc" ***
     String primaryAddress = walletRpc.getPrimaryAddress();  // 555zgduFhmKd2o8rPUz...
-    BigInteger balance = walletRpc.getBalance();            // 533648366742
+    BigInteger balance = walletRpc.getBalance().get(ZephyrAssets.ZPH);            // 533648366742
     List<ZephyrTxWallet> txs = walletRpc.getTxs();          // get transactions containing transfers to/from the wallet
     
     // create wallet from mnemonic phrase using JNI bindings to zephyr

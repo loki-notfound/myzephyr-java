@@ -10,10 +10,13 @@ import java.util.concurrent.TimeUnit;
 import zephyr.daemon.model.ZephyrNetworkType;
 import zephyr.wallet.ZephyrWallet;
 import zephyr.wallet.ZephyrWalletFull;
+import zephyr.wallet.model.ZephyrAssets;
 import zephyr.wallet.model.ZephyrDestination;
 import zephyr.wallet.model.ZephyrTxConfig;
 import zephyr.wallet.model.ZephyrTxWallet;
 import zephyr.wallet.model.ZephyrWalletConfig;
+
+// temporary until R8: wallet balance calls read the base coin ZPH until the tests cover assets
 
 /**
  * Utility to fund test wallets.
@@ -54,7 +57,7 @@ public class FundWallets {
       fundedWallet.close(true);
       
       // wait for unlocked funds
-      while (srcWallet.getUnlockedBalance(0).compareTo(TestUtils.MAX_FEE) < 0) {
+      while (srcWallet.getUnlockedBalance(ZephyrAssets.ZPH, 0).compareTo(TestUtils.MAX_FEE) < 0) {
         System.out.println("Waiting...");
         try { TimeUnit.MILLISECONDS.sleep(TestUtils.SYNC_PERIOD_IN_MS); }
         catch (InterruptedException e) { throw new RuntimeException(e.getMessage()); }

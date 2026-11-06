@@ -8,7 +8,10 @@ import java.util.ArrayList;
 import java.util.List;
 import zephyr.wallet.ZephyrWallet;
 import zephyr.wallet.model.ZephyrAccount;
+import zephyr.wallet.model.ZephyrAssets;
 import zephyr.wallet.model.ZephyrSubaddress;
+
+// temporary until R8: wallet balance calls read the base coin ZPH until the tests cover assets
 
 /**
  * Prints the balances of the wallet.
@@ -29,8 +32,8 @@ public class PrintBalances {
     List<Pair<String, List<Object>>> pairs = new ArrayList<Pair<String, List<Object>>>();
     if (wallet == null) wallet = TestUtils.getWalletRpc();
     //if (wallet == null) wallet = TestUtils.getWalletFull();
-    BigInteger balance = wallet.getBalance();
-    BigInteger unlockedBalance = wallet.getUnlockedBalance();
+    BigInteger balance = wallet.getBalance().get(ZephyrAssets.ZPH);
+    BigInteger unlockedBalance = wallet.getUnlockedBalance().get(ZephyrAssets.ZPH);
     List<ZephyrAccount> accounts = wallet.getAccounts(true);
     System.out.println("Wallet balance: " + balance);
     System.out.println("Wallet unlocked balance: " + unlockedBalance);

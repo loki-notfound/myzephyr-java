@@ -8,7 +8,10 @@ import zephyr.daemon.ZephyrDaemon;
 import zephyr.daemon.model.ZephyrMiningStatus;
 import zephyr.daemon.model.ZephyrTx;
 import zephyr.wallet.ZephyrWallet;
+import zephyr.wallet.model.ZephyrAssets;
 import zephyr.wallet.model.ZephyrTxWallet;
+
+// temporary until R8: wallet balance calls read the base coin ZPH until the tests cover assets
 
 /**
  * Tracks wallets which are in sync with the tx pool and therefore whose txs in the pool
@@ -113,10 +116,10 @@ public class WalletTxTracker {
     if (minAmount == null) minAmount = new BigInteger("0");
     
     // check if wallet has balance
-    if (wallet.getBalance(accountIndex, subaddressIndex).compareTo(minAmount) < 0) throw new RuntimeException("Wallet does not have enough balance to wait for");
+    if (wallet.getBalance(ZephyrAssets.ZPH, accountIndex, subaddressIndex).compareTo(minAmount) < 0) throw new RuntimeException("Wallet does not have enough balance to wait for");
     
     // check if wallet has unlocked balance
-    BigInteger unlockedBalance = wallet.getUnlockedBalance(accountIndex, subaddressIndex);
+    BigInteger unlockedBalance = wallet.getUnlockedBalance(ZephyrAssets.ZPH, accountIndex, subaddressIndex);
     if (unlockedBalance.compareTo(minAmount) > 0) return unlockedBalance;
    
     // start mining
@@ -132,7 +135,7 @@ public class WalletTxTracker {
     // wait for unlocked balance // TODO: promote to ZephyrWallet interface?
     System.out.println("Waiting for unlocked balance");
     while (unlockedBalance.compareTo(minAmount) < 0) {
-      unlockedBalance = wallet.getUnlockedBalance(accountIndex, subaddressIndex);
+      unlockedBalance = wallet.getUnlockedBalance(ZephyrAssets.ZPH, accountIndex, subaddressIndex);
       try { TimeUnit.MILLISECONDS.sleep(TestUtils.SYNC_PERIOD_IN_MS); }
       catch (InterruptedException e) { throw new RuntimeException(e); }
     }

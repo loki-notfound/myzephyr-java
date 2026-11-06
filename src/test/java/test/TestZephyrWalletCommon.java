@@ -81,6 +81,8 @@ import utils.StartMining;
 import utils.TestUtils;
 import utils.WalletEqualityUtils;
 
+// temporary until R8: wallet balance calls read the base coin ZPH until the tests cover assets
+
 /**
  * Runs common tests that every Zephyr wallet implementation should support.
  */
@@ -405,7 +407,7 @@ public abstract class TestZephyrWalletCommon {
      // observe unconfirmed funds
      GenUtils.waitFor(1000);
      receiver.sync();
-     assert(receiver.getBalance().compareTo(new BigInteger("0")) > 0);
+     assert(receiver.getBalance().get(ZephyrAssets.ZPH).compareTo(new BigInteger("0")) > 0);
    } catch (Exception e) {
      e1 = e;
    }
@@ -792,16 +794,16 @@ public abstract class TestZephyrWalletCommon {
         subaddressesUnlockedBalance = subaddressesUnlockedBalance.add(subaddress.getUnlockedBalance().get(ZephyrAssets.ZPH)); // temporary until R8
         
         // test that balances are consistent with getAccounts() call
-        assertEquals((wallet.getBalance(subaddress.getAccountIndex(), subaddress.getIndex())).toString(), subaddress.getBalance().get(ZephyrAssets.ZPH).toString()); // temporary until R8
-        assertEquals((wallet.getUnlockedBalance(subaddress.getAccountIndex(), subaddress.getIndex())).toString(), subaddress.getUnlockedBalance().get(ZephyrAssets.ZPH).toString()); // temporary until R8
+        assertEquals((wallet.getBalance(ZephyrAssets.ZPH, subaddress.getAccountIndex(), subaddress.getIndex())).toString(), subaddress.getBalance().get(ZephyrAssets.ZPH).toString()); // temporary until R8
+        assertEquals((wallet.getUnlockedBalance(ZephyrAssets.ZPH, subaddress.getAccountIndex(), subaddress.getIndex())).toString(), subaddress.getUnlockedBalance().get(ZephyrAssets.ZPH).toString()); // temporary until R8
       }
-      assertEquals((wallet.getBalance(account.getIndex())).toString(), subaddressesBalance.toString());
-      assertEquals((wallet.getUnlockedBalance(account.getIndex())).toString(), subaddressesUnlockedBalance.toString());
+      assertEquals((wallet.getBalance(ZephyrAssets.ZPH, account.getIndex())).toString(), subaddressesBalance.toString());
+      assertEquals((wallet.getUnlockedBalance(ZephyrAssets.ZPH, account.getIndex())).toString(), subaddressesUnlockedBalance.toString());
     }
     TestUtils.testUnsignedBigInteger(accountsBalance);
     TestUtils.testUnsignedBigInteger(accountsUnlockedBalance);
-    assertEquals((wallet.getBalance()).toString(), accountsBalance.toString());
-    assertEquals((wallet.getUnlockedBalance()).toString(), accountsUnlockedBalance.toString());
+    assertEquals((wallet.getBalance().get(ZephyrAssets.ZPH)).toString(), accountsBalance.toString());
+    assertEquals((wallet.getUnlockedBalance().get(ZephyrAssets.ZPH)).toString(), accountsUnlockedBalance.toString());
   }
   
   // Can get accounts without subaddresses
@@ -1904,8 +1906,8 @@ public abstract class TestZephyrWalletCommon {
     assumeTrue(TEST_NON_RELAYS);
     
     // pre-fetch wallet balances, accounts, subaddresses, and txs
-    BigInteger walletBalance = wallet.getBalance();
-    BigInteger walletUnlockedBalance = wallet.getUnlockedBalance();
+    BigInteger walletBalance = wallet.getBalance().get(ZephyrAssets.ZPH);
+    BigInteger walletUnlockedBalance = wallet.getUnlockedBalance().get(ZephyrAssets.ZPH);
     List<ZephyrAccount> accounts = wallet.getAccounts(true);  // includes subaddresses
     
     // test wallet balance
@@ -2213,7 +2215,7 @@ public abstract class TestZephyrWalletCommon {
     ZephyrCheckReserve check = wallet.checkReserveProof(wallet.getPrimaryAddress(), "Test message", signature);
     assertTrue(check.isGood());
     testCheckReserve(check);
-    BigInteger balance = wallet.getBalance();
+    BigInteger balance = wallet.getBalance().get(ZephyrAssets.ZPH);
     if (!balance.equals(check.getTotalAmount())) {  // TODO zephyr-wallet-rpc: this check fails with unconfirmed txs
       List<ZephyrTxWallet> unconfirmedTxs = wallet.getTxs(new ZephyrTxQuery().setInTxPool(true));
       assertTrue(unconfirmedTxs.size() > 0, "Reserve amount must equal balance unless wallet has unconfirmed txs");
@@ -2434,7 +2436,7 @@ public abstract class TestZephyrWalletCommon {
     
     // determine if non-zero spent and unspent amounts are expected
     List<ZephyrTxWallet> txs = wallet.getTxs(new ZephyrTxQuery().setIsOutgoing(true).setIsConfirmed(true));
-    BigInteger balance = wallet.getBalance();
+    BigInteger balance = wallet.getBalance().get(ZephyrAssets.ZPH);
     boolean hasSpent = txs.size() > 0;
     boolean hasUnspent = balance.compareTo(BigInteger.valueOf(0)) > 0;
     
@@ -2877,8 +2879,8 @@ public abstract class TestZephyrWalletCommon {
     TestUtils.WALLET_TX_TRACKER.waitForUnlockedBalance(wallet, config.getAccountIndex(), null, config.getAmount());
     
     // record wallet balances before submitting tx to pool
-    BigInteger balanceBefore = wallet.getBalance();
-    BigInteger unlockedBalanceBefore = wallet.getUnlockedBalance();
+    BigInteger balanceBefore = wallet.getBalance().get(ZephyrAssets.ZPH);
+    BigInteger unlockedBalanceBefore = wallet.getUnlockedBalance().get(ZephyrAssets.ZPH);
     
     // create tx but do not relay
     ZephyrTxConfig configNoRelay = config.copy().setRelay(false);
@@ -2929,8 +2931,8 @@ public abstract class TestZephyrWalletCommon {
       if (runFailingCoreCode) {
         
         // wallet balances should change
-        assertNotEquals(balanceBefore, wallet.getBalance(), "Wallet balance should revert to original after flushing tx from pool without relaying");
-        assertNotEquals(unlockedBalanceBefore, wallet.getUnlockedBalance(), "Wallet unlocked balance should revert to original after flushing tx from pool without relaying");  // TODO: test exact amounts, maybe in ux test
+        assertNotEquals(balanceBefore, wallet.getBalance().get(ZephyrAssets.ZPH), "Wallet balance should revert to original after flushing tx from pool without relaying");
+        assertNotEquals(unlockedBalanceBefore, wallet.getUnlockedBalance().get(ZephyrAssets.ZPH), "Wallet unlocked balance should revert to original after flushing tx from pool without relaying");  // TODO: test exact amounts, maybe in ux test
         
         // create tx using same config which is no longer double spend
         ZephyrTxWallet tx2 = wallet.createTx(configNoRelay);
@@ -2964,8 +2966,8 @@ public abstract class TestZephyrWalletCommon {
         }
         
         // wallet balances should be restored
-        assertEquals(balanceBefore, wallet.getBalance(), "Wallet balance should be same as original since tx was flushed and not relayed");
-        assertEquals(unlockedBalanceBefore, wallet.getUnlockedBalance(), "Wallet unlocked balance should be same as original since tx was flushed and not relayed");
+        assertEquals(balanceBefore, wallet.getBalance().get(ZephyrAssets.ZPH), "Wallet balance should be same as original since tx was flushed and not relayed");
+        assertEquals(unlockedBalanceBefore, wallet.getUnlockedBalance().get(ZephyrAssets.ZPH), "Wallet unlocked balance should be same as original since tx was flushed and not relayed");
       } else {
         TestUtils.WALLET_TX_TRACKER.reset(); // all wallets need to wait for tx to confirm in order to reliably sync
       }
@@ -2982,8 +2984,8 @@ public abstract class TestZephyrWalletCommon {
    TestUtils.WALLET_TX_TRACKER.waitForWalletTxsToClearPool(wallet);
     
     // record wallet balances before submitting tx to pool
-    BigInteger balanceBefore = wallet.getBalance();
-    BigInteger unlockedBalanceBefore = wallet.getUnlockedBalance();
+    BigInteger balanceBefore = wallet.getBalance().get(ZephyrAssets.ZPH);
+    BigInteger unlockedBalanceBefore = wallet.getUnlockedBalance().get(ZephyrAssets.ZPH);
     
     // create config
     ZephyrTxConfig config = new ZephyrTxConfig()
@@ -3019,9 +3021,9 @@ public abstract class TestZephyrWalletCommon {
       }
       
       // test wallet balances
-      if (unlockedBalanceBefore.compareTo(wallet.getUnlockedBalance()) != 1) issues.add("WARNING: unlocked balance should have decreased after relaying tx directly to the daemon");
+      if (unlockedBalanceBefore.compareTo(wallet.getUnlockedBalance().get(ZephyrAssets.ZPH)) != 1) issues.add("WARNING: unlocked balance should have decreased after relaying tx directly to the daemon");
       BigInteger expectedBalance = balanceBefore.subtract(tx.getOutgoingAmount()).subtract(tx.getFee());
-      if (!expectedBalance.equals(wallet.getBalance())) issues.add("WARNING: expected balance after relaying tx directly to the daemon to be " + expectedBalance + " but was " + wallet.getBalance());
+      if (!expectedBalance.equals(wallet.getBalance().get(ZephyrAssets.ZPH))) issues.add("WARNING: expected balance after relaying tx directly to the daemon to be " + expectedBalance + " but was " + wallet.getBalance());
       
       // submit double spend tx
       ZephyrSubmitTxResult resultDoubleSpend = daemon.submitTxHex(txDoubleSpend.getFullHex(), true);
@@ -3069,8 +3071,8 @@ public abstract class TestZephyrWalletCommon {
     TestUtils.WALLET_TX_TRACKER.waitForUnlockedBalance(wallet, 0, null, amount);
     
     // collect sender balances before
-    BigInteger balance1 = wallet.getBalance();
-    BigInteger unlockedBalance1 = wallet.getUnlockedBalance();
+    BigInteger balance1 = wallet.getBalance().get(ZephyrAssets.ZPH);
+    BigInteger unlockedBalance1 = wallet.getUnlockedBalance().get(ZephyrAssets.ZPH);
     
     // test error sending funds to self with integrated subaddress
     // TODO (monero-project): sending funds to self with integrated subaddress throws error: https://github.com/monero-project/monero/issues/8380
@@ -3093,8 +3095,8 @@ public abstract class TestZephyrWalletCommon {
             .setRelay(true));
     
     // test balances after
-    BigInteger balance2 = wallet.getBalance();
-    BigInteger unlockedBalance2 = wallet.getUnlockedBalance();
+    BigInteger balance2 = wallet.getBalance().get(ZephyrAssets.ZPH);
+    BigInteger unlockedBalance2 = wallet.getUnlockedBalance().get(ZephyrAssets.ZPH);
     assertTrue(unlockedBalance2.compareTo(unlockedBalance1) < 0); // unlocked balance should decrease
     BigInteger expectedBalance = balance1.subtract(tx.getFee());
     if (!expectedBalance.equals(balance2)) System.out.println("Expected=" + expectedBalance + " - Actual=" + balance2 + " = " + (expectedBalance.subtract(balance2)));
@@ -3117,8 +3119,8 @@ public abstract class TestZephyrWalletCommon {
       recipient = createWallet(new ZephyrWalletConfig());
       
       // collect sender balances before
-      BigInteger balance1 = wallet.getBalance();
-      BigInteger unlockedBalance1 = wallet.getUnlockedBalance();
+      BigInteger balance1 = wallet.getBalance().get(ZephyrAssets.ZPH);
+      BigInteger unlockedBalance1 = wallet.getUnlockedBalance().get(ZephyrAssets.ZPH);
       
       // send funds to recipient
       ZephyrTxWallet tx = wallet.createTx(new ZephyrTxConfig()
@@ -3128,8 +3130,8 @@ public abstract class TestZephyrWalletCommon {
               .setRelay(true));
       
       // test sender balances after
-      BigInteger balance2 = wallet.getBalance();
-      BigInteger unlockedBalance2 = wallet.getUnlockedBalance();
+      BigInteger balance2 = wallet.getBalance().get(ZephyrAssets.ZPH);
+      BigInteger unlockedBalance2 = wallet.getUnlockedBalance().get(ZephyrAssets.ZPH);
       assertTrue(unlockedBalance2.compareTo(unlockedBalance1) < 0); // unlocked balance should decrease
       BigInteger expectedBalance = balance1.subtract(tx.getOutgoingAmount()).subtract(tx.getFee());
       assertEquals(expectedBalance, balance2, "Balance after send was not balance before - net tx amount - fee (5 - 1 != 4 test)");
@@ -3137,7 +3139,7 @@ public abstract class TestZephyrWalletCommon {
       // test recipient balance after
       recipient.sync();
       assertFalse(wallet.getTxs(new ZephyrTxQuery().setIsConfirmed(false)).isEmpty());
-      assertEquals(amount, recipient.getBalance());
+      assertEquals(amount, recipient.getBalance().get(ZephyrAssets.ZPH));
     } finally {
       if (recipient != null && !recipient.isClosed()) closeWallet(recipient);
     }
@@ -3843,7 +3845,7 @@ public abstract class TestZephyrWalletCommon {
       TestUtils.WALLET_TX_TRACKER.waitForUnlockedBalance(wallet, 0, null, TestUtils.MAX_FEE.multiply(new BigInteger("20")));
       
       // send funds from the main test wallet to destinations in the first multisig wallet
-      assertTrue(wallet.getBalance().compareTo(BigInteger.valueOf(0)) > 0);
+      assertTrue(wallet.getBalance().get(ZephyrAssets.ZPH).compareTo(BigInteger.valueOf(0)) > 0);
       System.out.println("Sending funds from main wallet");
       wallet.createTx(new ZephyrTxConfig().setAccountIndex(0).setDestinations(destinations).setRelay(true));
       String returnAddress = wallet.getPrimaryAddress(); // funds will be returned to this address from the multisig wallet
@@ -3886,7 +3888,7 @@ public abstract class TestZephyrWalletCommon {
       
       // multisig wallet should have unlocked balance in subaddresses 0-3
       for (int i = 0; i < numSubaddresses; i++) {
-        assertTrue(participant.getUnlockedBalance(accountIdx, i).compareTo(BigInteger.valueOf(0)) > 0);
+        assertTrue(participant.getUnlockedBalance(ZephyrAssets.ZPH, accountIdx, i).compareTo(BigInteger.valueOf(0)) > 0);
       }
       List<ZephyrOutputWallet> outputs = participant.getOutputs(new ZephyrOutputQuery().setAccountIndex(accountIdx));
       assertFalse(outputs.isEmpty());
@@ -4631,10 +4633,10 @@ public abstract class TestZephyrWalletCommon {
     TestUtils.WALLET_TX_TRACKER.waitForUnlockedBalance(sender, 0, null, TestUtils.MAX_FEE.multiply(new BigInteger("10")));
     
     // get balances to compare after sending
-    BigInteger senderBalanceBefore = sender.getBalance();
-    BigInteger senderUnlockedBalanceBefore = sender.getUnlockedBalance();
-    BigInteger receiverBalanceBefore = receiver.getBalance();
-    BigInteger receiverUnlockedBalanceBefore = receiver.getUnlockedBalance();
+    BigInteger senderBalanceBefore = sender.getBalance().get(ZephyrAssets.ZPH);
+    BigInteger senderUnlockedBalanceBefore = sender.getUnlockedBalance().get(ZephyrAssets.ZPH);
+    BigInteger receiverBalanceBefore = receiver.getBalance().get(ZephyrAssets.ZPH);
+    BigInteger receiverUnlockedBalanceBefore = receiver.getUnlockedBalance().get(ZephyrAssets.ZPH);
     Long lastHeight = daemon.getHeight();
     
     // start collecting notifications from sender and receiver
@@ -4690,12 +4692,12 @@ public abstract class TestZephyrWalletCommon {
       if (senderTx.getIncomingAmount() != null) issues.add("ERROR: tx incoming amount should be null"); // TODO: should be 0? then can remove null checks in this method
     }
     senderTx = sender.getTxs(new ZephyrTxQuery().setHash(senderTx.getHash()).setIncludeOutputs(true)).get(0);
-    if (!sender.getBalance().equals(senderBalanceBefore.subtract(senderTx.getFee()).subtract(senderTx.getOutgoingAmount()).add(senderTx.getIncomingAmount() == null ? new BigInteger("0") : senderTx.getIncomingAmount()))) issues.add("ERROR: sender balance after send != balance before - tx fee - outgoing amount + incoming amount (" + sender.getBalance() + " != " + senderBalanceBefore + " - " + senderTx.getFee() + " - " + senderTx.getOutgoingAmount() + " + " + senderTx.getIncomingAmount() + ")");
-    if (sender.getUnlockedBalance().compareTo(senderUnlockedBalanceBefore) >= 0) issues.add("ERROR: sender unlocked balance should have decreased after sending");
+    if (!sender.getBalance().get(ZephyrAssets.ZPH).equals(senderBalanceBefore.subtract(senderTx.getFee()).subtract(senderTx.getOutgoingAmount()).add(senderTx.getIncomingAmount() == null ? new BigInteger("0") : senderTx.getIncomingAmount()))) issues.add("ERROR: sender balance after send != balance before - tx fee - outgoing amount + incoming amount (" + sender.getBalance().get(ZephyrAssets.ZPH) + " != " + senderBalanceBefore + " - " + senderTx.getFee() + " - " + senderTx.getOutgoingAmount() + " + " + senderTx.getIncomingAmount() + ")");
+    if (sender.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(senderUnlockedBalanceBefore) >= 0) issues.add("ERROR: sender unlocked balance should have decreased after sending");
     if (senderNotificationCollector.getBalanceNotifications().size() == 0) issues.add("ERROR: sender did not notify balance change after sending");
     else {
-      if (!sender.getBalance().equals(senderNotificationCollector.getBalanceNotifications().get(senderNotificationCollector.getBalanceNotifications().size() - 1).getFirst())) issues.add("ERROR: sender balance != last notified balance after sending (" + sender.getBalance() + " != " + senderNotificationCollector.getBalanceNotifications().get(senderNotificationCollector.getBalanceNotifications().size() - 1).getFirst() + ")");
-      if (!sender.getUnlockedBalance().equals(senderNotificationCollector.getBalanceNotifications().get(senderNotificationCollector.getBalanceNotifications().size() - 1).getSecond())) issues.add("ERROR: sender unlocked balance != last notified unlocked balance after sending (" + sender.getUnlockedBalance() + " != " + senderNotificationCollector.getBalanceNotifications().get(senderNotificationCollector.getBalanceNotifications().size() - 1).getSecond() + ")");
+      if (!sender.getBalance().get(ZephyrAssets.ZPH).equals(senderNotificationCollector.getBalanceNotifications().get(senderNotificationCollector.getBalanceNotifications().size() - 1).getFirst())) issues.add("ERROR: sender balance != last notified balance after sending (" + sender.getBalance().get(ZephyrAssets.ZPH) + " != " + senderNotificationCollector.getBalanceNotifications().get(senderNotificationCollector.getBalanceNotifications().size() - 1).getFirst() + ")");
+      if (!sender.getUnlockedBalance().get(ZephyrAssets.ZPH).equals(senderNotificationCollector.getBalanceNotifications().get(senderNotificationCollector.getBalanceNotifications().size() - 1).getSecond())) issues.add("ERROR: sender unlocked balance != last notified unlocked balance after sending (" + sender.getUnlockedBalance().get(ZephyrAssets.ZPH) + " != " + senderNotificationCollector.getBalanceNotifications().get(senderNotificationCollector.getBalanceNotifications().size() - 1).getSecond() + ")");
     }
     if (senderNotificationCollector.getOutputsSpent(outputQuery).size() == 0) issues.add("ERROR: sender did not announce unconfirmed spent output");
         
@@ -4707,15 +4709,15 @@ public abstract class TestZephyrWalletCommon {
       if (sameAccount) issues.add("WARNING: sender tx outgoing amount != receiver tx incoming amount when sent to same account (" + senderTx.getOutgoingAmount() + " != " + receiverTx.getIncomingAmount() + ")");
       else if (sameAccount) issues.add("ERROR: sender tx outgoing amount != receiver tx incoming amount (" + senderTx.getOutgoingAmount() + " != " + receiverTx.getIncomingAmount() + ")");
     }
-    if (!receiver.getBalance().equals(receiverBalanceBefore.add(receiverTx.getIncomingAmount() == null ? new BigInteger("0") : receiverTx.getIncomingAmount()).subtract(receiverTx.getOutgoingAmount() == null ? new BigInteger("0") : receiverTx.getOutgoingAmount()).subtract(sameWallet ? receiverTx.getFee() : new BigInteger("0")))) {
+    if (!receiver.getBalance().get(ZephyrAssets.ZPH).equals(receiverBalanceBefore.add(receiverTx.getIncomingAmount() == null ? new BigInteger("0") : receiverTx.getIncomingAmount()).subtract(receiverTx.getOutgoingAmount() == null ? new BigInteger("0") : receiverTx.getOutgoingAmount()).subtract(sameWallet ? receiverTx.getFee() : new BigInteger("0")))) {
       if (sameAccount) issues.add("WARNING: after sending, receiver balance != balance before + incoming amount - outgoing amount - tx fee when sent to same account (" + receiver.getBalance() + " != " + receiverBalanceBefore + " + " + receiverTx.getIncomingAmount() + " - " + receiverTx.getOutgoingAmount() + " - " + (sameWallet ? receiverTx.getFee() : new BigInteger("0")) + ")");
       else issues.add("ERROR: after sending, receiver balance != balance before + incoming amount - outgoing amount - tx fee (" + receiver.getBalance() + " != " + receiverBalanceBefore + " + " + receiverTx.getIncomingAmount() + " - " + receiverTx.getOutgoingAmount() + " - " + (sameWallet ? receiverTx.getFee() : new BigInteger("0")) + ")");
     }
-    if (!sameWallet && !receiver.getUnlockedBalance().equals(receiverUnlockedBalanceBefore)) issues.add("ERROR: receiver unlocked balance should not have changed after sending");
+    if (!sameWallet && !receiver.getUnlockedBalance().get(ZephyrAssets.ZPH).equals(receiverUnlockedBalanceBefore)) issues.add("ERROR: receiver unlocked balance should not have changed after sending");
     if (receiverNotificationCollector.getBalanceNotifications().size() == 0) issues.add("ERROR: receiver did not notify balance change when funds received");
     else {
-      if (!receiver.getBalance().equals(receiverNotificationCollector.getBalanceNotifications().get(receiverNotificationCollector.getBalanceNotifications().size() - 1).getFirst())) issues.add("ERROR: receiver balance != last notified balance after funds received");
-      if (!receiver.getUnlockedBalance().equals(receiverNotificationCollector.getBalanceNotifications().get(receiverNotificationCollector.getBalanceNotifications().size() - 1).getSecond())) issues.add("ERROR: receiver unlocked balance != last notified unlocked balance after funds received");
+      if (!receiver.getBalance().get(ZephyrAssets.ZPH).equals(receiverNotificationCollector.getBalanceNotifications().get(receiverNotificationCollector.getBalanceNotifications().size() - 1).getFirst())) issues.add("ERROR: receiver balance != last notified balance after funds received");
+      if (!receiver.getUnlockedBalance().get(ZephyrAssets.ZPH).equals(receiverNotificationCollector.getBalanceNotifications().get(receiverNotificationCollector.getBalanceNotifications().size() - 1).getSecond())) issues.add("ERROR: receiver unlocked balance != last notified unlocked balance after funds received");
     }
     if (receiverNotificationCollector.getOutputsReceived(outputQuery).size() == 0) issues.add("ERROR: receiver did not announce unconfirmed received output");
     else {
@@ -4806,13 +4808,13 @@ public abstract class TestZephyrWalletCommon {
             if (!sameWallet && !receiver.getBalance().equals(receiver.getUnlockedBalance())) issues.add("ERROR: receiver balance != unlocked balance after funds unlocked");
             if (senderNotificationCollector.getBalanceNotifications().size() == 0) issues.add("ERROR: sender did not announce any balance notifications");
             else {
-              if (!sender.getBalance().equals(senderNotificationCollector.getBalanceNotifications().get(senderNotificationCollector.getBalanceNotifications().size() - 1).getFirst())) issues.add("ERROR: sender balance != last notified balance after funds unlocked");
-              if (!sender.getUnlockedBalance().equals(senderNotificationCollector.getBalanceNotifications().get(senderNotificationCollector.getBalanceNotifications().size() - 1).getSecond())) issues.add("ERROR: sender unlocked balance != last notified unlocked balance after funds unlocked");
+              if (!sender.getBalance().get(ZephyrAssets.ZPH).equals(senderNotificationCollector.getBalanceNotifications().get(senderNotificationCollector.getBalanceNotifications().size() - 1).getFirst())) issues.add("ERROR: sender balance != last notified balance after funds unlocked");
+              if (!sender.getUnlockedBalance().get(ZephyrAssets.ZPH).equals(senderNotificationCollector.getBalanceNotifications().get(senderNotificationCollector.getBalanceNotifications().size() - 1).getSecond())) issues.add("ERROR: sender unlocked balance != last notified unlocked balance after funds unlocked");
             }
             if (receiverNotificationCollector.getBalanceNotifications().size() == 0) issues.add("ERROR: receiver did not announce any balance notifications");
             else {
-              if (!receiver.getBalance().equals(receiverNotificationCollector.getBalanceNotifications().get(receiverNotificationCollector.getBalanceNotifications().size() - 1).getFirst())) issues.add("ERROR: receiver balance != last notified balance after funds unlocked");
-              if (!receiver.getUnlockedBalance().equals(receiverNotificationCollector.getBalanceNotifications().get(receiverNotificationCollector.getBalanceNotifications().size() - 1).getSecond())) issues.add("ERROR: receiver unlocked balance != last notified unlocked balance after funds unlocked");
+              if (!receiver.getBalance().get(ZephyrAssets.ZPH).equals(receiverNotificationCollector.getBalanceNotifications().get(receiverNotificationCollector.getBalanceNotifications().size() - 1).getFirst())) issues.add("ERROR: receiver balance != last notified balance after funds unlocked");
+              if (!receiver.getUnlockedBalance().get(ZephyrAssets.ZPH).equals(receiverNotificationCollector.getBalanceNotifications().get(receiverNotificationCollector.getBalanceNotifications().size() - 1).getSecond())) issues.add("ERROR: receiver unlocked balance != last notified unlocked balance after funds unlocked");
             }
           }
         });
