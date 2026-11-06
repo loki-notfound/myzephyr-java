@@ -60,9 +60,24 @@ if [ -f "$Z/build/release/lib/libwallet.a" ]; then
 else
   mkdir -p "$Z/build/release" && cd "$Z/build/release"
   cmake -D STATIC=ON -D BUILD_64=ON -D CMAKE_BUILD_TYPE=Release -D USE_CCACHE=ON ../..
-  make -j"$(nproc)"
+  # Only the wallet targets: the daemon, the tests and miniupnpc's sample are not needed,
+  # and the sample does not compile with gcc 14 (strdup undeclared under -std=c11).
+  make -j"$(nproc)" wallet_rpc_server
   cd "$ROOT"
 fi
+
+# Every static library zephyr-cpp imports from the zephyr build must exist (libwallet-crypto.a
+# is optional there, guarded by if (EXISTS ...), and is skipped here).
+MISSING=0
+for LIB in $(grep -o '\${MONERO_PROJECT_BUILD}/[^)[:space:]]*\.a' external/zephyr-cpp/CMakeLists.txt \
+             | grep -v '/libwallet-crypto\.a$' | sort -u); do
+  P="$Z/build/release/${LIB#\$\{MONERO_PROJECT_BUILD\}/}"
+  if [ ! -f "$P" ]; then
+    echo "missing zephyr library: $P" >&2
+    MISSING=1
+  fi
+done
+[ "$MISSING" = 0 ] || exit 1
 
 # 4. JNI library
 mkdir -p build && cd build
