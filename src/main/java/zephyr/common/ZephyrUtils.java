@@ -65,7 +65,7 @@ public class ZephyrUtils {
     return JNI_LOADED;
   }
   
-  public static final int RING_SIZE = 12; // network-enforced ring size
+  public static final int RING_SIZE = 16; // network-enforced ring size of the Zephyr core
   
   private static int LOG_LEVEL = 0;
   private static long AU_PER_COIN = 1000000000000l;
