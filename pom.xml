@@ -136,6 +136,15 @@
 								<version>3.2.5</version>
 							</dependency>
 						</dependencies>
+						<configuration>
+							<!-- the pure suites; the integration suites need a daemon and wallets: mvn test -Pintegration -->
+							<includes>
+								<include>test/TestSerialization.java</include>
+								<include>test/TestZephyrModel.java</include>
+								<include>test/TestZephyrUtils.java</include>
+							</includes>
+							<argLine>-Djava.library.path=${project.basedir}/build</argLine>
+						</configuration>
 					</plugin>
 					<plugin>
 						<groupId>org.apache.maven.plugins</groupId>
@@ -158,6 +167,33 @@
 								</goals>
 							</execution>
 						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+		<profile>
+			<id>integration</id>
+			<!-- activating a profile switches the default one off, so the JUnit 5 provider is repeated here -->
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-surefire-plugin</artifactId>
+						<version>3.2.5</version>
+						<dependencies>
+							<dependency>
+								<groupId>org.apache.maven.surefire</groupId>
+								<artifactId>surefire-junit-platform</artifactId>
+								<version>3.2.5</version>
+							</dependency>
+						</dependencies>
+						<configuration>
+							<!-- every suite; needs a daemon and wallet files -->
+							<includes>
+								<include>test/Test*.java</include>
+							</includes>
+							<argLine>-Djava.library.path=${project.basedir}/build</argLine>
+						</configuration>
 					</plugin>
 				</plugins>
 			</build>
