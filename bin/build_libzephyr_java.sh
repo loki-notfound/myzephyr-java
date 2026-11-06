@@ -9,8 +9,8 @@
 #    tree is not committed anywhere; it is excluded in the submodule's git directory
 #    (info/exclude, inside .git, not in the tree) so the submodule stays clean.
 # 3. Builds zephyr in external/zephyr-cpp/external/zephyr/build/release with the settings of
-#    zephyr's "make release-static" target plus ccache. Skipped when libwallet.a already exists
-#    and the tree is at the pinned sha; to rebuild, remove that build directory first.
+#    zephyr's "make release-static" target plus ccache, library targets only. cmake is skipped
+#    when the build directory has a CMakeCache.txt; make always runs (a no-op when up to date).
 # 4. Builds the JNI library in build/ (CMakeLists.txt of this repo).
 #
 # Usage: bin/build_libzephyr_java.sh [--keep-going]
@@ -55,16 +55,17 @@ mkdir -p "$(dirname "$EXCLUDE")"
 grep -qxF 'external/zephyr' "$EXCLUDE" 2>/dev/null || echo 'external/zephyr' >> "$EXCLUDE"
 
 # 3. zephyr, release-static settings plus ccache
-if [ -f "$Z/build/release/lib/libwallet.a" ]; then
-  echo "zephyr: $Z/build/release/lib/libwallet.a exists at $ZEPHYR_SHA, skipping the zephyr build"
+mkdir -p "$Z/build/release" && cd "$Z/build/release"
+if [ -f CMakeCache.txt ]; then
+  echo "zephyr: $Z/build/release/CMakeCache.txt exists, skipping cmake"
 else
-  mkdir -p "$Z/build/release" && cd "$Z/build/release"
   cmake -D STATIC=ON -D BUILD_64=ON -D CMAKE_BUILD_TYPE=Release -D USE_CCACHE=ON ../..
-  # Only the wallet targets: the daemon, the tests and miniupnpc's sample are not needed,
-  # and the sample does not compile with gcc 14 (strdup undeclared under -std=c11).
-  make -j"$(nproc)" wallet_rpc_server
-  cd "$ROOT"
 fi
+# Only the wallet targets: the daemon, the tests and miniupnpc's sample are not needed,
+# and the sample does not compile with gcc 14 (strdup undeclared under -std=c11).
+# The wallet-rpc executable is built in a later round.
+make -j"$(nproc)" wallet blocks cryptonote_protocol
+cd "$ROOT"
 
 # Every static library zephyr-cpp imports from the zephyr build must exist (libwallet-crypto.a
 # is optional there, guarded by if (EXISTS ...), and is skipped here).
