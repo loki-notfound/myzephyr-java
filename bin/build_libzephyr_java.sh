@@ -64,14 +64,15 @@ fi
 # Only the wallet targets: the daemon, the tests and miniupnpc's sample are not needed,
 # and the sample does not compile with gcc 14 (strdup undeclared under -std=c11).
 # The wallet-rpc executable is built in a later round.
-make -j"$(nproc)" wallet blocks cryptonote_protocol
+# blocks is not built by this tree (PER_BLOCK_CHECKPOINT 0) and not needed by the wallet.
+make -j"$(nproc)" wallet cryptonote_protocol
 cd "$ROOT"
 
 # Every static library zephyr-cpp imports from the zephyr build must exist (libwallet-crypto.a
-# is optional there, guarded by if (EXISTS ...), and is skipped here).
+# is optional there, guarded by if (EXISTS ...), and is skipped here; so is libblocks.a, see above).
 MISSING=0
 for LIB in $(grep -o '\${MONERO_PROJECT_BUILD}/[^)[:space:]]*\.a' external/zephyr-cpp/CMakeLists.txt \
-             | grep -v '/libwallet-crypto\.a$' | sort -u); do
+             | grep -v -e '/libwallet-crypto\.a$' -e '/libblocks\.a$' | sort -u); do
   P="$Z/build/release/${LIB#\$\{MONERO_PROJECT_BUILD\}/}"
   if [ ! -f "$P" ]; then
     echo "missing zephyr library: $P" >&2

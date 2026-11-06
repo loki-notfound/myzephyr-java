@@ -257,9 +257,7 @@ add_library(blockchain_db STATIC IMPORTED)
 set_target_properties(blockchain_db PROPERTIES IMPORTED_LOCATION
     ${MONERO_PROJECT_BUILD}/src/blockchain_db/libblockchain_db.a)
 
-add_library(blocks STATIC IMPORTED)
-set_target_properties(blocks PROPERTIES IMPORTED_LOCATION
-    ${MONERO_PROJECT_BUILD}/src/blocks/libblocks.a)
+# D22: no blocks library; zephyr builds with PER_BLOCK_CHECKPOINT 0, so libblocks.a never exists
 
 add_library(checkpoints STATIC IMPORTED)
 set_target_properties(checkpoints PROPERTIES IMPORTED_LOCATION
@@ -332,7 +330,6 @@ target_link_libraries(zephyr-java
     common
     cncrypto
     blockchain_db
-    blocks
     checkpoints
     device
     device_trezor
