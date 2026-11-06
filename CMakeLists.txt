@@ -360,6 +360,12 @@ target_link_libraries(zephyr-java
 # JNI entry points are exported from libzephyr-java
 target_link_options(zephyr-java PRIVATE "-Wl,--exclude-libs,ALL")
 
+# D17: exact export list (Java_zephyr_* and JNI_OnLoad) from src/main/cpp/zephyr-java.map
+if (NOT APPLE AND NOT WIN32)
+  target_link_options(zephyr-java PRIVATE "-Wl,--version-script=${CMAKE_SOURCE_DIR}/src/main/cpp/zephyr-java.map")
+  set_property(TARGET zephyr-java APPEND PROPERTY LINK_DEPENDS "${CMAKE_SOURCE_DIR}/src/main/cpp/zephyr-java.map")
+endif()
+
 if (WIN32)
   target_link_options(zephyr-java PUBLIC "-Wl,--enable-auto-import,--export-all-symbols")
 endif()

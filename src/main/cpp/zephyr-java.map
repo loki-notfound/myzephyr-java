@@ -1,0 +1,10 @@
+/* Linker version script of libzephyr-java (D17): only the JNI entry points are exported.
+   -fvisibility=hidden leaves the weak std/boost template instantiations visible (libstdc++'s
+   visibility pragma, BOOST_SYMBOL_VISIBLE); this list makes everything else local. */
+{
+  global:
+    Java_zephyr_*;
+    JNI_OnLoad;
+  local:
+    *;
+};
