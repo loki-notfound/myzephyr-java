@@ -206,4 +206,10 @@ public class ZephyrOutputWallet extends ZephyrOutput {
     super.setStealthPublicKey(stealthPublicKey);
     return this;
   }
+  
+  @Override
+  public ZephyrOutputWallet setAssetType(String assetType) {
+    super.setAssetType(assetType);
+    return this;
+  }
 }

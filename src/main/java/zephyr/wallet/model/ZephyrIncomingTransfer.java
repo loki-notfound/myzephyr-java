@@ -157,4 +157,10 @@ public class ZephyrIncomingTransfer extends ZephyrTransfer {
     super.setAccountIndex(accountIndex);
     return this;
   }
+  
+  @Override
+  public ZephyrIncomingTransfer setAssetType(String assetType) {
+    super.setAssetType(assetType);
+    return this;
+  }
 }

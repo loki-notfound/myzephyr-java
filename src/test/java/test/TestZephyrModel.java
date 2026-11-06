@@ -22,6 +22,8 @@ import zephyr.wallet.model.ZephyrAssets;
 import zephyr.wallet.model.ZephyrBalance;
 import zephyr.wallet.model.ZephyrDestination;
 import zephyr.wallet.model.ZephyrIncomingTransfer;
+import zephyr.wallet.model.ZephyrOutgoingTransfer;
+import zephyr.wallet.model.ZephyrOutputWallet;
 import zephyr.wallet.model.ZephyrReserveInfo;
 import zephyr.wallet.model.ZephyrSubaddress;
 import zephyr.wallet.model.ZephyrTxConfig;
@@ -147,6 +149,14 @@ public class TestZephyrModel {
     assertNotSame(output, outputCopy);
     assertEquals(ZephyrAssets.ZYS, outputCopy.getAssetType());
     assertEquals(output, outputCopy);
+
+    // fluent chains keep the subclass type
+    ZephyrIncomingTransfer incoming = new ZephyrIncomingTransfer().setAssetType(ZephyrAssets.ZSD).setAmount(BigInteger.ONE).setSubaddressIndex(0);
+    assertEquals(ZephyrAssets.ZSD, incoming.getAssetType());
+    ZephyrOutgoingTransfer outgoing = new ZephyrOutgoingTransfer().setAssetType(ZephyrAssets.ZRS).setAmount(BigInteger.ONE).setSubaddressIndices(Arrays.asList(0));
+    assertEquals(ZephyrAssets.ZRS, outgoing.getAssetType());
+    ZephyrOutputWallet outputWallet = new ZephyrOutputWallet().setAssetType(ZephyrAssets.ZYS).setAmount(BigInteger.ONE).setSubaddressIndex(0);
+    assertEquals(ZephyrAssets.ZYS, outputWallet.getAssetType());
   }
 
   // 6. the currency pair on the tx config, camelCase keys as the core deserializes them
