@@ -17,6 +17,8 @@ import zephyr.common.ZephyrUtils;
 import zephyr.daemon.model.ZephyrNetworkType;
 import zephyr.wallet.ZephyrWallet;
 import zephyr.wallet.ZephyrWalletFull;
+import zephyr.wallet.model.ZephyrAddressType;
+import zephyr.wallet.model.ZephyrDecodedAddress;
 import zephyr.wallet.model.ZephyrIntegratedAddress;
 import zephyr.wallet.model.ZephyrWalletConfig;
 import org.junit.jupiter.api.Test;
@@ -27,31 +29,91 @@ import utils.TestUtils;
  */
 public class TestZephyrUtils {
   
+  // Zephyr test vectors: fresh throwaway wallets of zephyr-wallet-cli v2.3.0 (67c5f53b8), generated
+  // offline on 2026-11-06; subaddresses are account 0 index 1, integrated addresses embed the
+  // payment id 0123456789abcdef and derive from the primary address of the same network
+  private static final String MAINNET_PRIMARY = "ZEPHYR3RDMKbaFgugwWnfL9zNc3Avpx8EBNJvwbmkN7LiGHMVbU2YkiSMk2b8Pq9myVT3deTgidge9ANsW3vUz5wP3omiUv2y5J4V";
+  private static final String MAINNET_SUBADDRESS = "ZEPHsCuTFRYfuPkNxAbu8f6RQkQtzwMv5GD6uzRGq7WZBF851LqPc4b2xXx6Lf2p9sWLQcCFJsc9FA9fEtJgWki365995PABC5J";
+  private static final String MAINNET_INTEGRATED = "ZEPHiizqWKqgGviYBXsgfaazPfzAV4mnSUyTZuKnp6Fi5gHPbbTpCS9GKZRjYywEwgRCRhdduGzpQHbGqrDXKdQU87SyuC3JYEnCcJz1bwwh6Q6NB";
+  private static final String TESTNET_PRIMARY = "ZPHTjeJQnpV8zJpwVBXoVE5RHkBDf4YBJSsvaj9mwn5d8MrASVrZCdzhwjroh6X2tkT79XyJVXnxVifz6HvhLZcA2QwG2Hx6Vug";
+  private static final String TESTNET_SUBADDRESS = "ZPHtsBZjCLCBNbvC9fgdPBjDALDriEQsygi9sv5sqV75MsmXRJqhaxVG8P7tb37M7ZHFUWceyiUFXKgssD12kbH8JxbKFVaNS3B";
+  private static final String TESTNET_INTEGRATED = "ZPHTiizJsGgXLVmUGP8w122csXQrHM7HMgpGCgTmGzRmguMyRFKpbVoJwP9hUN8c7TLP3SX474FRm3WBFUBjWepDEydD5PsGuRkCcJz1bwweTK3Zp";
+  private static final String STAGENET_PRIMARY = "ZPHSjp3QtHUQxfT4k9bfCBgye5EVdTGxicgvwSwysedp3AU4UarjWufgafz9n9FesB2C6FYrQCAXVJfRiKCK7UK3PUnUEmrWXXE";
+  private static final String STAGENET_SUBADDRESS = "ZPHss9WbJq5YK7Ji3WPFdbNqqtQTwtmAK3NkxVZuNAxvS1vSQbPQKDnC2wWWf55PKHGot7zwf73Fo2R9TQ88UAYaZLEvc9BnsAp";
+  private static final String STAGENET_INTEGRATED = "ZPHSii2S3xqjkFNb84Y9MeEYA8UvnTkMeb6SWzwHyaAJde4jku2mc5oNu8ZNpq8ZP6eokg3DLefKdXBEB732nUd8cDMeTcLYUjEJKSspVLvsNX2A";
+
+  // network type, address type, address
+  private static final Object[][] ZEPHYR_ADDRESSES = {
+    { ZephyrNetworkType.MAINNET, ZephyrAddressType.PRIMARY_ADDRESS, MAINNET_PRIMARY },
+    { ZephyrNetworkType.MAINNET, ZephyrAddressType.SUBADDRESS, MAINNET_SUBADDRESS },
+    { ZephyrNetworkType.MAINNET, ZephyrAddressType.INTEGRATED_ADDRESS, MAINNET_INTEGRATED },
+    { ZephyrNetworkType.TESTNET, ZephyrAddressType.PRIMARY_ADDRESS, TESTNET_PRIMARY },
+    { ZephyrNetworkType.TESTNET, ZephyrAddressType.SUBADDRESS, TESTNET_SUBADDRESS },
+    { ZephyrNetworkType.TESTNET, ZephyrAddressType.INTEGRATED_ADDRESS, TESTNET_INTEGRATED },
+    { ZephyrNetworkType.STAGENET, ZephyrAddressType.PRIMARY_ADDRESS, STAGENET_PRIMARY },
+    { ZephyrNetworkType.STAGENET, ZephyrAddressType.SUBADDRESS, STAGENET_SUBADDRESS },
+    { ZephyrNetworkType.STAGENET, ZephyrAddressType.INTEGRATED_ADDRESS, STAGENET_INTEGRATED },
+  };
+
+  // Monero addresses of upstream's tests, which must not validate on any Zephyr network
+  private static final String[] MONERO_ADDRESSES = {
+    "58qRVVjZ4KxMX57TH6yWqGcH5AswvZZS494hWHcHPt6cDkP7V8AqxFhi3RKXZueVRgUnk8niQGHSpY5Bm9DjuWn16GDKXpF",
+    "7B9w2xieXjhDumgPX39h1CAYELpsZ7Pe8Wqtr3pVL9jJ5gGDqgxjWt55gTYUCAuhahhM85ajEp6VbQfLDPETt4oT2ZRXa6n",
+    "42U9v3qs5CjZEePHBZHwuSckQXebuZu299NSmVEmQ41YJZQhKcPyujyMSzpDH4VMMVSBo3U3b54JaNvQLwAjqDhKS3rvM3L",
+    "48ZxX3Y2y5s4nJ8fdz2w65TrTEp9PRsv5J8iHSShkHQcE2V31FhnWptioNst1K9oeDY4KpWZ7v8V2BZNVa4Wdky89iqmPz2",
+    "48W972Fx1SQMCHVKENnPpM7tRcL5oWMgpMCqQDbhH8UrjDFg2H9i5AQWXuU1qacJgUUCVLTsgDmZKXGz1vPLXY8QB5ypYqG",
+    "4CApvrfMgUFZEePHBZHwuSckQXebuZu299NSmVEmQ41YJZQhKcPyujyMSzpDH4VMMVSBo3U3b54JaNvQLwAjqDhKeGLQ9vfRBRKFKnBtVH",
+    "4JGdXrMXaMP4nJ8fdz2w65TrTEp9PRsv5J8iHSShkHQcE2V31FhnWptioNst1K9oeDY4KpWZ7v8V2BZNVa4Wdky8DvDyXvDZXvE9jTQwom",
+    "4JCp7q5SchvMCHVKENnPpM7tRcL5oWMgpMCqQDbhH8UrjDFg2H9i5AQWXuU1qacJgUUCVLTsgDmZKXGz1vPLXY8QFySJXARQWju8AuRN2z",
+    "891TQPrWshJVpnBR4ZMhHiHpLx1PUnMqa3ccV5TJFBbqcJa3DWhjBh2QByCv3Su7WDPTGMHmCKkiVFN2fyGJKwbM1t6G7Ea",
+    "88fyq3t8Gxn1QWMG189EufHtMHXZXkfJtJKFJXqeA4GpSiuyfjVwVyp47PeQJnD7Tc8iK8TDvvhcmEmfh8nx7Va2ToP8wAo",
+    "88hnoBiX3TPjbFaQE8RxgyBcf3DtMKZWWQMoArBjQfn37JJwtm568mPX6ipcCuGKDnLCzgjmpLSqce4aBDyapJJAFtNxUMb",
+    "9tUBnNCkC3UKGygHCwYvAB1FscpjUuq5e9MYJd2rXuiiTjjfVeSVjnbSG5VTnJgBgy9Y7GTLfxpZNMUwNZjGfdFr1z79eV1",
+    "9xZmQa1kYakGoHcfXeBgcsLf622NCpChcACwXxfdgY9uAa9hXSPCV9cLvUsAShfDcFKDdPzCNJ1n5cFGKw5GVM722pjuGPd",
+    "A2TXS6QFQ4wEsp8U7C2Y4B7wBtiML8aDG7mdCbRvDQmRaRNj1YSSgJE46fSzUkwgpMUCXFqscvrQuN7oKpP6eDyQ7XuYsuf",
+    "A4AroB2EoJzKGygHCwYvAB1FscpjUuq5e9MYJd2rXuiiTjjfVeSVjnbSG5VTnJgBgy9Y7GTLfxpZNMUwNZjGfdFr2QY5Ba2aHhTEdQa2ra",
+    "A8GSRNqF9rGGoHcfXeBgcsLf622NCpChcACwXxfdgY9uAa9hXSPCV9cLvUsAShfDcFKDdPzCNJ1n5cFGKw5GVM723iPoCEF1Fs9BcPYxTW",
+    "ACACSuDk1LTEsp8U7C2Y4B7wBtiML8aDG7mdCbRvDQmRaRNj1YSSgJE46fSzUkwgpMUCXFqscvrQuN7oKpP6eDyQAdgDoT3UnMYKQz7SHC",
+    "BgnKzHPJQDcg7xiP7bMN9MfPv9Z8ciT71iEMYnCdgBRBFETWgu9nKTr8fnzyGfU9h9gyNA8SFzYYzHfTS9KhqytSU943Nu1",
+    "BZwiuKkoNP59zgPHTxpNw3PM4DW2xiAVQJWqfFRrGyeZ7afVdQqoiJg3E2dDL3Ja8BV4ov2LEoHx9UjzF3W4ihPBSZvWwTx",
+    "Bhf1DEYrentcehUvNreLK5gxosnC2VStMXNCCs163RTxQq4jxFYvpw7LrQFmrMwWW2KsXLhMRtyho6Lq11ci3Fb246bxYmi",
+    "5B8s3obCY2ETeQB3GNAGPK2zRGen5UeW1WzegSizVsmf6z5NvM2GLoN6zzk1vHyzGAAfA8pGhuYAeCFZjHAp59jRVQkunGS",
+    "57VfotUbSZLG82UkKhWXDjS5ZEK9ZCDcmjdk4gpVq2fbKdEgwRCFrGTLZ2MMdSHphRWJDWVBi5qS8T7dz13JTCWtC228zyn",
+    "52FysgWJYmAG73QUQZRULJj2Dv2C2mceUMB5zHqNzMn8WBtfPWQrSUFSQUKTX9r7bUMmVSGbrau976xYLynR8jTWLdA7rfp",
+    "5LqY4cQh9HkTeQB3GNAGPK2zRGen5UeW1WzegSizVsmf6z5NvM2GLoN6zzk1vHyzGAAfA8pGhuYAeCFZjHAp59jRj6LZRFrjuGK8Whthg2",
+    "5HCLphJ63prG82UkKhWXDjS5ZEK9ZCDcmjdk4gpVq2fbKdEgwRCFrGTLZ2MMdSHphRWJDWVBi5qS8T7dz13JTCWtHETX8zcUhDjVKcynf6",
+    "5BxetVKoA2gG73QUQZRULJj2Dv2C2mceUMB5zHqNzMn8WBtfPWQrSUFSQUKTX9r7bUMmVSGbrau976xYLynR8jTWVwQwpHNg5fCLgtA2Dv",
+    "778B5D2JmMh5TJVWFbygJR15dvio5Z5B24hfSrWDzeroM8j8Lqc9sMoFE6324xg2ReaAZqHJkgfGFRugRmYHugHZ4f17Gxo",
+    "73U97wGEH9RCVUf6bopo45jSgoqjMzz4mTUsvWs5EusmYAmFcBYFm7wKMVmgtVKCBhMQqXrcMbHvwck2md63jMZSFJxUhQ2",
+    "747wPpaPKrjDPZrF48jAfz9pRRUHLMCWfYu2UanP4ZfTG8NrmYrSEWNW8gYoadU8hTiwBjV14e6DLaC5xfhyEpX5154aMm6",
+  };
+
   // Can get integrated addresses
   @Test
   public void testGetIntegratedAddresses() {
-    String primaryAddress = "58qRVVjZ4KxMX57TH6yWqGcH5AswvZZS494hWHcHPt6cDkP7V8AqxFhi3RKXZueVRgUnk8niQGHSpY5Bm9DjuWn16GDKXpF";
-    String subaddress = "7B9w2xieXjhDumgPX39h1CAYELpsZ7Pe8Wqtr3pVL9jJ5gGDqgxjWt55gTYUCAuhahhM85ajEp6VbQfLDPETt4oT2ZRXa6n";
+    String primaryAddress = MAINNET_PRIMARY;
+    String subaddress = MAINNET_SUBADDRESS;
     String paymentId = "03284e41c342f036";
-    ZephyrNetworkType networkType = ZephyrNetworkType.STAGENET;
+    ZephyrNetworkType networkType = ZephyrNetworkType.MAINNET;
+    int integratedAddressLength = MAINNET_INTEGRATED.length();
     
     // get integrated address with randomly generated payment id
     ZephyrIntegratedAddress integratedAddress = ZephyrUtils.getIntegratedAddress(networkType, primaryAddress, null);
     assertEquals(primaryAddress, integratedAddress.getStandardAddress());
     assertEquals(16, integratedAddress.getPaymentId().length());
-    assertEquals(106, integratedAddress.getIntegratedAddress().length());
+    assertEquals(integratedAddressLength, integratedAddress.getIntegratedAddress().length());
     
     // get integrated address with specific payment id
     integratedAddress = ZephyrUtils.getIntegratedAddress(networkType, primaryAddress, paymentId);
     assertEquals(primaryAddress, integratedAddress.getStandardAddress());
     assertEquals(paymentId, integratedAddress.getPaymentId());
-    assertEquals(106, integratedAddress.getIntegratedAddress().length());
+    assertEquals(integratedAddressLength, integratedAddress.getIntegratedAddress().length());
     
     // get integrated address with subaddress
     integratedAddress = ZephyrUtils.getIntegratedAddress(networkType, subaddress, paymentId);
     assertEquals(subaddress, integratedAddress.getStandardAddress());
     assertEquals(paymentId, integratedAddress.getPaymentId());
-    assertEquals(106, integratedAddress.getIntegratedAddress().length());
+    assertEquals(integratedAddressLength, integratedAddress.getIntegratedAddress().length());
     
     // get integrated address with invalid payment id
     try {
@@ -59,6 +121,71 @@ public class TestZephyrUtils {
       fail("Getting integrated address with invalid payment id should have failed");
     } catch (ZephyrError err) {
       assertEquals("Invalid payment id", err.getMessage());
+    }
+  }
+  
+  // Can decode Zephyr addresses of every network and type
+  @Test
+  public void testDecodeZephyrAddresses() {
+    for (Object[] vector : ZEPHYR_ADDRESSES) {
+      ZephyrDecodedAddress decoded = ZephyrUtils.decodeAddress((String) vector[2]);
+      assertEquals(vector[2], decoded.getAddress());
+      assertEquals(vector[0], decoded.getNetworkType(), (String) vector[2]);
+      assertEquals(vector[1], decoded.getAddressType(), (String) vector[2]);
+    }
+  }
+  
+  // Rejects Monero addresses and broken Zephyr addresses
+  @Test
+  public void testRejectForeignAndBrokenAddresses() {
+    
+    // Monero addresses are invalid on every network
+    for (String moneroAddress : MONERO_ADDRESSES) {
+      for (ZephyrNetworkType networkType : ZephyrNetworkType.values()) {
+        assertFalse(ZephyrUtils.isValidAddress(moneroAddress, networkType), moneroAddress + " on " + networkType);
+      }
+    }
+    
+    // changed last character (checksum)
+    testInvalidAddress(changeChar(MAINNET_PRIMARY, MAINNET_PRIMARY.length() - 1), ZephyrNetworkType.MAINNET);
+    
+    // mainnet address on testnet
+    testInvalidAddress(MAINNET_PRIMARY, ZephyrNetworkType.TESTNET);
+    
+    // truncated by one character: a ZephyrError for every vector
+    for (Object[] vector : ZEPHYR_ADDRESSES) {
+      String address = (String) vector[2];
+      testInvalidAddress(address.substring(0, address.length() - 1), (ZephyrNetworkType) vector[0]);
+    }
+    
+    // short strings and block overflows: a ZephyrError, not a decoder exception
+    for (String malformed : new String[] { "11", "111", "11111", "zzzzzzzzzzz", "11111111111zz" }) {
+      testInvalidAddress(malformed, ZephyrNetworkType.MAINNET);
+    }
+  }
+  
+  // The base58 decoder handles every last-block size without a NullPointerException
+  @Test
+  public void testBase58LastBlockSizes() {
+    
+    // last blocks of 9 and 10 characters (6 and 7 bytes) decode; the hash check then rejects them
+    for (int length : new int[] { 20, 21 }) {
+      try {
+        ZephyrUtils.validateAddress(repeat('1', length), ZephyrNetworkType.MAINNET);
+        fail("Should have thrown exception");
+      } catch (ZephyrError e) {
+        assertEquals("Address has invalid hash", e.getMessage());
+      }
+    }
+    
+    // last blocks of 1, 4 and 8 characters are invalid encodings
+    for (int length : new int[] { 12, 15, 19 }) {
+      try {
+        ZephyrUtils.validateAddress(repeat('1', length), ZephyrNetworkType.MAINNET);
+        fail("Should have thrown exception");
+      } catch (ZephyrError e) {
+        assertEquals("Address has invalid encoding", e.getMessage());
+      }
     }
   }
   
@@ -124,71 +251,42 @@ public class TestZephyrUtils {
   @Test
   public void testAddressValidation() {
     
-    // test mainnet primary address validation
-    assertTrue(ZephyrUtils.isValidAddress("42U9v3qs5CjZEePHBZHwuSckQXebuZu299NSmVEmQ41YJZQhKcPyujyMSzpDH4VMMVSBo3U3b54JaNvQLwAjqDhKS3rvM3L", ZephyrNetworkType.MAINNET));
-    assertTrue(ZephyrUtils.isValidAddress("48ZxX3Y2y5s4nJ8fdz2w65TrTEp9PRsv5J8iHSShkHQcE2V31FhnWptioNst1K9oeDY4KpWZ7v8V2BZNVa4Wdky89iqmPz2", ZephyrNetworkType.MAINNET));
-    assertTrue(ZephyrUtils.isValidAddress("48W972Fx1SQMCHVKENnPpM7tRcL5oWMgpMCqQDbhH8UrjDFg2H9i5AQWXuU1qacJgUUCVLTsgDmZKXGz1vPLXY8QB5ypYqG", ZephyrNetworkType.MAINNET));
+    // test mainnet address validation
+    assertTrue(ZephyrUtils.isValidAddress(MAINNET_PRIMARY, ZephyrNetworkType.MAINNET));
+    ZephyrUtils.validateAddress(MAINNET_PRIMARY, ZephyrNetworkType.MAINNET);
+    ZephyrUtils.validateAddress(MAINNET_INTEGRATED, ZephyrNetworkType.MAINNET);
+    ZephyrUtils.validateAddress(MAINNET_SUBADDRESS, ZephyrNetworkType.MAINNET);
     
-    // test mainnet integrated address validation
-    ZephyrUtils.validateAddress("4CApvrfMgUFZEePHBZHwuSckQXebuZu299NSmVEmQ41YJZQhKcPyujyMSzpDH4VMMVSBo3U3b54JaNvQLwAjqDhKeGLQ9vfRBRKFKnBtVH", ZephyrNetworkType.MAINNET);
-    ZephyrUtils.validateAddress("4JGdXrMXaMP4nJ8fdz2w65TrTEp9PRsv5J8iHSShkHQcE2V31FhnWptioNst1K9oeDY4KpWZ7v8V2BZNVa4Wdky8DvDyXvDZXvE9jTQwom", ZephyrNetworkType.MAINNET);
-    ZephyrUtils.validateAddress("4JCp7q5SchvMCHVKENnPpM7tRcL5oWMgpMCqQDbhH8UrjDFg2H9i5AQWXuU1qacJgUUCVLTsgDmZKXGz1vPLXY8QFySJXARQWju8AuRN2z", ZephyrNetworkType.MAINNET);
+    // test testnet address validation
+    ZephyrUtils.validateAddress(TESTNET_PRIMARY, ZephyrNetworkType.TESTNET);
+    ZephyrUtils.validateAddress(TESTNET_INTEGRATED, ZephyrNetworkType.TESTNET);
+    ZephyrUtils.validateAddress(TESTNET_SUBADDRESS, ZephyrNetworkType.TESTNET);
     
-    // test mainnet subaddress validation
-    ZephyrUtils.validateAddress("891TQPrWshJVpnBR4ZMhHiHpLx1PUnMqa3ccV5TJFBbqcJa3DWhjBh2QByCv3Su7WDPTGMHmCKkiVFN2fyGJKwbM1t6G7Ea", ZephyrNetworkType.MAINNET);
-    ZephyrUtils.validateAddress("88fyq3t8Gxn1QWMG189EufHtMHXZXkfJtJKFJXqeA4GpSiuyfjVwVyp47PeQJnD7Tc8iK8TDvvhcmEmfh8nx7Va2ToP8wAo", ZephyrNetworkType.MAINNET);
-    ZephyrUtils.validateAddress("88hnoBiX3TPjbFaQE8RxgyBcf3DtMKZWWQMoArBjQfn37JJwtm568mPX6ipcCuGKDnLCzgjmpLSqce4aBDyapJJAFtNxUMb", ZephyrNetworkType.MAINNET);
-    
-    // test testnet primary address validation
-    ZephyrUtils.validateAddress("9tUBnNCkC3UKGygHCwYvAB1FscpjUuq5e9MYJd2rXuiiTjjfVeSVjnbSG5VTnJgBgy9Y7GTLfxpZNMUwNZjGfdFr1z79eV1", ZephyrNetworkType.TESTNET);
-    ZephyrUtils.validateAddress("9xZmQa1kYakGoHcfXeBgcsLf622NCpChcACwXxfdgY9uAa9hXSPCV9cLvUsAShfDcFKDdPzCNJ1n5cFGKw5GVM722pjuGPd", ZephyrNetworkType.TESTNET);
-    ZephyrUtils.validateAddress("A2TXS6QFQ4wEsp8U7C2Y4B7wBtiML8aDG7mdCbRvDQmRaRNj1YSSgJE46fSzUkwgpMUCXFqscvrQuN7oKpP6eDyQ7XuYsuf", ZephyrNetworkType.TESTNET);
-    
-    // test testnet integrated address validation
-    ZephyrUtils.validateAddress("A4AroB2EoJzKGygHCwYvAB1FscpjUuq5e9MYJd2rXuiiTjjfVeSVjnbSG5VTnJgBgy9Y7GTLfxpZNMUwNZjGfdFr2QY5Ba2aHhTEdQa2ra", ZephyrNetworkType.TESTNET);
-    ZephyrUtils.validateAddress("A8GSRNqF9rGGoHcfXeBgcsLf622NCpChcACwXxfdgY9uAa9hXSPCV9cLvUsAShfDcFKDdPzCNJ1n5cFGKw5GVM723iPoCEF1Fs9BcPYxTW", ZephyrNetworkType.TESTNET);
-    ZephyrUtils.validateAddress("ACACSuDk1LTEsp8U7C2Y4B7wBtiML8aDG7mdCbRvDQmRaRNj1YSSgJE46fSzUkwgpMUCXFqscvrQuN7oKpP6eDyQAdgDoT3UnMYKQz7SHC", ZephyrNetworkType.TESTNET);
-    
-    // test testnet subaddress validation
-    ZephyrUtils.validateAddress("BgnKzHPJQDcg7xiP7bMN9MfPv9Z8ciT71iEMYnCdgBRBFETWgu9nKTr8fnzyGfU9h9gyNA8SFzYYzHfTS9KhqytSU943Nu1", ZephyrNetworkType.TESTNET);
-    ZephyrUtils.validateAddress("BZwiuKkoNP59zgPHTxpNw3PM4DW2xiAVQJWqfFRrGyeZ7afVdQqoiJg3E2dDL3Ja8BV4ov2LEoHx9UjzF3W4ihPBSZvWwTx", ZephyrNetworkType.TESTNET);
-    ZephyrUtils.validateAddress("Bhf1DEYrentcehUvNreLK5gxosnC2VStMXNCCs163RTxQq4jxFYvpw7LrQFmrMwWW2KsXLhMRtyho6Lq11ci3Fb246bxYmi", ZephyrNetworkType.TESTNET);
-    
-    // test stagenet primary address validation
-    ZephyrUtils.validateAddress("5B8s3obCY2ETeQB3GNAGPK2zRGen5UeW1WzegSizVsmf6z5NvM2GLoN6zzk1vHyzGAAfA8pGhuYAeCFZjHAp59jRVQkunGS", ZephyrNetworkType.STAGENET);
-    ZephyrUtils.validateAddress("57VfotUbSZLG82UkKhWXDjS5ZEK9ZCDcmjdk4gpVq2fbKdEgwRCFrGTLZ2MMdSHphRWJDWVBi5qS8T7dz13JTCWtC228zyn", ZephyrNetworkType.STAGENET);
-    ZephyrUtils.validateAddress("52FysgWJYmAG73QUQZRULJj2Dv2C2mceUMB5zHqNzMn8WBtfPWQrSUFSQUKTX9r7bUMmVSGbrau976xYLynR8jTWLdA7rfp", ZephyrNetworkType.STAGENET);
-    
-    // test stagenet integrated address validation
-    ZephyrUtils.validateAddress("5LqY4cQh9HkTeQB3GNAGPK2zRGen5UeW1WzegSizVsmf6z5NvM2GLoN6zzk1vHyzGAAfA8pGhuYAeCFZjHAp59jRj6LZRFrjuGK8Whthg2", ZephyrNetworkType.STAGENET);
-    ZephyrUtils.validateAddress("5HCLphJ63prG82UkKhWXDjS5ZEK9ZCDcmjdk4gpVq2fbKdEgwRCFrGTLZ2MMdSHphRWJDWVBi5qS8T7dz13JTCWtHETX8zcUhDjVKcynf6", ZephyrNetworkType.STAGENET);
-    ZephyrUtils.validateAddress("5BxetVKoA2gG73QUQZRULJj2Dv2C2mceUMB5zHqNzMn8WBtfPWQrSUFSQUKTX9r7bUMmVSGbrau976xYLynR8jTWVwQwpHNg5fCLgtA2Dv", ZephyrNetworkType.STAGENET);
-    
-    // test stagenet subaddress validation
-    ZephyrUtils.validateAddress("778B5D2JmMh5TJVWFbygJR15dvio5Z5B24hfSrWDzeroM8j8Lqc9sMoFE6324xg2ReaAZqHJkgfGFRugRmYHugHZ4f17Gxo", ZephyrNetworkType.STAGENET);
-    ZephyrUtils.validateAddress("73U97wGEH9RCVUf6bopo45jSgoqjMzz4mTUsvWs5EusmYAmFcBYFm7wKMVmgtVKCBhMQqXrcMbHvwck2md63jMZSFJxUhQ2", ZephyrNetworkType.STAGENET);
-    ZephyrUtils.validateAddress("747wPpaPKrjDPZrF48jAfz9pRRUHLMCWfYu2UanP4ZfTG8NrmYrSEWNW8gYoadU8hTiwBjV14e6DLaC5xfhyEpX5154aMm6", ZephyrNetworkType.STAGENET);
+    // test stagenet address validation
+    ZephyrUtils.validateAddress(STAGENET_PRIMARY, ZephyrNetworkType.STAGENET);
+    ZephyrUtils.validateAddress(STAGENET_INTEGRATED, ZephyrNetworkType.STAGENET);
+    ZephyrUtils.validateAddress(STAGENET_SUBADDRESS, ZephyrNetworkType.STAGENET);
     
     // test invalid addresses on mainnet
     testInvalidAddress(null, ZephyrNetworkType.MAINNET);
     testInvalidAddress("", ZephyrNetworkType.MAINNET);
-    testInvalidAddress("42ZxX3Y2y5s4nJ8fdz2w65TrTEp9PRsv5J8iHSShkHQcE2V31FhnWptioNst1K9oeDY4KpWZ7v8V2BZNVa4Wdky89iqmPz2", ZephyrNetworkType.MAINNET);
-    testInvalidAddress("41ApvrfMgUFZEePHBZHwuSckQXebuZu299NSmVEmQ41YJZQhKcPyujyMSzpDH4VMMVSBo3U3b54JaNvQLwAjqDhKeGLQ9vfRBRKFKnBtVH", ZephyrNetworkType.MAINNET);
-    testInvalidAddress("81fyq3t8Gxn1QWMG189EufHtMHXZXkfJtJKFJXqeA4GpSiuyfjVwVyp47PeQJnD7Tc8iK8TDvvhcmEmfh8nx7Va2ToP8wAo", ZephyrNetworkType.MAINNET);
+    testInvalidAddress(changeChar(MAINNET_PRIMARY, 1), ZephyrNetworkType.MAINNET);
+    testInvalidAddress(changeChar(MAINNET_INTEGRATED, 1), ZephyrNetworkType.MAINNET);
+    testInvalidAddress(changeChar(MAINNET_SUBADDRESS, 1), ZephyrNetworkType.MAINNET);
     
     // test invalid addresses on testnet
     testInvalidAddress(null, ZephyrNetworkType.TESTNET);
     testInvalidAddress("", ZephyrNetworkType.TESTNET);
-    testInvalidAddress("91UBnNCkC3UKGygHCwYvAB1FscpjUuq5e9MYJd2rXuiiTjjfVeSVjnbSG5VTnJgBgy9Y7GTLfxpZNMUwNZjGfdFr1z79eV1", ZephyrNetworkType.TESTNET);
-    testInvalidAddress("A1AroB2EoJzKGygHCwYvAB1FscpjUuq5e9MYJd2rXuiiTjjfVeSVjnbSG5VTnJgBgy9Y7GTLfxpZNMUwNZjGfdFr2QY5Ba2aHhTEdQa2ra", ZephyrNetworkType.TESTNET);
-    testInvalidAddress("B1nKzHPJQDcg7xiP7bMN9MfPv9Z8ciT71iEMYnCdgBRBFETWgu9nKTr8fnzyGfU9h9gyNA8SFzYYzHfTS9KhqytSU943Nu1", ZephyrNetworkType.TESTNET);
+    testInvalidAddress(changeChar(TESTNET_PRIMARY, 1), ZephyrNetworkType.TESTNET);
+    testInvalidAddress(changeChar(TESTNET_INTEGRATED, 1), ZephyrNetworkType.TESTNET);
+    testInvalidAddress(changeChar(TESTNET_SUBADDRESS, 1), ZephyrNetworkType.TESTNET);
     
     // test invalid addresses on stagenet
     testInvalidAddress(null, ZephyrNetworkType.STAGENET);
     testInvalidAddress("", ZephyrNetworkType.STAGENET);
-    testInvalidAddress("518s3obCY2ETeQB3GNAGPK2zRGen5UeW1WzegSizVsmf6z5NvM2GLoN6zzk1vHyzGAAfA8pGhuYAeCFZjHAp59jRVQkunGS", ZephyrNetworkType.STAGENET);
-    testInvalidAddress("51qY4cQh9HkTeQB3GNAGPK2zRGen5UeW1WzegSizVsmf6z5NvM2GLoN6zzk1vHyzGAAfA8pGhuYAeCFZjHAp59jRj6LZRFrjuGK8Whthg2", ZephyrNetworkType.STAGENET);
-    testInvalidAddress("718B5D2JmMh5TJVWFbygJR15dvio5Z5B24hfSrWDzeroM8j8Lqc9sMoFE6324xg2ReaAZqHJkgfGFRugRmYHugHZ4f17Gxo", ZephyrNetworkType.STAGENET);
+    testInvalidAddress(changeChar(STAGENET_PRIMARY, 1), ZephyrNetworkType.STAGENET);
+    testInvalidAddress(changeChar(STAGENET_INTEGRATED, 1), ZephyrNetworkType.STAGENET);
+    testInvalidAddress(changeChar(STAGENET_SUBADDRESS, 1), ZephyrNetworkType.STAGENET);
   }
   
   // Can validate keys
@@ -234,6 +332,18 @@ public class TestZephyrUtils {
   };
   
   // ---------------------------- PRIVATE HELPERS -----------------------------
+  
+  // replaces the character at the given index with another base58 character
+  private static String changeChar(String address, int index) {
+    char replacement = address.charAt(index) == '1' ? '2' : '1';
+    return address.substring(0, index) + replacement + address.substring(index + 1);
+  }
+  
+  private static String repeat(char c, int count) {
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < count; i++) sb.append(c);
+    return sb.toString();
+  }
   
   private static void testInvalidAddress(String address, ZephyrNetworkType networkType) {
     assertFalse(ZephyrUtils.isValidAddress(address, networkType));

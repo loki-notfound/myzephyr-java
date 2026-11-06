@@ -94,8 +94,11 @@ public class ZephyrUtils {
   private final static int FULL_BLOCK_SIZE = 8;
   private final static int FULL_ENCODED_BLOCK_SIZE = 11;
   private final static BigDecimal UINT64_MAX = new BigDecimal(Math.pow(2, 64));
-  private final static Pattern STANDARD_ADDRESS_PATTERN = Pattern.compile("^[" + ALPHABET + "]{95}$");
-  private final static Pattern INTEGRATED_ADDRESS_PATTERN = Pattern.compile("^[" + ALPHABET + "]{106}$");
+  private final static Pattern BASE58_PATTERN = Pattern.compile("^[" + ALPHABET + "]+$");
+  private final static int MIN_DECODED_LENGTH = 5; // bytes: one-byte tag plus checksum
+  private final static int MAX_VARINT_LENGTH = 10; // bytes of a varint-encoded uint64
+  private final static int STANDARD_ADDRESS_REMAINDER = 68; // after the tag: spend key, view key, checksum
+  private final static int INTEGRATED_ADDRESS_REMAINDER = 76; // after the tag: spend key, view key, payment id, checksum
   
   /**
    * Indicates if a wallet keys file exists at the given path.
@@ -247,49 +250,64 @@ public class ZephyrUtils {
   public static ZephyrDecodedAddress decodeAddress(String address) {
     GenUtils.assertNotNull("Address is null", address);
     
-    // determine if address has integrated address pattern
-    boolean isIntegrated = false;
-    if (!STANDARD_ADDRESS_PATTERN.matcher(address).matches()) {
-      if (INTEGRATED_ADDRESS_PATTERN.matcher(address).matches()) {
-        isIntegrated = true;
-      } else {
-        throw new ZephyrError("Address has invalid regex pattern");
-      }
+    // address must consist of base58 characters
+    if (!BASE58_PATTERN.matcher(address).matches()) throw new ZephyrError("Address has invalid characters");
+    
+    // decode address to hex string; the base58 block scheme rejects invalid encodings
+    String addressHex;
+    try {
+      addressHex = decodeAddressToHex(address);
+    } catch (IllegalArgumentException e) {
+      throw new ZephyrError("Address has invalid encoding");
     }
     
-    // decode address to hex string
-    String addressHex = decodeAddressToHex(address);
+    // at least a one-byte tag and the four-byte checksum
+    if (addressHex.length() < 2 * MIN_DECODED_LENGTH) throw new ZephyrError("Address has invalid length");
     
     // validate address hash
     GenUtils.assertTrue("Address has invalid hash", isValidAddressHash(addressHex));
     
-    // get address code
-    int addressCode = Integer.parseInt(addressHex.substring(0, 2), 16);
+    // read the varint tag (little-endian base-128)
+    byte[] addressBytes = hexToBin(addressHex);
+    long tag = 0;
+    int tagLength = 0;
+    while (true) {
+      if (tagLength >= MAX_VARINT_LENGTH || tagLength >= addressBytes.length) throw new ZephyrError("Address has invalid prefix");
+      int b = addressBytes[tagLength] & 0xff;
+      tag |= ((long) (b & 0x7f)) << (7 * tagLength);
+      tagLength++;
+      if ((b & 0x80) == 0) break;
+    }
+    
+    // classify by the length after the tag
+    boolean isIntegrated;
+    int remainder = addressBytes.length - tagLength;
+    if (remainder == STANDARD_ADDRESS_REMAINDER) isIntegrated = false;
+    else if (remainder == INTEGRATED_ADDRESS_REMAINDER) isIntegrated = true;
+    else throw new ZephyrError("Address has invalid length");
     
     // determine network and address types
     ZephyrAddressType addressType = null;
     ZephyrNetworkType networkType = null;
     for (ZephyrNetworkType aNetworkType : ZephyrNetworkType.values()) {
-      if (addressCode == aNetworkType.getPrimaryAddressCode()) {
-        GenUtils.assertFalse("Address has primary address code but integrated address pattern", isIntegrated);
+      if (tag == aNetworkType.getPrimaryAddressTag()) {
         addressType = ZephyrAddressType.PRIMARY_ADDRESS;
         networkType = aNetworkType;
         break;
-      } else if (addressCode == aNetworkType.getIntegratedAddressCode()) {
-        GenUtils.assertTrue("Address has integrated address code but non-integrated address pattern", isIntegrated);
+      } else if (tag == aNetworkType.getIntegratedAddressTag()) {
         addressType = ZephyrAddressType.INTEGRATED_ADDRESS;
         networkType = aNetworkType;
         break;
-      } else if (addressCode == aNetworkType.getSubaddressCode()) {
-        GenUtils.assertFalse("Address has subaddress code but integrated address pattern", isIntegrated);
+      } else if (tag == aNetworkType.getSubaddressTag()) {
         addressType = ZephyrAddressType.SUBADDRESS;
         networkType = aNetworkType;
         break;
       }
     }
+    if (addressType == null) throw new ZephyrError("Address has invalid code: 0x" + Long.toHexString(tag));
     
-    // validate address and network types
-    GenUtils.assertTrue("Address has invalid code: " + addressCode, addressType != null && networkType != null);
+    // the address type must agree with the length after the tag
+    if ((addressType == ZephyrAddressType.INTEGRATED_ADDRESS) != isIntegrated) throw new ZephyrError("Address has invalid code");
     
     // return decoded address
     return new ZephyrDecodedAddress(address, addressType, networkType);
@@ -549,10 +567,8 @@ public class ZephyrUtils {
 
     int fullBlockCount = (int) Math.floor(bin.length / FULL_ENCODED_BLOCK_SIZE);
     int lastBlockSize = bin.length % FULL_ENCODED_BLOCK_SIZE;
-    int lastBlockDecodedSize = ENCODED_BLOCK_SIZE.get(lastBlockSize);
-    if (lastBlockDecodedSize < 0) {
-      throw new IllegalArgumentException("Invalid encoded length");
-    }
+    Integer lastBlockDecodedSize = ENCODED_BLOCK_SIZE.get(lastBlockSize);
+    if (lastBlockDecodedSize == null) throw new IllegalArgumentException("Invalid encoded length: " + address.length());
 
     int dataSize = fullBlockCount * FULL_BLOCK_SIZE + lastBlockDecodedSize;
     int[] data = new int[dataSize];
@@ -560,7 +576,7 @@ public class ZephyrUtils {
       data = decodeBlock(GenUtils.subarray(bin, i * FULL_ENCODED_BLOCK_SIZE, i * FULL_ENCODED_BLOCK_SIZE + FULL_ENCODED_BLOCK_SIZE), data, i * FULL_BLOCK_SIZE);
     }
     if (lastBlockSize > 0) {
-      int[] subarray = GenUtils.subarray(bin, fullBlockCount * FULL_ENCODED_BLOCK_SIZE, fullBlockCount * FULL_ENCODED_BLOCK_SIZE + FULL_BLOCK_SIZE);
+      int[] subarray = GenUtils.subarray(bin, fullBlockCount * FULL_ENCODED_BLOCK_SIZE, fullBlockCount * FULL_ENCODED_BLOCK_SIZE + lastBlockSize);
       data = decodeBlock(subarray, data, fullBlockCount * FULL_BLOCK_SIZE);
     }
 
@@ -570,30 +586,30 @@ public class ZephyrUtils {
   private static int[] decodeBlock(int[] data, int[] buf, int index) {
 
     if (data.length < 1 || data.length > FULL_ENCODED_BLOCK_SIZE) {
-      throw new RuntimeException("Invalid block length: " + data.length);
+      throw new IllegalArgumentException("Invalid block length: " + data.length);
     }
 
     int resSize = ENCODED_BLOCK_SIZE.get(data.length);
     if (resSize <= 0) {
-      throw new RuntimeException("Invalid block size");
+      throw new IllegalArgumentException("Invalid block size");
     }
     BigDecimal resNum = BigDecimal.ZERO;
     BigDecimal order = BigDecimal.ONE;
     for (int i = data.length - 1; i >= 0; i--) {
       int digit = ALPHABET.indexOf(data[i]);
       if (digit < 0) {
-        throw new RuntimeException("Invalid symbol");
+        throw new IllegalArgumentException("Invalid symbol");
       }
       BigDecimal product = order.multiply(new BigDecimal(digit)).add(resNum);
       // if product > UINT64_MAX
       if (product.compareTo(UINT64_MAX) > 0) {
-        throw new RuntimeException("Overflow");
+        throw new IllegalArgumentException("Overflow");
       }
       resNum = product;
       order = order.multiply(ALPHABET_SIZE);
     }
     if (resSize < FULL_BLOCK_SIZE && (new BigDecimal(2).pow(8 * resSize).compareTo(resNum) <= 0)) {
-      throw new RuntimeException("Overflow 2");
+      throw new IllegalArgumentException("Overflow 2");
     }
 
     int[] tmpBuf = uint64To8be(resNum, resSize);
