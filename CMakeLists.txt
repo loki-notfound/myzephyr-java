@@ -301,7 +301,7 @@ set(
 
 set(
     JNI_SRC_FILES
-    src/main/cpp/monero_jni_bridge.cpp
+    src/main/cpp/zephyr_jni_bridge.cpp
 )
 
 add_library(zephyr-java SHARED ${JNI_SRC_FILES} ${ZEPHYR_CPP_SRC_FILES})

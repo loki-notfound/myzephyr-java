@@ -36,7 +36,7 @@
 
 #include <iostream>
 #include "chacha.h" // TODO: explicitly include because wallet2.h #include "crypto/chacha.h" is ignored
-#include "monero_jni_bridge.h"
+#include "zephyr_jni_bridge.h"
 #include "wallet/monero_wallet_full.h"
 #include "utils/monero_utils.h"
 
@@ -157,7 +157,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *jvm, void *reserved) {
 //  class_ArrayList = static_cast<jclass>(env->NewGlobalRef(env->FindClass("java/util/ArrayList")));
 //  class_TransactionInfo = static_cast<jclass>(env->NewGlobalRef(env->FindClass("com/m2049r/xmrwallet/model/TransactionInfo")));
 //  class_Transfer = static_cast<jclass>(env->NewGlobalRef(env->FindClass("com/m2049r/xmrwallet/model/Transfer")));
-  class_WalletListener = static_cast<jclass>(env->NewGlobalRef(env->FindClass("monero/wallet/MoneroWalletFull$WalletJniListener")));
+  class_WalletListener = static_cast<jclass>(env->NewGlobalRef(env->FindClass("zephyr/wallet/ZephyrWalletFull$WalletJniListener")));
 //  class_Ledger = static_cast<jclass>(env->NewGlobalRef(env->FindClass("com/m2049r/xmrwallet/ledger/Ledger")));
   return JNI_VERSION_1_6;
 }
@@ -332,7 +332,7 @@ extern "C"
 
 // ------------------------------ STATIC UTILS --------------------------------
 
-JNIEXPORT jstring JNICALL Java_monero_common_MoneroUtils_getIntegratedAddressJni(JNIEnv *env, jclass clazz, jint jnetwork_type, jstring jstandard_address, jstring jpayment_id) {
+JNIEXPORT jstring JNICALL Java_zephyr_common_ZephyrUtils_getIntegratedAddressJni(JNIEnv *env, jclass clazz, jint jnetwork_type, jstring jstandard_address, jstring jpayment_id) {
 
   // convert jstrings to strings
   string standard_address = jstring2string(env, jstandard_address);
@@ -348,7 +348,7 @@ JNIEXPORT jstring JNICALL Java_monero_common_MoneroUtils_getIntegratedAddressJni
   }
 }
 
-JNIEXPORT jbyteArray JNICALL Java_monero_common_MoneroUtils_jsonToBinaryJni(JNIEnv *env, jclass clazz, jstring json) {
+JNIEXPORT jbyteArray JNICALL Java_zephyr_common_ZephyrUtils_jsonToBinaryJni(JNIEnv *env, jclass clazz, jstring json) {
 
   // convert json jstring to string
   string json_str = jstring2string(env, json);
@@ -372,7 +372,7 @@ JNIEXPORT jbyteArray JNICALL Java_monero_common_MoneroUtils_jsonToBinaryJni(JNIE
   return result;
 }
 
-JNIEXPORT jstring JNICALL Java_monero_common_MoneroUtils_binaryToJsonJni(JNIEnv *env, jclass clazz, jbyteArray bin) {
+JNIEXPORT jstring JNICALL Java_zephyr_common_ZephyrUtils_binaryToJsonJni(JNIEnv *env, jclass clazz, jbyteArray bin) {
 
   // convert the jbyteArray to a string
   int binLength = env->GetArrayLength(bin);
@@ -388,7 +388,7 @@ JNIEXPORT jstring JNICALL Java_monero_common_MoneroUtils_binaryToJsonJni(JNIEnv 
   return env->NewStringUTF(json_str.c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_monero_common_MoneroUtils_binaryBlocksToJsonJni(JNIEnv *env, jclass clazz, jbyteArray blocks_bin) {
+JNIEXPORT jstring JNICALL Java_zephyr_common_ZephyrUtils_binaryBlocksToJsonJni(JNIEnv *env, jclass clazz, jbyteArray blocks_bin) {
 
   // convert the jbyteArray to a string
   int binLength = env->GetArrayLength(blocks_bin);
@@ -404,11 +404,11 @@ JNIEXPORT jstring JNICALL Java_monero_common_MoneroUtils_binaryBlocksToJsonJni(J
   return env->NewStringUTF(json_str.c_str());
 }
 
-JNIEXPORT void JNICALL Java_monero_common_MoneroUtils_setLogLevelJni(JNIEnv* env, jclass clazz, jint level) {
+JNIEXPORT void JNICALL Java_zephyr_common_ZephyrUtils_setLogLevelJni(JNIEnv* env, jclass clazz, jint level) {
   mlog_set_log_level(level); // D3: zephyr-cpp is at monero-cpp 686fbdc, before ad7be65 added the monero_utils logging wrappers
 }
 
-JNIEXPORT void JNICALL Java_monero_common_MoneroUtils_configureLoggingJni(JNIEnv* env, jclass clazz, jstring jpath, jboolean console) {
+JNIEXPORT void JNICALL Java_zephyr_common_ZephyrUtils_configureLoggingJni(JNIEnv* env, jclass clazz, jstring jpath, jboolean console) {
   const char* _path = jpath ? env->GetStringUTFChars(jpath, NULL) : nullptr;
   string path = string(_path ? _path : "");
   env->ReleaseStringUTFChars(jpath, _path);
@@ -417,8 +417,8 @@ JNIEXPORT void JNICALL Java_monero_common_MoneroUtils_configureLoggingJni(JNIEnv
 
 // --------------------------- STATIC WALLET UTILS ----------------------------
 
-JNIEXPORT jboolean JNICALL Java_monero_wallet_MoneroWalletFull_walletExistsJni(JNIEnv *env, jclass clazz, jstring jpath) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_walletExistsJni");
+JNIEXPORT jboolean JNICALL Java_zephyr_wallet_ZephyrWalletFull_walletExistsJni(JNIEnv *env, jclass clazz, jstring jpath) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_walletExistsJni");
   const char* _path = env->GetStringUTFChars(jpath, NULL);
   string path = string(_path);
   env->ReleaseStringUTFChars(jpath, _path);
@@ -426,8 +426,8 @@ JNIEXPORT jboolean JNICALL Java_monero_wallet_MoneroWalletFull_walletExistsJni(J
   return static_cast<jboolean>(wallet_exists);
 }
 
-JNIEXPORT jlong JNICALL Java_monero_wallet_MoneroWalletFull_openWalletJni(JNIEnv *env, jclass clazz, jstring jpath, jstring jpassword, jint jnetwork_type) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_openWalletJni");
+JNIEXPORT jlong JNICALL Java_zephyr_wallet_ZephyrWalletFull_openWalletJni(JNIEnv *env, jclass clazz, jstring jpath, jstring jpassword, jint jnetwork_type) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_openWalletJni");
   const char* _path = env->GetStringUTFChars(jpath, NULL);
   const char* _password = env->GetStringUTFChars(jpassword, NULL);
   string path = string(_path);
@@ -445,8 +445,8 @@ JNIEXPORT jlong JNICALL Java_monero_wallet_MoneroWalletFull_openWalletJni(JNIEnv
   }
 }
 
-JNIEXPORT jlong JNICALL Java_monero_wallet_MoneroWalletFull_openWalletDataJni(JNIEnv *env, jclass clazz, jstring jpassword, jint jnetwork_type, jbyteArray jkeys_data, jbyteArray jcache_data) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_openWalletDataJni()");
+JNIEXPORT jlong JNICALL Java_zephyr_wallet_ZephyrWalletFull_openWalletDataJni(JNIEnv *env, jclass clazz, jstring jpassword, jint jnetwork_type, jbyteArray jkeys_data, jbyteArray jcache_data) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_openWalletDataJni()");
 
   // convert password to string
   const char* _password = env->GetStringUTFChars(jpassword, NULL);
@@ -476,8 +476,8 @@ JNIEXPORT jlong JNICALL Java_monero_wallet_MoneroWalletFull_openWalletDataJni(JN
   }
 }
 
-JNIEXPORT jlong JNICALL Java_monero_wallet_MoneroWalletFull_createWalletJni(JNIEnv *env, jclass clazz, jstring jconfig) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_createWalletJni");
+JNIEXPORT jlong JNICALL Java_zephyr_wallet_ZephyrWalletFull_createWalletJni(JNIEnv *env, jclass clazz, jstring jconfig) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_createWalletJni");
 
   // get config as json string
   const char* _config = jconfig ? env->GetStringUTFChars(jconfig, NULL) : nullptr;
@@ -497,8 +497,8 @@ JNIEXPORT jlong JNICALL Java_monero_wallet_MoneroWalletFull_createWalletJni(JNIE
   }
 }
 
-JNIEXPORT jobjectArray JNICALL Java_monero_wallet_MoneroWalletFull_getMnemonicLanguagesJni(JNIEnv *env, jclass clazz) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getLanguagesJni");
+JNIEXPORT jobjectArray JNICALL Java_zephyr_wallet_ZephyrWalletFull_getMnemonicLanguagesJni(JNIEnv *env, jclass clazz) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getLanguagesJni");
 
   // get languages
   vector<string> languages;
@@ -519,14 +519,14 @@ JNIEXPORT jobjectArray JNICALL Java_monero_wallet_MoneroWalletFull_getMnemonicLa
 
 //  ------------------------ WALLET INSTANCE METHODS --------------------------
 
-JNIEXPORT jboolean JNICALL Java_monero_wallet_MoneroWalletFull_isViewOnlyJni(JNIEnv *env, jobject instance) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_isViewOnlyJni");
+JNIEXPORT jboolean JNICALL Java_zephyr_wallet_ZephyrWalletFull_isViewOnlyJni(JNIEnv *env, jobject instance) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_isViewOnlyJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   return wallet->is_view_only();
 }
 
-JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_setDaemonConnectionJni(JNIEnv *env, jobject instance, jstring juri, jstring jusername, jstring jpassword) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_setDaemonConnectionJni");
+JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_setDaemonConnectionJni(JNIEnv *env, jobject instance, jstring juri, jstring jusername, jstring jpassword) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_setDaemonConnectionJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   try {
     set_daemon_connection(env, wallet, juri, jusername, jpassword);
@@ -535,8 +535,8 @@ JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_setDaemonConnectionJn
   }
 }
 
-JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_setProxyJni(JNIEnv *env, jobject instance, jstring juri) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_setProxyJni");
+JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_setProxyJni(JNIEnv *env, jobject instance, jstring juri) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_setProxyJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _uri = juri ? env->GetStringUTFChars(juri, NULL) : nullptr;
   string uri = string(_uri ? _uri : "");
@@ -548,8 +548,8 @@ JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_setProxyJni(JNIEnv *e
   }
 }
 
-JNIEXPORT jobjectArray JNICALL Java_monero_wallet_MoneroWalletFull_getDaemonConnectionJni(JNIEnv *env, jobject instance) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getDaemonConnectionJni()");
+JNIEXPORT jobjectArray JNICALL Java_zephyr_wallet_ZephyrWalletFull_getDaemonConnectionJni(JNIEnv *env, jobject instance) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getDaemonConnectionJni()");
 
   // get wallet
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
@@ -571,7 +571,7 @@ JNIEXPORT jobjectArray JNICALL Java_monero_wallet_MoneroWalletFull_getDaemonConn
   }
 }
 
-JNIEXPORT jboolean JNICALL Java_monero_wallet_MoneroWalletFull_isConnectedToDaemonJni(JNIEnv* env, jobject instance) {
+JNIEXPORT jboolean JNICALL Java_zephyr_wallet_ZephyrWalletFull_isConnectedToDaemonJni(JNIEnv* env, jobject instance) {
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   try {
     return static_cast<jboolean>(wallet->is_connected_to_daemon());
@@ -581,7 +581,7 @@ JNIEXPORT jboolean JNICALL Java_monero_wallet_MoneroWalletFull_isConnectedToDaem
   }
 }
 
-JNIEXPORT jboolean JNICALL Java_monero_wallet_MoneroWalletFull_isDaemonSyncedJni(JNIEnv* env, jobject instance) {
+JNIEXPORT jboolean JNICALL Java_zephyr_wallet_ZephyrWalletFull_isDaemonSyncedJni(JNIEnv* env, jobject instance) {
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   try {
     return wallet->is_daemon_synced();
@@ -591,7 +591,7 @@ JNIEXPORT jboolean JNICALL Java_monero_wallet_MoneroWalletFull_isDaemonSyncedJni
   }
 }
 
-JNIEXPORT jboolean JNICALL Java_monero_wallet_MoneroWalletFull_isSyncedJni(JNIEnv* env, jobject instance) {
+JNIEXPORT jboolean JNICALL Java_zephyr_wallet_ZephyrWalletFull_isSyncedJni(JNIEnv* env, jobject instance) {
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   try {
     return wallet->is_synced();
@@ -601,8 +601,8 @@ JNIEXPORT jboolean JNICALL Java_monero_wallet_MoneroWalletFull_isSyncedJni(JNIEn
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getVersionJni(JNIEnv *env, jobject instance) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getVersionJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getVersionJni(JNIEnv *env, jobject instance) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getVersionJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   try {
     return env->NewStringUTF(wallet->get_version().serialize().c_str());
@@ -612,20 +612,20 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getVersionJni(JNIE
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getPathJni(JNIEnv *env, jobject instance) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getPathJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getPathJni(JNIEnv *env, jobject instance) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getPathJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   return env->NewStringUTF(wallet->get_path().c_str());
 }
 
-JNIEXPORT jint JNICALL Java_monero_wallet_MoneroWalletFull_getNetworkTypeJni(JNIEnv *env, jobject instance) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getNetworkTypeJni");
+JNIEXPORT jint JNICALL Java_zephyr_wallet_ZephyrWalletFull_getNetworkTypeJni(JNIEnv *env, jobject instance) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getNetworkTypeJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   return wallet->get_network_type();
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getMnemonicJni(JNIEnv *env, jobject instance) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getMnemonicJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getMnemonicJni(JNIEnv *env, jobject instance) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getMnemonicJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   try {
     return env->NewStringUTF(wallet->get_mnemonic().c_str());
@@ -635,8 +635,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getMnemonicJni(JNI
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getMnemonicLanguageJni(JNIEnv *env, jobject instance) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getMnemonicLanguageJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getMnemonicLanguageJni(JNIEnv *env, jobject instance) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getMnemonicLanguageJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   try {
     return env->NewStringUTF(wallet->get_mnemonic_language().c_str());
@@ -646,39 +646,39 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getMnemonicLanguag
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getPublicViewKeyJni(JNIEnv *env, jobject instance) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getPublicViewKeyJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getPublicViewKeyJni(JNIEnv *env, jobject instance) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getPublicViewKeyJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   return env->NewStringUTF(wallet->get_public_view_key().c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getPrivateViewKeyJni(JNIEnv *env, jobject instance) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getPrivateViewKeyJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getPrivateViewKeyJni(JNIEnv *env, jobject instance) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getPrivateViewKeyJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   return env->NewStringUTF(wallet->get_private_view_key().c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getPublicSpendKeyJni(JNIEnv *env, jobject instance) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getPublicSpendKeyJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getPublicSpendKeyJni(JNIEnv *env, jobject instance) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getPublicSpendKeyJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   return env->NewStringUTF(wallet->get_public_spend_key().c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getPrivateSpendKeyJni(JNIEnv *env, jobject instance) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getPrivateSpendKeyJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getPrivateSpendKeyJni(JNIEnv *env, jobject instance) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getPrivateSpendKeyJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   return env->NewStringUTF(wallet->get_private_spend_key().c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getAddressJni(JNIEnv *env, jobject instance, jint account_idx, jint subaddress_idx) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getAddressJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getAddressJni(JNIEnv *env, jobject instance, jint account_idx, jint subaddress_idx) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getAddressJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   string address = wallet->get_address((uint32_t) account_idx, (uint32_t) subaddress_idx);
   return env->NewStringUTF(address.c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getAddressIndexJni(JNIEnv *env, jobject instance, jstring jaddress) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getAddressIndexJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getAddressIndexJni(JNIEnv *env, jobject instance, jstring jaddress) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getAddressIndexJni");
 
   // collect and release string param
   const char* _address = jaddress ? env->GetStringUTFChars(jaddress, NULL) : nullptr;
@@ -701,8 +701,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getAddressIndexJni
  * Only one listener needs to subscribe over JNI, so this removes the previously registered listener
  * and registers the new listener.
  */
-JNIEXPORT jlong JNICALL Java_monero_wallet_MoneroWalletFull_setListenerJni(JNIEnv *env, jobject instance, jobject jlistener) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_setListenerJni");
+JNIEXPORT jlong JNICALL Java_zephyr_wallet_ZephyrWalletFull_setListenerJni(JNIEnv *env, jobject instance, jobject jlistener) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_setListenerJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
 
   // remove old listener
@@ -719,8 +719,8 @@ JNIEXPORT jlong JNICALL Java_monero_wallet_MoneroWalletFull_setListenerJni(JNIEn
   return reinterpret_cast<jlong>(listener);
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getIntegratedAddressJni(JNIEnv *env, jobject instance, jstring jstandard_address, jstring jpayment_id) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getIntegratedAddressJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getIntegratedAddressJni(JNIEnv *env, jobject instance, jstring jstandard_address, jstring jpayment_id) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getIntegratedAddressJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
 
   // collect and release string params
@@ -742,8 +742,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getIntegratedAddre
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_decodeIntegratedAddressJni(JNIEnv *env, jobject instance, jstring jintegrated_address) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_decodeIntegratedAddressJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_decodeIntegratedAddressJni(JNIEnv *env, jobject instance, jstring jintegrated_address) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_decodeIntegratedAddressJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _integratedAddress = jintegrated_address ? env->GetStringUTFChars(jintegrated_address, NULL) : nullptr;
   string integrated_address_str = string(_integratedAddress ? _integratedAddress : "");
@@ -760,14 +760,14 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_decodeIntegratedAd
   }
 }
 
-JNIEXPORT jlong JNICALL Java_monero_wallet_MoneroWalletFull_getHeightJni(JNIEnv *env, jobject instance) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getHeightJni");
+JNIEXPORT jlong JNICALL Java_zephyr_wallet_ZephyrWalletFull_getHeightJni(JNIEnv *env, jobject instance) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getHeightJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   return wallet->get_height();
 }
 
-JNIEXPORT jlong JNICALL Java_monero_wallet_MoneroWalletFull_getChainHeightJni(JNIEnv *env, jobject instance) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getChainHeightJni");
+JNIEXPORT jlong JNICALL Java_zephyr_wallet_ZephyrWalletFull_getChainHeightJni(JNIEnv *env, jobject instance) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getChainHeightJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   try {
     return wallet->get_daemon_height();
@@ -777,14 +777,14 @@ JNIEXPORT jlong JNICALL Java_monero_wallet_MoneroWalletFull_getChainHeightJni(JN
   }
 }
 
-JNIEXPORT jlong JNICALL Java_monero_wallet_MoneroWalletFull_getRestoreHeightJni(JNIEnv *env, jobject instance) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getRestoreHeightJni");
+JNIEXPORT jlong JNICALL Java_zephyr_wallet_ZephyrWalletFull_getRestoreHeightJni(JNIEnv *env, jobject instance) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getRestoreHeightJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   return wallet->get_restore_height();
 }
 
-JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_setRestoreHeightJni(JNIEnv *env, jobject instance, jlong restore_height) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_setRestoreHeightJni");
+JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_setRestoreHeightJni(JNIEnv *env, jobject instance, jlong restore_height) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_setRestoreHeightJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   try {
     wallet->set_restore_height(restore_height);
@@ -793,7 +793,7 @@ JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_setRestoreHeightJni(J
   }
 }
 
-JNIEXPORT jlong JNICALL Java_monero_wallet_MoneroWalletFull_getDaemonHeightJni(JNIEnv* env, jobject instance) {
+JNIEXPORT jlong JNICALL Java_zephyr_wallet_ZephyrWalletFull_getDaemonHeightJni(JNIEnv* env, jobject instance) {
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   try {
     return wallet->get_daemon_height();
@@ -803,7 +803,7 @@ JNIEXPORT jlong JNICALL Java_monero_wallet_MoneroWalletFull_getDaemonHeightJni(J
   }
 }
 
-JNIEXPORT jlong JNICALL Java_monero_wallet_MoneroWalletFull_getDaemonMaxPeerHeightJni(JNIEnv* env, jobject instance) {
+JNIEXPORT jlong JNICALL Java_zephyr_wallet_ZephyrWalletFull_getDaemonMaxPeerHeightJni(JNIEnv* env, jobject instance) {
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   try {
     return wallet->get_daemon_max_peer_height();
@@ -813,7 +813,7 @@ JNIEXPORT jlong JNICALL Java_monero_wallet_MoneroWalletFull_getDaemonMaxPeerHeig
   }
 }
 
-JNIEXPORT jlong JNICALL Java_monero_wallet_MoneroWalletFull_getHeightByDateJni(JNIEnv* env, jobject instance, jint year, jint month, jint day) {
+JNIEXPORT jlong JNICALL Java_zephyr_wallet_ZephyrWalletFull_getHeightByDateJni(JNIEnv* env, jobject instance, jint year, jint month, jint day) {
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   try {
     return wallet->get_height_by_date(year, month, day);
@@ -823,8 +823,8 @@ JNIEXPORT jlong JNICALL Java_monero_wallet_MoneroWalletFull_getHeightByDateJni(J
   }
 }
 
-JNIEXPORT jobjectArray JNICALL Java_monero_wallet_MoneroWalletFull_syncJni(JNIEnv *env, jobject instance, jlong start_height) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_syncJni");
+JNIEXPORT jobjectArray JNICALL Java_zephyr_wallet_ZephyrWalletFull_syncJni(JNIEnv *env, jobject instance, jlong start_height) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_syncJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   try {
 
@@ -848,8 +848,8 @@ JNIEXPORT jobjectArray JNICALL Java_monero_wallet_MoneroWalletFull_syncJni(JNIEn
   }
 }
 
-JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_startSyncingJni(JNIEnv *env, jobject instance, jlong sync_period_in_ms) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_startSyncingJni");
+JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_startSyncingJni(JNIEnv *env, jobject instance, jlong sync_period_in_ms) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_startSyncingJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   try {
     wallet->start_syncing(sync_period_in_ms);
@@ -858,8 +858,8 @@ JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_startSyncingJni(JNIEn
   }
 }
 
-JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_stopSyncingJni(JNIEnv *env, jobject instance) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_stopSyncingJni");
+JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_stopSyncingJni(JNIEnv *env, jobject instance) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_stopSyncingJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   try {
     wallet->stop_syncing();
@@ -868,8 +868,8 @@ JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_stopSyncingJni(JNIEnv
   }
 }
 
-JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_scanTxsJni(JNIEnv* env, jobject instance, jobjectArray jtx_hashes) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_scanTxsJni");
+JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_scanTxsJni(JNIEnv* env, jobject instance, jobjectArray jtx_hashes) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_scanTxsJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
 
   // get tx hashes from jobjectArray to vector<string>
@@ -893,8 +893,8 @@ JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_scanTxsJni(JNIEnv* en
   }
 }
 
-JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_rescanSpentJni(JNIEnv *env, jobject instance) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_rescanSpentJni");
+JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_rescanSpentJni(JNIEnv *env, jobject instance) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_rescanSpentJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   try {
     wallet->rescan_spent();
@@ -903,8 +903,8 @@ JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_rescanSpentJni(JNIEnv
   }
 }
 
-JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_rescanBlockchainJni(JNIEnv *env, jobject instance) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_rescanBlockchainJni");
+JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_rescanBlockchainJni(JNIEnv *env, jobject instance) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_rescanBlockchainJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   try {
     wallet->rescan_blockchain();
@@ -913,50 +913,50 @@ JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_rescanBlockchainJni(J
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getBalanceWalletJni(JNIEnv *env, jobject instance) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getBalanceWalletJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getBalanceWalletJni(JNIEnv *env, jobject instance) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getBalanceWalletJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   uint64_t balance = wallet->get_balance();
   return env->NewStringUTF(boost::lexical_cast<std::string>(balance).c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getBalanceAccountJni(JNIEnv *env, jobject instance, jint account_idx) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getBalanceAccountJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getBalanceAccountJni(JNIEnv *env, jobject instance, jint account_idx) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getBalanceAccountJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   uint64_t balance = wallet->get_balance(account_idx);
   return env->NewStringUTF(boost::lexical_cast<std::string>(balance).c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getBalanceSubaddressJni(JNIEnv *env, jobject instance, jint account_idx, jint subaddress_idx) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getBalanceSubaddressJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getBalanceSubaddressJni(JNIEnv *env, jobject instance, jint account_idx, jint subaddress_idx) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getBalanceSubaddressJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   uint64_t balance = wallet->get_balance(account_idx, subaddress_idx);
   return env->NewStringUTF(boost::lexical_cast<std::string>(balance).c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getUnlockedBalanceWalletJni(JNIEnv *env, jobject instance) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getUnlockedBalanceWalletJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getUnlockedBalanceWalletJni(JNIEnv *env, jobject instance) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getUnlockedBalanceWalletJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   uint64_t balance = wallet->get_unlocked_balance();
   return env->NewStringUTF(boost::lexical_cast<std::string>(balance).c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getUnlockedBalanceAccountJni(JNIEnv *env, jobject instance, jint account_idx) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getUnlockedBalanceAccountJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getUnlockedBalanceAccountJni(JNIEnv *env, jobject instance, jint account_idx) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getUnlockedBalanceAccountJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   uint64_t balance = wallet->get_unlocked_balance(account_idx);
   return env->NewStringUTF(boost::lexical_cast<std::string>(balance).c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getUnlockedBalanceSubaddressJni(JNIEnv *env, jobject instance, jint account_idx, jint subaddress_idx) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getUnlockedBalanceSubaddressJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getUnlockedBalanceSubaddressJni(JNIEnv *env, jobject instance, jint account_idx, jint subaddress_idx) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getUnlockedBalanceSubaddressJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   uint64_t balance = wallet->get_unlocked_balance(account_idx, subaddress_idx);
   return env->NewStringUTF(boost::lexical_cast<std::string>(balance).c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getAccountsJni(JNIEnv* env, jobject instance, jboolean include_subaddresses, jstring jtag) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getAccountsJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getAccountsJni(JNIEnv* env, jobject instance, jboolean include_subaddresses, jstring jtag) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getAccountsJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _tag = jtag ? env->GetStringUTFChars(jtag, NULL) : nullptr;
   string tag = string(_tag ? _tag : "");
@@ -973,8 +973,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getAccountsJni(JNI
   return env->NewStringUTF(accounts_json.c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getAccountJni(JNIEnv* env, jobject instance, jint account_idx, jboolean include_subaddresses) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getAccountJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getAccountJni(JNIEnv* env, jobject instance, jint account_idx, jboolean include_subaddresses) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getAccountJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
 
   // get account
@@ -985,8 +985,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getAccountJni(JNIE
   return env->NewStringUTF(account_json.c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_createAccountJni(JNIEnv* env, jobject instance, jstring jlabel) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_createAccountJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_createAccountJni(JNIEnv* env, jobject instance, jstring jlabel) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_createAccountJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _label = jlabel ? env->GetStringUTFChars(jlabel, NULL) : nullptr;
   string label = string(_label ? _label : "");
@@ -1000,8 +1000,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_createAccountJni(J
   return env->NewStringUTF(account_json.c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getSubaddressesJni(JNIEnv* env, jobject instance, jint account_idx, jintArray jsubaddressIndices) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getSubaddressesJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getSubaddressesJni(JNIEnv* env, jobject instance, jint account_idx, jintArray jsubaddressIndices) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getSubaddressesJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
 
   // convert subaddress indices from jintArray to vector<uint32_t>
@@ -1025,8 +1025,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getSubaddressesJni
   return env->NewStringUTF(subaddresses_json.c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_createSubaddressJni(JNIEnv* env, jobject instance, jint account_idx, jstring jlabel) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_createSubaddressJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_createSubaddressJni(JNIEnv* env, jobject instance, jint account_idx, jstring jlabel) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_createSubaddressJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _label = jlabel ? env->GetStringUTFChars(jlabel, NULL) : nullptr;
   string label = string(_label ? _label : "");
@@ -1040,8 +1040,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_createSubaddressJn
   return env->NewStringUTF(subaddress_json.c_str());
 }
 
-JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_setSubaddressLabelJni(JNIEnv* env, jobject instance, jint account_idx, jint subaddress_idx, jstring jlabel) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_setSubaddressLabelJni");
+JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_setSubaddressLabelJni(JNIEnv* env, jobject instance, jint account_idx, jint subaddress_idx, jstring jlabel) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_setSubaddressLabelJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _label = jlabel ? env->GetStringUTFChars(jlabel, NULL) : nullptr;
   string label = string(_label ? _label : "");
@@ -1053,8 +1053,8 @@ JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_setSubaddressLabelJni
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getTxsJni(JNIEnv* env, jobject instance, jstring jtx_query) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getTxsJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getTxsJni(JNIEnv* env, jobject instance, jstring jtx_query) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getTxsJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _tx_query = jtx_query ? env->GetStringUTFChars(jtx_query, NULL) : nullptr;
   string tx_query_json = string(_tx_query ? _tx_query : "");
@@ -1101,8 +1101,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getTxsJni(JNIEnv* 
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getTransfersJni(JNIEnv* env, jobject instance, jstring jtransfer_query) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getTransfersJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getTransfersJni(JNIEnv* env, jobject instance, jstring jtransfer_query) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getTransfersJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _transfer_query = jtransfer_query ? env->GetStringUTFChars(jtransfer_query, NULL) : nullptr;
   string transfer_query_json = string(_transfer_query ? _transfer_query : "");
@@ -1151,8 +1151,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getTransfersJni(JN
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getOutputsJni(JNIEnv* env, jobject instance, jstring joutput_query) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getOutputsJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getOutputsJni(JNIEnv* env, jobject instance, jstring joutput_query) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getOutputsJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _output_query = joutput_query ? env->GetStringUTFChars(joutput_query, NULL) : nullptr;
   string output_query_json = string(_output_query ? _output_query : "");
@@ -1193,8 +1193,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getOutputsJni(JNIE
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_exportOutputsJni(JNIEnv* env, jobject instance, jboolean all) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_exportOutputsJni()");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_exportOutputsJni(JNIEnv* env, jobject instance, jboolean all) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_exportOutputsJni()");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   try {
     return env->NewStringUTF(wallet->export_outputs(all).c_str());
@@ -1204,8 +1204,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_exportOutputsJni(J
   }
 }
 
-JNIEXPORT jint JNICALL Java_monero_wallet_MoneroWalletFull_importOutputsJni(JNIEnv* env, jobject instance, jstring joutputs_hex) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_exportOutputsJni()");
+JNIEXPORT jint JNICALL Java_zephyr_wallet_ZephyrWalletFull_importOutputsJni(JNIEnv* env, jobject instance, jstring joutputs_hex) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_exportOutputsJni()");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _outputs_hex = joutputs_hex ? env->GetStringUTFChars(joutputs_hex, NULL) : nullptr;
   string outputs_hex = string(_outputs_hex ? _outputs_hex : "");
@@ -1218,8 +1218,8 @@ JNIEXPORT jint JNICALL Java_monero_wallet_MoneroWalletFull_importOutputsJni(JNIE
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_exportKeyImagesJni(JNIEnv* env, jobject instance, jboolean all) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_exportKeyImagesJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_exportKeyImagesJni(JNIEnv* env, jobject instance, jboolean all) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_exportKeyImagesJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   try {
 
@@ -1239,8 +1239,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_exportKeyImagesJni
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_importKeyImagesJni(JNIEnv* env, jobject instance, jstring jkey_images_json) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_importKeyImagesJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_importKeyImagesJni(JNIEnv* env, jobject instance, jstring jkey_images_json) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_importKeyImagesJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _key_images_json = jkey_images_json ? env->GetStringUTFChars(jkey_images_json, NULL) : nullptr;
   string key_images_json = string(_key_images_json ? _key_images_json : "");
@@ -1261,8 +1261,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_importKeyImagesJni
   }
 }
 
-JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_freezeOutputJni(JNIEnv* env, jobject instance, jstring jkey_image) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_freezeJni");
+JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_freezeOutputJni(JNIEnv* env, jobject instance, jstring jkey_image) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_freezeJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _key_image = jkey_image ? env->GetStringUTFChars(jkey_image, NULL) : nullptr;
   string key_image = string(_key_image ? _key_image : "");
@@ -1276,8 +1276,8 @@ JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_freezeOutputJni(JNIEn
   }
 }
 
-JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_thawOutputJni(JNIEnv* env, jobject instance, jstring jkey_image) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_thawJni");
+JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_thawOutputJni(JNIEnv* env, jobject instance, jstring jkey_image) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_thawJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _key_image = jkey_image ? env->GetStringUTFChars(jkey_image, NULL) : nullptr;
   string key_image = string(_key_image ? _key_image : "");
@@ -1291,8 +1291,8 @@ JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_thawOutputJni(JNIEnv*
   }
 }
 
-JNIEXPORT bool JNICALL Java_monero_wallet_MoneroWalletFull_isOutputFrozenJni(JNIEnv* env, jobject instance, jstring jkey_image) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_isFrozenJni");
+JNIEXPORT bool JNICALL Java_zephyr_wallet_ZephyrWalletFull_isOutputFrozenJni(JNIEnv* env, jobject instance, jstring jkey_image) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_isFrozenJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _key_image = jkey_image ? env->GetStringUTFChars(jkey_image, NULL) : nullptr;
   string key_image = string(_key_image ? _key_image : "");
@@ -1307,8 +1307,8 @@ JNIEXPORT bool JNICALL Java_monero_wallet_MoneroWalletFull_isOutputFrozenJni(JNI
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_createTxsJni(JNIEnv* env, jobject instance, jstring jconfig) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_sendTxsJni(request)");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_createTxsJni(JNIEnv* env, jobject instance, jstring jconfig) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_sendTxsJni(request)");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _config = jconfig ? env->GetStringUTFChars(jconfig, NULL) : nullptr;
   string config_json = string(_config ? _config : "");
@@ -1332,8 +1332,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_createTxsJni(JNIEn
   return env->NewStringUTF(txs[0]->m_tx_set.get()->serialize().c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_sweepUnlockedJni(JNIEnv* env, jobject instance, jstring jconfig) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_sweepUnlockedJni(config)");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_sweepUnlockedJni(JNIEnv* env, jobject instance, jstring jconfig) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_sweepUnlockedJni(config)");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _config = jconfig ? env->GetStringUTFChars(jconfig, NULL) : nullptr;
   string config_json = string(_config ? _config : "");
@@ -1368,8 +1368,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_sweepUnlockedJni(J
   return env->NewStringUTF(tx_sets_json.c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_sweepOutputJni(JNIEnv* env, jobject instance, jstring jconfig) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_sweepOutputJni(request)");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_sweepOutputJni(JNIEnv* env, jobject instance, jstring jconfig) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_sweepOutputJni(request)");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _config = jconfig ? env->GetStringUTFChars(jconfig, NULL) : nullptr;
   string config_json = string(_config);
@@ -1394,8 +1394,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_sweepOutputJni(JNI
   return env->NewStringUTF(tx->m_tx_set.get()->serialize().c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_sweepDustJni(JNIEnv* env, jobject instance, jboolean relay) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_sweepDustJni(request)");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_sweepDustJni(JNIEnv* env, jobject instance, jboolean relay) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_sweepDustJni(request)");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
 
   // sweep dust
@@ -1411,8 +1411,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_sweepDustJni(JNIEn
   return env->NewStringUTF(txs.empty() ? std::string("{}").c_str() : txs[0]->m_tx_set.get()->serialize().c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_describeTxSetJni(JNIEnv* env, jobject instance, jstring jtx_set_json) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_describeTxSetJson(tx_set_json)");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_describeTxSetJni(JNIEnv* env, jobject instance, jstring jtx_set_json) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_describeTxSetJson(tx_set_json)");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
 
   // get tx set json string
@@ -1436,8 +1436,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_describeTxSetJni(J
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_signTxsJni(JNIEnv* env, jobject instance, jstring junsigned_tx_hex) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_signTxsJni()");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_signTxsJni(JNIEnv* env, jobject instance, jstring junsigned_tx_hex) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_signTxsJni()");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
 
   // get unsigned tx set as string
@@ -1454,8 +1454,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_signTxsJni(JNIEnv*
   }
 }
 
-JNIEXPORT jobjectArray JNICALL Java_monero_wallet_MoneroWalletFull_submitTxsJni(JNIEnv* env, jobject instance, jstring jsigned_tx_hex) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_submitTxsJni()");
+JNIEXPORT jobjectArray JNICALL Java_zephyr_wallet_ZephyrWalletFull_submitTxsJni(JNIEnv* env, jobject instance, jstring jsigned_tx_hex) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_submitTxsJni()");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
 
   // get signed tx set as string
@@ -1478,8 +1478,8 @@ JNIEXPORT jobjectArray JNICALL Java_monero_wallet_MoneroWalletFull_submitTxsJni(
   }
 }
 
-JNIEXPORT jobjectArray JNICALL Java_monero_wallet_MoneroWalletFull_relayTxsJni(JNIEnv* env, jobject instance, jobjectArray jtx_metadatas) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_relayTxsJni");
+JNIEXPORT jobjectArray JNICALL Java_zephyr_wallet_ZephyrWalletFull_relayTxsJni(JNIEnv* env, jobject instance, jobjectArray jtx_metadatas) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_relayTxsJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
 
   // get tx metadatas from jobjectArray to vector<string>
@@ -1510,8 +1510,8 @@ JNIEXPORT jobjectArray JNICALL Java_monero_wallet_MoneroWalletFull_relayTxsJni(J
   return jtx_hashes;
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_signMessageJni(JNIEnv* env, jobject instance, jstring jmsg, jint message_signature_type, jint account_idx, jint subaddress_idx) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_signMessageJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_signMessageJni(JNIEnv* env, jobject instance, jstring jmsg, jint message_signature_type, jint account_idx, jint subaddress_idx) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_signMessageJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _msg = jmsg ? env->GetStringUTFChars(jmsg, NULL) : nullptr;
   string msg = string(_msg ? _msg : "");
@@ -1526,8 +1526,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_signMessageJni(JNI
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_verifyMessageJni(JNIEnv* env, jobject instance, jstring jmsg, jstring jaddress, jstring jsignature) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_verifyMessageJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_verifyMessageJni(JNIEnv* env, jobject instance, jstring jmsg, jstring jaddress, jstring jsignature) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_verifyMessageJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _msg = jmsg ? env->GetStringUTFChars(jmsg, NULL) : nullptr;
   const char* _address = jaddress ? env->GetStringUTFChars(jaddress, NULL) : nullptr;
@@ -1547,8 +1547,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_verifyMessageJni(J
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getTxKeyJni(JNIEnv* env, jobject instance, jstring jtx_hash) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getTxKeyJniJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getTxKeyJni(JNIEnv* env, jobject instance, jstring jtx_hash) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getTxKeyJniJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _tx_hash = jtx_hash ? env->GetStringUTFChars(jtx_hash, NULL) : nullptr;
   string tx_hash = string(_tx_hash == nullptr ? "" : _tx_hash);
@@ -1561,8 +1561,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getTxKeyJni(JNIEnv
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_checkTxKeyJni(JNIEnv* env, jobject instance, jstring jtx_hash, jstring jtx_key, jstring jaddress) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_checktx_keyJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_checkTxKeyJni(JNIEnv* env, jobject instance, jstring jtx_hash, jstring jtx_key, jstring jaddress) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_checktx_keyJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _tx_hash = jtx_hash ? env->GetStringUTFChars(jtx_hash, NULL) : nullptr;
   const char* _tx_key = jtx_key ? env->GetStringUTFChars(jtx_key, NULL) : nullptr;
@@ -1581,8 +1581,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_checkTxKeyJni(JNIE
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getTxProofJni(JNIEnv* env, jobject instance, jstring jtx_hash, jstring jaddress, jstring jmessage) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getTxProofJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getTxProofJni(JNIEnv* env, jobject instance, jstring jtx_hash, jstring jaddress, jstring jmessage) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getTxProofJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _tx_hash = jtx_hash ? env->GetStringUTFChars(jtx_hash, NULL) : nullptr;
   const char* _address = jaddress ? env->GetStringUTFChars(jaddress, NULL) : nullptr;
@@ -1601,8 +1601,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getTxProofJni(JNIE
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_checkTxProofJni(JNIEnv* env, jobject instance, jstring jtx_hash, jstring jaddress, jstring jmessage, jstring jsignature) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_checkTxProofJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_checkTxProofJni(JNIEnv* env, jobject instance, jstring jtx_hash, jstring jaddress, jstring jmessage, jstring jsignature) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_checkTxProofJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _tx_hash = jtx_hash ? env->GetStringUTFChars(jtx_hash, NULL) : nullptr;
   const char* _address = jaddress ? env->GetStringUTFChars(jaddress, NULL) : nullptr;
@@ -1624,8 +1624,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_checkTxProofJni(JN
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getSpendProofJni(JNIEnv* env, jobject instance, jstring jtx_hash, jstring jmessage) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getSpendProofJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getSpendProofJni(JNIEnv* env, jobject instance, jstring jtx_hash, jstring jmessage) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getSpendProofJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _tx_hash = jtx_hash ? env->GetStringUTFChars(jtx_hash, NULL) : nullptr;
   const char* _message = jmessage ? env->GetStringUTFChars(jmessage, NULL) : nullptr;
@@ -1641,8 +1641,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getSpendProofJni(J
   }
 }
 
-JNIEXPORT jboolean JNICALL Java_monero_wallet_MoneroWalletFull_checkSpendProofJni(JNIEnv* env, jobject instance, jstring jtx_hash, jstring jmessage, jstring jsignature) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_checkSpendProofJni");
+JNIEXPORT jboolean JNICALL Java_zephyr_wallet_ZephyrWalletFull_checkSpendProofJni(JNIEnv* env, jobject instance, jstring jtx_hash, jstring jmessage, jstring jsignature) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_checkSpendProofJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _tx_hash = jtx_hash ? env->GetStringUTFChars(jtx_hash, NULL) : nullptr;
   const char* _message = jmessage ? env->GetStringUTFChars(jmessage, NULL) : nullptr;
@@ -1661,8 +1661,8 @@ JNIEXPORT jboolean JNICALL Java_monero_wallet_MoneroWalletFull_checkSpendProofJn
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getReserveProofWalletJni(JNIEnv* env, jobject instance, jstring jmessage) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getReserveProofWalletJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getReserveProofWalletJni(JNIEnv* env, jobject instance, jstring jmessage) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getReserveProofWalletJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _message = jmessage ? env->GetStringUTFChars(jmessage, NULL) : nullptr;
   string message = string(_message == nullptr ? "" : _message);
@@ -1675,8 +1675,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getReserveProofWal
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getReserveProofAccountJni(JNIEnv* env, jobject instance, jint account_idx, jstring jamount_str, jstring jmessage) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getReserveProofWalletJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getReserveProofAccountJni(JNIEnv* env, jobject instance, jint account_idx, jstring jamount_str, jstring jmessage) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getReserveProofWalletJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _amount_str = jamount_str ? env->GetStringUTFChars(jamount_str, NULL) : nullptr;
   const char* _message = jmessage ? env->GetStringUTFChars(jmessage, NULL) : nullptr;
@@ -1693,8 +1693,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getReserveProofAcc
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_checkReserveProofJni(JNIEnv* env, jobject instance, jstring jaddress, jstring jmessage, jstring jsignature) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_checkReserveProofAccountJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_checkReserveProofJni(JNIEnv* env, jobject instance, jstring jaddress, jstring jmessage, jstring jsignature) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_checkReserveProofAccountJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _address = jaddress ? env->GetStringUTFChars(jaddress, NULL) : nullptr;
   const char* _message = jmessage ? env->GetStringUTFChars(jmessage, NULL) : nullptr;
@@ -1713,8 +1713,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_checkReserveProofJ
   }
 }
 
-JNIEXPORT jobjectArray JNICALL Java_monero_wallet_MoneroWalletFull_getTxNotesJni(JNIEnv* env, jobject instance, jobjectArray jtx_hashes) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getTxNotesJni");
+JNIEXPORT jobjectArray JNICALL Java_zephyr_wallet_ZephyrWalletFull_getTxNotesJni(JNIEnv* env, jobject instance, jobjectArray jtx_hashes) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getTxNotesJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
 
   // get tx hashes from jobjectArray to vector<string>
@@ -1747,8 +1747,8 @@ JNIEXPORT jobjectArray JNICALL Java_monero_wallet_MoneroWalletFull_getTxNotesJni
   return jtx_notes;
 }
 
-JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_setTxNotesJni(JNIEnv* env, jobject instance, jobjectArray jtx_hashes, jobjectArray jtx_notes) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_setTxNotesJni");
+JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_setTxNotesJni(JNIEnv* env, jobject instance, jobjectArray jtx_hashes, jobjectArray jtx_notes) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_setTxNotesJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
 
   // get tx hashes from jobjectArray to vector<string>
@@ -1785,8 +1785,8 @@ JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_setTxNotesJni(JNIEnv*
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getAddressBookEntriesJni(JNIEnv* env, jobject instance, jintArray jindices) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getAddressBookEntriesJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getAddressBookEntriesJni(JNIEnv* env, jobject instance, jintArray jindices) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getAddressBookEntriesJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
 
   // convert subaddress indices from jintArray to vector<uint32_t>
@@ -1817,8 +1817,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getAddressBookEntr
 }
 
 // TODO: return jlong for uint64_t
-JNIEXPORT jint JNICALL Java_monero_wallet_MoneroWalletFull_addAddressBookEntryJni(JNIEnv* env, jobject instance, jstring jaddress, jstring jdescription) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_addAddressBookEntryJni");
+JNIEXPORT jint JNICALL Java_zephyr_wallet_ZephyrWalletFull_addAddressBookEntryJni(JNIEnv* env, jobject instance, jstring jaddress, jstring jdescription) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_addAddressBookEntryJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
 
   // collect string params
@@ -1838,8 +1838,8 @@ JNIEXPORT jint JNICALL Java_monero_wallet_MoneroWalletFull_addAddressBookEntryJn
   }
 }
 
-JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_editAddressBookEntryJni(JNIEnv* env, jobject instance, jint index, jboolean set_address, jstring jaddress, jboolean set_description, jstring jdescription) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_editAddressBookEntryJni");
+JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_editAddressBookEntryJni(JNIEnv* env, jobject instance, jint index, jboolean set_address, jstring jaddress, jboolean set_description, jstring jdescription) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_editAddressBookEntryJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
 
   // collect string params
@@ -1858,8 +1858,8 @@ JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_editAddressBookEntryJ
   }
 }
 
-JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_deleteAddressBookEntryJni(JNIEnv* env, jobject instance, jint index) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_deleteAddressBookEntryJni");
+JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_deleteAddressBookEntryJni(JNIEnv* env, jobject instance, jint index) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_deleteAddressBookEntryJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
 
   // delete address book entry
@@ -1870,8 +1870,8 @@ JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_deleteAddressBookEntr
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getPaymentUriJni(JNIEnv* env, jobject instance, jstring jconfig) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getPaymentUriJni()");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getPaymentUriJni(JNIEnv* env, jobject instance, jstring jconfig) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getPaymentUriJni()");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _config = jconfig ? env->GetStringUTFChars(jconfig, NULL) : nullptr;
   string config_json = string(_config ? _config : "");
@@ -1894,8 +1894,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getPaymentUriJni(J
   return env->NewStringUTF(payment_uri.c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_parsePaymentUriJni(JNIEnv* env, jobject instance, jstring juri) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_parsePaymentUriJni()");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_parsePaymentUriJni(JNIEnv* env, jobject instance, jstring juri) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_parsePaymentUriJni()");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _uri = juri ? env->GetStringUTFChars(juri, NULL) : nullptr;
   string uri = string(_uri ? _uri : "");
@@ -1914,8 +1914,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_parsePaymentUriJni
   return env->NewStringUTF(config->serialize().c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getAttributeJni(JNIEnv* env, jobject instance, jstring jkey) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getAttribute()");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getAttributeJni(JNIEnv* env, jobject instance, jstring jkey) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getAttribute()");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _key = jkey ? env->GetStringUTFChars(jkey, NULL) : nullptr;
   string key = string(_key);
@@ -1930,8 +1930,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getAttributeJni(JN
   }
 }
 
-JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_setAttributeJni(JNIEnv* env, jobject instance, jstring jkey, jstring jval) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_setAttribute()");
+JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_setAttributeJni(JNIEnv* env, jobject instance, jstring jkey, jstring jval) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_setAttribute()");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _key = jkey ? env->GetStringUTFChars(jkey, NULL) : nullptr;
   const char* _val = jval ? env->GetStringUTFChars(jval, NULL) : nullptr;
@@ -1946,8 +1946,8 @@ JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_setAttributeJni(JNIEn
   }
 }
 
-JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_startMiningJni(JNIEnv* env, jobject instance, jlong num_threads, jboolean background_mining, jboolean ignore_battery) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_startMiningJni()");
+JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_startMiningJni(JNIEnv* env, jobject instance, jlong num_threads, jboolean background_mining, jboolean ignore_battery) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_startMiningJni()");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   try {
     wallet->start_mining(num_threads, background_mining, ignore_battery);
@@ -1956,8 +1956,8 @@ JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_startMiningJni(JNIEnv
   }
 }
 
-JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_stopMiningJni(JNIEnv* env, jobject instance) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_startMiningJni()");
+JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_stopMiningJni(JNIEnv* env, jobject instance) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_startMiningJni()");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   try {
     wallet->stop_mining();
@@ -1966,8 +1966,8 @@ JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_stopMiningJni(JNIEnv*
   }
 }
 
-JNIEXPORT jboolean JNICALL Java_monero_wallet_MoneroWalletFull_isMultisigImportNeededJni(JNIEnv* env, jobject instance) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_isMultisigImportNeededJni");
+JNIEXPORT jboolean JNICALL Java_zephyr_wallet_ZephyrWalletFull_isMultisigImportNeededJni(JNIEnv* env, jobject instance) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_isMultisigImportNeededJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   try {
     bool is_multisig_import_needed = wallet->is_multisig_import_needed();
@@ -1978,8 +1978,8 @@ JNIEXPORT jboolean JNICALL Java_monero_wallet_MoneroWalletFull_isMultisigImportN
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getMultisigInfoJni(JNIEnv* env, jobject instance) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getMultisigInfoJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getMultisigInfoJni(JNIEnv* env, jobject instance) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getMultisigInfoJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   try {
     monero_multisig_info info = wallet->get_multisig_info();
@@ -1990,8 +1990,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_getMultisigInfoJni
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_prepareMultisigJni(JNIEnv* env, jobject instance) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_prepareMultisigJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_prepareMultisigJni(JNIEnv* env, jobject instance) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_prepareMultisigJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   try {
     string multisig_hex = wallet->prepare_multisig();
@@ -2002,8 +2002,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_prepareMultisigJni
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_makeMultisigJni(JNIEnv* env, jobject instance, jobjectArray jmultisig_hexes, jint threshold, jstring jpassword) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_makeMultisigJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_makeMultisigJni(JNIEnv* env, jobject instance, jobjectArray jmultisig_hexes, jint threshold, jstring jpassword) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_makeMultisigJni");
 
   // get multisig hex as vector<string>
   vector<string> multisig_hexes;
@@ -2034,8 +2034,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_makeMultisigJni(JN
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_exchangeMultisigKeysJni(JNIEnv* env, jobject instance, jobjectArray jmultisig_hexes, jstring jpassword) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_exchangeMultisigKeysJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_exchangeMultisigKeysJni(JNIEnv* env, jobject instance, jobjectArray jmultisig_hexes, jstring jpassword) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_exchangeMultisigKeysJni");
 
   // get multisig hex as vector<string>
   vector<string> multisig_hexes;
@@ -2066,8 +2066,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_exchangeMultisigKe
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_exportMultisigHexJni(JNIEnv* env, jobject instance) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_exportMultisigHexJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_exportMultisigHexJni(JNIEnv* env, jobject instance) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_exportMultisigHexJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   try {
     string multisig_hex = wallet->export_multisig_hex();
@@ -2078,8 +2078,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_exportMultisigHexJ
   }
 }
 
-JNIEXPORT jint JNICALL Java_monero_wallet_MoneroWalletFull_importMultisigHexJni(JNIEnv* env, jobject instance, jobjectArray jmultisig_hexes) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_importMultisigHexJni");
+JNIEXPORT jint JNICALL Java_zephyr_wallet_ZephyrWalletFull_importMultisigHexJni(JNIEnv* env, jobject instance, jobjectArray jmultisig_hexes) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_importMultisigHexJni");
 
   // get peer multisig hex as vector<string>
   vector<string> multisig_hexes;
@@ -2105,8 +2105,8 @@ JNIEXPORT jint JNICALL Java_monero_wallet_MoneroWalletFull_importMultisigHexJni(
   }
 }
 
-JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_signMultisigTxHexJni(JNIEnv* env, jobject instance, jstring jmultisig_tx_hex) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_signMultisigTxHexJni");
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_signMultisigTxHexJni(JNIEnv* env, jobject instance, jstring jmultisig_tx_hex) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_signMultisigTxHexJni");
 
   // get multisig tx hex as string
   const char* _multisig_tx_hex = jmultisig_tx_hex ? env->GetStringUTFChars(jmultisig_tx_hex, NULL) : nullptr;
@@ -2124,8 +2124,8 @@ JNIEXPORT jstring JNICALL Java_monero_wallet_MoneroWalletFull_signMultisigTxHexJ
   }
 }
 
-JNIEXPORT jobjectArray JNICALL Java_monero_wallet_MoneroWalletFull_submitMultisigTxHexJni(JNIEnv* env, jobject instance, jstring jsigned_multisig_tx_hex) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_submitMultisigTxHexJni");
+JNIEXPORT jobjectArray JNICALL Java_zephyr_wallet_ZephyrWalletFull_submitMultisigTxHexJni(JNIEnv* env, jobject instance, jstring jsigned_multisig_tx_hex) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_submitMultisigTxHexJni");
 
   // get signed multisig tx hex as string
   const char* _signed_multisig_tx_hex = jsigned_multisig_tx_hex ? env->GetStringUTFChars(jsigned_multisig_tx_hex, NULL) : nullptr;
@@ -2145,8 +2145,8 @@ JNIEXPORT jobjectArray JNICALL Java_monero_wallet_MoneroWalletFull_submitMultisi
   }
 }
 
-JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_changePasswordJni(JNIEnv* env, jobject instance, jstring jold_password, jstring jnew_password) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_changePasswordJni(oldPassword, newPassword)");
+JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_changePasswordJni(JNIEnv* env, jobject instance, jstring jold_password, jstring jnew_password) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_changePasswordJni(oldPassword, newPassword)");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   const char* _old_password = jold_password ? env->GetStringUTFChars(jold_password, NULL) : nullptr;
   const char* _new_password = jnew_password ? env->GetStringUTFChars(jnew_password, NULL) : nullptr;
@@ -2159,8 +2159,8 @@ JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_changePasswordJni(JNI
   }
 }
 
-JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_moveToJni(JNIEnv* env, jobject instance, jstring jpath, jstring jpassword) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_moveToJni(path, password)");
+JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_moveToJni(JNIEnv* env, jobject instance, jstring jpath, jstring jpassword) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_moveToJni(path, password)");
   const char* _path = jpath ? env->GetStringUTFChars(jpath, NULL) : nullptr;
   const char* _password = jpassword ? env->GetStringUTFChars(jpassword, NULL) : nullptr;
   string path = string(_path ? _path : "");
@@ -2175,8 +2175,8 @@ JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_moveToJni(JNIEnv* env
   }
 }
 
-JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_saveJni(JNIEnv* env, jobject instance) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_saveJni(path, password)");
+JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_saveJni(JNIEnv* env, jobject instance) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_saveJni(path, password)");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   try {
     wallet->save();
@@ -2185,16 +2185,16 @@ JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_saveJni(JNIEnv* env, 
   }
 }
 
-JNIEXPORT void JNICALL Java_monero_wallet_MoneroWalletFull_closeJni(JNIEnv* env, jobject instance, jboolean save) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_CloseJni");
+JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_closeJni(JNIEnv* env, jobject instance, jboolean save) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_CloseJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   if (save) wallet->save();
   delete wallet;
   wallet = nullptr;
 }
 
-JNIEXPORT jbyteArray JNICALL Java_monero_wallet_MoneroWalletFull_getKeysFileBufferJni(JNIEnv* env, jobject instance, jstring jpassword, jboolean view_only) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getKeysFileBufferJni(password, view_only)");
+JNIEXPORT jbyteArray JNICALL Java_zephyr_wallet_ZephyrWalletFull_getKeysFileBufferJni(JNIEnv* env, jobject instance, jstring jpassword, jboolean view_only) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getKeysFileBufferJni(password, view_only)");
   monero_wallet_full* wallet = get_handle<monero_wallet_full>(env, instance, JNI_WALLET_HANDLE);
   const char* _password = jpassword ? env->GetStringUTFChars(jpassword, NULL) : nullptr;
   string password = string(_password ? _password : "");
@@ -2214,8 +2214,8 @@ JNIEXPORT jbyteArray JNICALL Java_monero_wallet_MoneroWalletFull_getKeysFileBuff
   }
 }
 
-JNIEXPORT jbyteArray JNICALL Java_monero_wallet_MoneroWalletFull_getCacheFileBufferJni(JNIEnv* env, jobject instance) {
-  MTRACE("Java_monero_wallet_MoneroWalletFull_getCacheFileBufferJni()");
+JNIEXPORT jbyteArray JNICALL Java_zephyr_wallet_ZephyrWalletFull_getCacheFileBufferJni(JNIEnv* env, jobject instance) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getCacheFileBufferJni()");
   monero_wallet_full* wallet = get_handle<monero_wallet_full>(env, instance, JNI_WALLET_HANDLE);
   try {
 
