@@ -792,8 +792,8 @@ public abstract class TestZephyrWalletCommon {
         subaddressesUnlockedBalance = subaddressesUnlockedBalance.add(subaddress.getUnlockedBalance().get(ZephyrAssets.ZPH)); // temporary until R8
         
         // test that balances are consistent with getAccounts() call
-        assertEquals((wallet.getBalance(subaddress.getAccountIndex(), subaddress.getIndex())).toString(), subaddress.getBalance().toString());
-        assertEquals((wallet.getUnlockedBalance(subaddress.getAccountIndex(), subaddress.getIndex())).toString(), subaddress.getUnlockedBalance().toString());
+        assertEquals((wallet.getBalance(subaddress.getAccountIndex(), subaddress.getIndex())).toString(), subaddress.getBalance().get(ZephyrAssets.ZPH).toString()); // temporary until R8
+        assertEquals((wallet.getUnlockedBalance(subaddress.getAccountIndex(), subaddress.getIndex())).toString(), subaddress.getUnlockedBalance().get(ZephyrAssets.ZPH).toString()); // temporary until R8
       }
       assertEquals((wallet.getBalance(account.getIndex())).toString(), subaddressesBalance.toString());
       assertEquals((wallet.getUnlockedBalance(account.getIndex())).toString(), subaddressesUnlockedBalance.toString());
@@ -1975,14 +1975,14 @@ public abstract class TestZephyrWalletCommon {
       BigInteger accountSum = BigInteger.valueOf(0);
       List<ZephyrOutputWallet> accountOutputs = wallet.getOutputs(new ZephyrOutputQuery().setAccountIndex(account.getIndex()).setIsSpent(false));
       for (ZephyrOutputWallet output : accountOutputs) accountSum = accountSum.add(output.getAmount());
-      if (!account.getBalance().equals(accountSum)) assertTrue(hasUnconfirmedTx, "Account balance must equal sum of its unspent outputs if no unconfirmed txs");
+      if (!account.getBalance().get(ZephyrAssets.ZPH).equals(accountSum)) assertTrue(hasUnconfirmedTx, "Account balance must equal sum of its unspent outputs if no unconfirmed txs"); // temporary until R8
       
       // subaddress balances are sum of their unspent outputs
       for (ZephyrSubaddress subaddress : account.getSubaddresses()) {
         BigInteger subaddressSum = BigInteger.valueOf(0);
         List<ZephyrOutputWallet> subaddressOutputs = wallet.getOutputs(new ZephyrOutputQuery().setAccountIndex(account.getIndex()).setSubaddressIndex(subaddress.getIndex()).setIsSpent(false));
         for (ZephyrOutputWallet output : subaddressOutputs) subaddressSum = subaddressSum.add(output.getAmount());
-        if (!subaddress.getBalance().equals(subaddressSum)) assertTrue(hasUnconfirmedTx, "Subaddress balance must equal sum of its unspent outputs if no unconfirmed txs");
+        if (!subaddress.getBalance().get(ZephyrAssets.ZPH).equals(subaddressSum)) assertTrue(hasUnconfirmedTx, "Subaddress balance must equal sum of its unspent outputs if no unconfirmed txs"); // temporary until R8
       }
     }
   }
@@ -5268,8 +5268,8 @@ public abstract class TestZephyrWalletCommon {
         balance = balance.add(account.getSubaddresses().get(i).getBalance().get(ZephyrAssets.ZPH)); // temporary until R8
         unlockedBalance = unlockedBalance.add(account.getSubaddresses().get(i).getUnlockedBalance().get(ZephyrAssets.ZPH)); // temporary until R8
       }
-      assertTrue(account.getBalance().equals(balance), "Subaddress balances " + balance + " != account " + account.getIndex() + " balance " + account.getBalance());
-      assertTrue(account.getUnlockedBalance().equals(unlockedBalance), "Subaddress unlocked balances " + unlockedBalance + " != account " + account.getIndex() + " unlocked balance " + account.getUnlockedBalance());
+      assertTrue(account.getBalance().get(ZephyrAssets.ZPH).equals(balance), "Subaddress balances " + balance + " != account " + account.getIndex() + " balance " + account.getBalance().get(ZephyrAssets.ZPH)); // temporary until R8
+      assertTrue(account.getUnlockedBalance().get(ZephyrAssets.ZPH).equals(unlockedBalance), "Subaddress unlocked balances " + unlockedBalance + " != account " + account.getIndex() + " unlocked balance " + account.getUnlockedBalance().get(ZephyrAssets.ZPH)); // temporary until R8
     }
     
     // tag must be undefined or non-empty
