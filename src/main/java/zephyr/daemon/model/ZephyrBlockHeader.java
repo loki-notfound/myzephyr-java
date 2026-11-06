@@ -27,6 +27,7 @@ public class ZephyrBlockHeader {
   private String prevHash;
   private BigInteger reward;
   private String powHash;
+  private ZephyrPricingRecord pricingRecord;
   
   public ZephyrBlockHeader() {
     super();
@@ -50,6 +51,7 @@ public class ZephyrBlockHeader {
     this.prevHash = header.prevHash;
     this.reward = header.reward;
     this.powHash = header.powHash;
+    this.pricingRecord = header.pricingRecord == null ? null : header.pricingRecord.copy();
   }
   
   public String getHash() {
@@ -225,6 +227,26 @@ public class ZephyrBlockHeader {
     return this;
   }
   
+  /**
+   * Return the oracle pricing record this block was built with.
+   * 
+   * @return the block's pricing record
+   */
+  public ZephyrPricingRecord getPricingRecord() {
+    return pricingRecord;
+  }
+  
+  /**
+   * Set the oracle pricing record this block was built with.
+   * 
+   * @param pricingRecord is the block's pricing record to set
+   * @return a reference to this header for chaining
+   */
+  public ZephyrBlockHeader setPricingRecord(ZephyrPricingRecord pricingRecord) {
+    this.pricingRecord = pricingRecord;
+    return this;
+  }
+  
   public ZephyrBlockHeader merge(ZephyrBlockHeader header) {
     GenUtils.assertNotNull(header);
     if (this == header) return this;
@@ -245,6 +267,7 @@ public class ZephyrBlockHeader {
     this.setPrevHash(GenUtils.reconcile(this.getPrevHash(), header.getPrevHash()));
     this.setReward(GenUtils.reconcile(this.getReward(), header.getReward()));
     this.setPowHash(GenUtils.reconcile(this.getPowHash(), header.getPowHash()));
+    this.setPricingRecord(GenUtils.reconcile(this.getPricingRecord(), header.getPricingRecord()));
     return this;
   }
   
@@ -271,6 +294,10 @@ public class ZephyrBlockHeader {
     sb.append(GenUtils.kvLine("Prev hash", getPrevHash(), indent));
     sb.append(GenUtils.kvLine("Reward", getReward(), indent));
     sb.append(GenUtils.kvLine("Pow hash", getPowHash(), indent));
+    if (getPricingRecord() != null) {
+      sb.append(GenUtils.kvLine("Pricing record", "", indent));
+      sb.append(getPricingRecord().toString(indent + 1) + "\n");
+    }
     String str = sb.toString();
     if (str.isEmpty()) return "";
     return str.charAt(str.length() - 1) == '\n' ? str.substring(0, str.length() - 1) : str; // strip newline
@@ -293,6 +320,7 @@ public class ZephyrBlockHeader {
     result = prime * result + ((numTxs == null) ? 0 : numTxs.hashCode());
     result = prime * result + ((orphanStatus == null) ? 0 : orphanStatus.hashCode());
     result = prime * result + ((powHash == null) ? 0 : powHash.hashCode());
+    result = prime * result + ((pricingRecord == null) ? 0 : pricingRecord.hashCode());
     result = prime * result + ((prevHash == null) ? 0 : prevHash.hashCode());
     result = prime * result + ((reward == null) ? 0 : reward.hashCode());
     result = prime * result + ((size == null) ? 0 : size.hashCode());
@@ -346,6 +374,9 @@ public class ZephyrBlockHeader {
     if (powHash == null) {
       if (other.powHash != null) return false;
     } else if (!powHash.equals(other.powHash)) return false;
+    if (pricingRecord == null) {
+      if (other.pricingRecord != null) return false;
+    } else if (!pricingRecord.equals(other.pricingRecord)) return false;
     if (prevHash == null) {
       if (other.prevHash != null) return false;
     } else if (!prevHash.equals(other.prevHash)) return false;

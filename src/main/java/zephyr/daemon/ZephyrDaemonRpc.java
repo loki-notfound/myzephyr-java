@@ -52,6 +52,7 @@ import zephyr.daemon.model.ZephyrBlockTemplate;
 import zephyr.daemon.model.ZephyrConnectionSpan;
 import zephyr.daemon.model.ZephyrDaemonInfo;
 import zephyr.daemon.model.ZephyrDaemonListener;
+import zephyr.daemon.model.ZephyrPricingRecord;
 import zephyr.daemon.model.ZephyrPeer;
 import zephyr.daemon.model.ZephyrPruneResult;
 import zephyr.daemon.model.ZephyrDaemonSyncInfo;
@@ -1161,6 +1162,7 @@ public class ZephyrDaemonRpc extends ZephyrDaemonDefault {
       else if (key.equals("tx_hashes")) {}  // used in block model, not header model
       else if (key.equals("miner_tx")) {}   // used in block model, not header model
       else if (key.equals("miner_tx_hash")) header.setMinerTxHash((String) val);
+      else if (key.equals("pricing_record")) header.setPricingRecord(GenUtils.reconcile(header.getPricingRecord(), ZephyrRpcConnection.MAPPER.convertValue(val, ZephyrPricingRecord.class)));
       else LOGGER.warning("ignoring unexpected block header field: '" + key + "': " + val);
     }
     return header;

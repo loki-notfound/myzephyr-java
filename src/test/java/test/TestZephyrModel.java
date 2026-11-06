@@ -10,12 +10,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.math.BigDecimal;
+import java.lang.reflect.Method;
 import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import zephyr.common.ZephyrRpcConnection;
+import zephyr.daemon.ZephyrDaemonRpc;
+import zephyr.daemon.model.ZephyrBlockHeader;
 import zephyr.daemon.model.ZephyrOutput;
+import zephyr.daemon.model.ZephyrPricingRecord;
 import zephyr.lib.utils.JsonUtils;
 import zephyr.wallet.model.ZephyrAccount;
 import zephyr.wallet.model.ZephyrAssets;
@@ -234,5 +238,49 @@ public class TestZephyrModel {
     assertEquals(Arrays.asList("ZPH", "ZSD", "ZRS", "ZYS"), ZephyrAssets.V2);
     assertThrows(UnsupportedOperationException.class, () -> ZephyrAssets.V2.add("ZEPH"));
     assertThrows(UnsupportedOperationException.class, () -> ZephyrAssets.V2.set(0, "ZEPH"));
+  }
+
+  // 9. the block header's pricing record
+  @Test
+  public void testPricingRecordJson() throws Exception {
+    String sig = "0123456789abcdef".repeat(8);  // 128 hex characters
+    assertEquals(128, sig.length());
+    String json = "{\"spot\":1500000000000,\"moving_average\":1490000000000,\"stable\":1000000000000,"
+        + "\"stable_ma\":1000000000001,\"reserve\":2000000000000,\"reserve_ma\":2000000000001,"
+        + "\"reserve_ratio\":4000000000000,\"reserve_ratio_ma\":4100000000000,\"yield_price\":1000000000002,"
+        + "\"timestamp\":1700000000,\"signature\":\"" + sig + "\"}";
+    ZephyrPricingRecord record = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, json, ZephyrPricingRecord.class);
+    assertEquals(new BigInteger("1500000000000"), record.getSpot());
+    assertEquals(new BigInteger("1490000000000"), record.getMovingAverage());
+    assertEquals(new BigInteger("1000000000000"), record.getStable());
+    assertEquals(new BigInteger("1000000000001"), record.getStableMa());
+    assertEquals(new BigInteger("2000000000000"), record.getReserve());
+    assertEquals(new BigInteger("2000000000001"), record.getReserveMa());
+    assertEquals(new BigInteger("4000000000000"), record.getReserveRatio());
+    assertEquals(new BigInteger("4100000000000"), record.getReserveRatioMa());
+    assertEquals(new BigInteger("1000000000002"), record.getYieldPrice());
+    assertEquals(new BigInteger("1700000000"), record.getTimestamp());
+    assertEquals(sig, record.getSignature());
+
+    // round trip through the mapper
+    String json2 = JsonUtils.serialize(ZephyrRpcConnection.MAPPER, record);
+    ZephyrPricingRecord record2 = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, json2, ZephyrPricingRecord.class);
+    assertEquals(record, record2);
+    assertEquals(record.hashCode(), record2.hashCode());
+    assertEquals(11, JsonUtils.toMap(ZephyrRpcConnection.MAPPER, json2).size());
+
+    // copy
+    ZephyrPricingRecord copy = record.copy();
+    assertNotSame(record, copy);
+    assertEquals(record, copy);
+
+    // the daemon RPC client's block header conversion parses the nested record
+    String headerJson = "{\"height\":100,\"hash\":\"ab\",\"pricing_record\":" + json + "}";
+    Method convert = ZephyrDaemonRpc.class.getDeclaredMethod("convertRpcBlockHeader", Map.class);
+    convert.setAccessible(true);
+    ZephyrBlockHeader header = (ZephyrBlockHeader) convert.invoke(null, JsonUtils.toMap(ZephyrRpcConnection.MAPPER, headerJson));
+    assertEquals(record, header.getPricingRecord());
+    assertEquals(Long.valueOf(100), header.getHeight());
+    assertEquals(header, new ZephyrBlockHeader(header));
   }
 }
