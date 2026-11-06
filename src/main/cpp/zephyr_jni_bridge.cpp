@@ -1014,6 +1014,71 @@ JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getUnlockedBalance
   return env->NewStringUTF(boost::lexical_cast<std::string>(balance).c_str());
 }
 
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getReserveInfoJni(JNIEnv *env, jobject instance) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getReserveInfoJni");
+  monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
+  try {
+    boost::multiprecision::uint128_t zeph_reserve = 0;
+    boost::multiprecision::uint128_t num_stables = 0;
+    boost::multiprecision::uint128_t num_reserves = 0;
+    boost::multiprecision::uint128_t assets = 0;
+    boost::multiprecision::uint128_t assets_ma = 0;
+    boost::multiprecision::uint128_t liabilities = 0;
+    boost::multiprecision::uint128_t equity = 0;
+    boost::multiprecision::uint128_t equity_ma = 0;
+    double reserve_ratio = 0;
+    double reserve_ratio_ma = 0;
+    uint8_t hf_version = 0;
+    boost::multiprecision::uint128_t zyield_circ = 0;
+    boost::multiprecision::uint128_t zyield_rsv = 0;
+    wallet->get_reserve_info(zeph_reserve, num_stables, num_reserves, assets, assets_ma, liabilities, equity, equity_ma, reserve_ratio, reserve_ratio_ma, hf_version, zyield_circ, zyield_rsv);
+
+    // serialize: uint128 values and the ratios as decimal strings (full double precision), hf_version as a number
+    rapidjson::Document doc;
+    doc.SetObject();
+    rapidjson::Document::AllocatorType& allocator = doc.GetAllocator();
+    auto add_string = [&](const char* key, const std::string& value) {
+      doc.AddMember(rapidjson::StringRef(key), rapidjson::Value(value.c_str(), allocator), allocator);
+    };
+    add_string("zeph_reserve", zeph_reserve.convert_to<std::string>());
+    add_string("num_stables", num_stables.convert_to<std::string>());
+    add_string("num_reserves", num_reserves.convert_to<std::string>());
+    add_string("assets", assets.convert_to<std::string>());
+    add_string("assets_ma", assets_ma.convert_to<std::string>());
+    add_string("liabilities", liabilities.convert_to<std::string>());
+    add_string("equity", equity.convert_to<std::string>());
+    add_string("equity_ma", equity_ma.convert_to<std::string>());
+    add_string("reserve_ratio", boost::lexical_cast<std::string>(reserve_ratio));
+    add_string("reserve_ratio_ma", boost::lexical_cast<std::string>(reserve_ratio_ma));
+    doc.AddMember("hf_version", rapidjson::Value().SetUint(hf_version), allocator);
+    add_string("zyield_circ", zyield_circ.convert_to<std::string>());
+    add_string("zyield_rsv", zyield_rsv.convert_to<std::string>());
+    string reserve_info_json = monero_utils::serialize(doc);
+    return env->NewStringUTF(reserve_info_json.c_str());
+  } catch (...) {
+    rethrow_cpp_exception_as_java_exception(env);
+    return 0;
+  }
+}
+
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getCirculatingSupplyJni(JNIEnv *env, jobject instance) {
+  MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getCirculatingSupplyJni");
+  monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
+  try {
+
+    // serialize the supply per asset as the document's root object {asset: "amount"}
+    std::vector<std::pair<std::string, std::string>> circulating_supply = wallet->get_circulating_supply();
+    std::map<std::string, std::string> circulating_supply_map(circulating_supply.begin(), circulating_supply.end());
+    rapidjson::Document doc;
+    doc.CopyFrom(monero_utils::to_rapidjson_val(doc.GetAllocator(), circulating_supply_map), doc.GetAllocator());
+    string circulating_supply_json = monero_utils::serialize(doc);
+    return env->NewStringUTF(circulating_supply_json.c_str());
+  } catch (...) {
+    rethrow_cpp_exception_as_java_exception(env);
+    return 0;
+  }
+}
+
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getAccountsJni(JNIEnv* env, jobject instance, jboolean include_subaddresses, jstring jtag) {
   MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getAccountsJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);

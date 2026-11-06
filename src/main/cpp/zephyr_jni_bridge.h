@@ -153,6 +153,10 @@ JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getUnlockedBalance
 
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getUnlockedBalanceAssetSubaddressJni(JNIEnv *, jobject, jstring, jint, jint);
 
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getReserveInfoJni(JNIEnv *, jobject);
+
+JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getCirculatingSupplyJni(JNIEnv *, jobject);
+
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getAccountsJni(JNIEnv *, jobject, jboolean, jstring);
 
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getAccountJni(JNIEnv *, jobject, jint, jboolean);

@@ -1473,6 +1473,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   
   private native String getUnlockedBalanceAssetSubaddressJni(String assetType, int accountIdx, int subaddressIdx);
   
+  private native String getReserveInfoJni();
+  
+  private native String getCirculatingSupplyJni();
+  
   private native String getAccountsJni(boolean includeSubaddresses, String tag);
   
   private native String getAccountJni(int accountIdx, boolean includeSubaddresses);
