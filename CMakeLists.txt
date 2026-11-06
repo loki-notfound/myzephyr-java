@@ -310,6 +310,11 @@ add_library(zephyr-java SHARED ${JNI_SRC_FILES} ${ZEPHYR_CPP_SRC_FILES})
 # boost 1.77 and later no longer include it transitively
 target_compile_options(zephyr-java PRIVATE -include map)
 
+# D17: the zephyr-cpp sources compiled into this library would otherwise export every monero::
+# symbol with default visibility; --exclude-libs,ALL covers only the static archives. JNIEXPORT
+# carries visibility("default") itself, so the bridge's entry points and JNI_OnLoad stay exported.
+target_compile_options(zephyr-java PRIVATE -fvisibility=hidden -fvisibility-inlines-hidden)
+
 target_link_libraries(zephyr-java
     ssl
     crypto
