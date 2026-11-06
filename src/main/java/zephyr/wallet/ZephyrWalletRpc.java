@@ -74,6 +74,7 @@ import zephyr.wallet.model.ZephyrMultisigSignResult;
 import zephyr.wallet.model.ZephyrOutgoingTransfer;
 import zephyr.wallet.model.ZephyrOutputQuery;
 import zephyr.wallet.model.ZephyrOutputWallet;
+import zephyr.wallet.model.ZephyrReserveInfo; // temporary until R7
 import zephyr.wallet.model.ZephyrSubaddress;
 import zephyr.wallet.model.ZephyrSyncResult;
 import zephyr.wallet.model.ZephyrTransfer;
@@ -773,13 +774,45 @@ public class ZephyrWalletRpc extends ZephyrWalletDefault {
   }
 
   @Override
-  public BigInteger getBalance(Integer accountIdx, Integer subaddressIdx) {
-    return getBalances(accountIdx, subaddressIdx)[0];
+  public ZephyrBalance getBalance() {
+    return new ZephyrBalance().set(ZephyrAssets.ZPH, getBalances(null, null)[0]); // temporary until R7
   }
 
   @Override
-  public BigInteger getUnlockedBalance(Integer accountIdx, Integer subaddressIdx) {
-    return getBalances(accountIdx, subaddressIdx)[1];
+  public Map<Integer, ZephyrBalance> getBalance(Integer accountIdx) {
+    throw new ZephyrError("ZephyrWalletRpc does not support per-asset balances until the RPC port"); // temporary until R7
+  }
+
+  @Override
+  public BigInteger getBalance(String assetType, Integer accountIdx, Integer subaddressIdx) {
+    if (ZephyrAssets.ZPH.equals(assetType)) return getBalances(accountIdx, subaddressIdx)[0]; // temporary until R7
+    throw new ZephyrError("ZephyrWalletRpc does not support per-asset balances until the RPC port"); // temporary until R7
+  }
+
+  @Override
+  public ZephyrBalance getUnlockedBalance() {
+    return new ZephyrBalance().set(ZephyrAssets.ZPH, getBalances(null, null)[1]); // temporary until R7
+  }
+
+  @Override
+  public Map<Integer, ZephyrBalance> getUnlockedBalance(Integer accountIdx) {
+    throw new ZephyrError("ZephyrWalletRpc does not support per-asset balances until the RPC port"); // temporary until R7
+  }
+
+  @Override
+  public BigInteger getUnlockedBalance(String assetType, Integer accountIdx, Integer subaddressIdx) {
+    if (ZephyrAssets.ZPH.equals(assetType)) return getBalances(accountIdx, subaddressIdx)[1]; // temporary until R7
+    throw new ZephyrError("ZephyrWalletRpc does not support per-asset balances until the RPC port"); // temporary until R7
+  }
+
+  @Override
+  public ZephyrReserveInfo getReserveInfo() {
+    throw new ZephyrError("ZephyrWalletRpc does not support per-asset balances until the RPC port"); // temporary until R7
+  }
+
+  @Override
+  public Map<String, BigInteger> getCirculatingSupply() {
+    throw new ZephyrError("ZephyrWalletRpc does not support per-asset balances until the RPC port"); // temporary until R7
   }
   
   @Override
@@ -2497,8 +2530,8 @@ public class ZephyrWalletRpc extends ZephyrWalletDefault {
     private List<String> prevLockedTxHashes = new ArrayList<String>();
     
     public WalletRpcZmqListener() {
-      prevBalance = getBalance();
-      prevUnlockedBalance = getUnlockedBalance();
+      prevBalance = getBalance().get(ZephyrAssets.ZPH); // temporary until R7
+      prevUnlockedBalance = getUnlockedBalance().get(ZephyrAssets.ZPH); // temporary until R7
     }
     
     public void setIsPolling(boolean isPolling) {
@@ -2654,8 +2687,8 @@ public class ZephyrWalletRpc extends ZephyrWalletDefault {
     }
     
     private boolean checkForChangedBalances() {
-      BigInteger balance = getBalance();
-      BigInteger unlockedBalance = getUnlockedBalance();
+      BigInteger balance = getBalance().get(ZephyrAssets.ZPH); // temporary until R7
+      BigInteger unlockedBalance = getUnlockedBalance().get(ZephyrAssets.ZPH); // temporary until R7
       if (!balance.equals(prevBalance) || !unlockedBalance.equals(prevUnlockedBalance)) {
         prevBalance =  balance;
         prevUnlockedBalance = unlockedBalance;

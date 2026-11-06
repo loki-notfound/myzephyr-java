@@ -25,6 +25,7 @@ package zephyr.wallet;
 import java.math.BigInteger;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import zephyr.common.ZephyrRpcConnection;
 import zephyr.daemon.model.ZephyrKeyImage;
@@ -32,6 +33,7 @@ import zephyr.daemon.model.ZephyrVersion;
 import zephyr.wallet.model.ZephyrAccount;
 import zephyr.wallet.model.ZephyrAccountTag;
 import zephyr.wallet.model.ZephyrAddressBookEntry;
+import zephyr.wallet.model.ZephyrBalance;
 import zephyr.wallet.model.ZephyrCheckReserve;
 import zephyr.wallet.model.ZephyrCheckTx;
 import zephyr.wallet.model.ZephyrIncomingTransfer;
@@ -45,6 +47,7 @@ import zephyr.wallet.model.ZephyrMultisigSignResult;
 import zephyr.wallet.model.ZephyrOutgoingTransfer;
 import zephyr.wallet.model.ZephyrOutputQuery;
 import zephyr.wallet.model.ZephyrOutputWallet;
+import zephyr.wallet.model.ZephyrReserveInfo;
 import zephyr.wallet.model.ZephyrSubaddress;
 import zephyr.wallet.model.ZephyrSyncResult;
 import zephyr.wallet.model.ZephyrTransfer;
@@ -343,52 +346,110 @@ public interface ZephyrWallet {
   public void rescanBlockchain();
   
   /**
-   * Get the wallet's balance.
+   * Get the wallet's balance per asset.
    * 
-   * @return the wallet's balance
+   * Amounts are in atomic units (10^12 per coin for every asset). The asset is an open string;
+   * the constants of the current assets are in ZephyrAssets.
+   * 
+   * @return the wallet's balance per asset
    */
-  public BigInteger getBalance();
+  public ZephyrBalance getBalance();
   
   /**
-   * Get an account's balance.
+   * Get the balance of each subaddress of an account, per asset.
    * 
-   * @param accountIdx index of the account to get the balance of (default all accounts if null)
-   * @return the requested balance
+   * The map is keyed by subaddress index and may omit subaddresses that never held funds.
+   * Amounts are in atomic units (10^12 per coin for every asset). The asset is an open string;
+   * the constants of the current assets are in ZephyrAssets.
+   * 
+   * @param accountIdx index of the account to get the balances of (required)
+   * @return the balance per asset of each subaddress of the account, keyed by subaddress index
    */
-  public BigInteger getBalance(Integer accountIdx);
+  public Map<Integer, ZephyrBalance> getBalance(Integer accountIdx);
   
   /**
-   * Get a subaddress's balance.
+   * Get an account's balance of one asset.
    * 
-   * @param accountIdx index of the account to get the balance of (default all accounts if null)
-   * @param subaddressIdx index of the subaddress to get the balance of (default all subaddresses if null)
-   * @return the requested balance
+   * Throws ZephyrError "Must provide account index" if the account index is null.
+   * 
+   * @param assetType the asset to get the balance of (an open string, see ZephyrAssets)
+   * @param accountIdx index of the account to get the balance of (required)
+   * @return the account's balance of the asset in atomic units (10^12 per coin)
    */
-  public BigInteger getBalance(Integer accountIdx, Integer subaddressIdx);
+  public BigInteger getBalance(String assetType, Integer accountIdx);
   
   /**
-   * Get the wallet's unlocked balance.
+   * Get a subaddress's balance of one asset.
    * 
-   * @return the wallet's unlocked balance
+   * Throws ZephyrError "Must provide account index" if the account index is null, which
+   * includes a subaddress index given without an account index.
+   * 
+   * @param assetType the asset to get the balance of (an open string, see ZephyrAssets)
+   * @param accountIdx index of the account to get the balance of (required)
+   * @param subaddressIdx index of the subaddress to get the balance of (the whole account if null)
+   * @return the requested balance of the asset in atomic units (10^12 per coin)
    */
-  public BigInteger getUnlockedBalance();
+  public BigInteger getBalance(String assetType, Integer accountIdx, Integer subaddressIdx);
   
   /**
-   * Get an account's unlocked balance.
+   * Get the wallet's unlocked balance per asset.
    * 
-   * @param accountIdx index of the account to get the unlocked balance of (default all accounts if null)
-   * @return the requested unlocked balance
+   * Amounts are in atomic units (10^12 per coin for every asset). The asset is an open string;
+   * the constants of the current assets are in ZephyrAssets.
+   * 
+   * @return the wallet's unlocked balance per asset
    */
-  public BigInteger getUnlockedBalance(Integer accountIdx);
+  public ZephyrBalance getUnlockedBalance();
   
   /**
-   * Get a subaddress's unlocked balance.
+   * Get the unlocked balance of each subaddress of an account, per asset.
    * 
-   * @param accountIdx index of the subaddress to get the unlocked balance of (default all accounts if null)
-   * @param subaddressIdx index of the subaddress to get the unlocked balance of (default all subaddresses if null)
-   * @return the requested unlocked balance
+   * The map is keyed by subaddress index and may omit subaddresses that never held funds.
+   * Amounts are in atomic units (10^12 per coin for every asset). The asset is an open string;
+   * the constants of the current assets are in ZephyrAssets.
+   * 
+   * @param accountIdx index of the account to get the unlocked balances of (required)
+   * @return the unlocked balance per asset of each subaddress of the account, keyed by subaddress index
    */
-  public BigInteger getUnlockedBalance(Integer accountIdx, Integer subaddressIdx);
+  public Map<Integer, ZephyrBalance> getUnlockedBalance(Integer accountIdx);
+  
+  /**
+   * Get an account's unlocked balance of one asset.
+   * 
+   * Throws ZephyrError "Must provide account index" if the account index is null.
+   * 
+   * @param assetType the asset to get the unlocked balance of (an open string, see ZephyrAssets)
+   * @param accountIdx index of the account to get the unlocked balance of (required)
+   * @return the account's unlocked balance of the asset in atomic units (10^12 per coin)
+   */
+  public BigInteger getUnlockedBalance(String assetType, Integer accountIdx);
+  
+  /**
+   * Get a subaddress's unlocked balance of one asset.
+   * 
+   * Throws ZephyrError "Must provide account index" if the account index is null, which
+   * includes a subaddress index given without an account index.
+   * 
+   * @param assetType the asset to get the unlocked balance of (an open string, see ZephyrAssets)
+   * @param accountIdx index of the account to get the unlocked balance of (required)
+   * @param subaddressIdx index of the subaddress to get the unlocked balance of (the whole account if null)
+   * @return the requested unlocked balance of the asset in atomic units (10^12 per coin)
+   */
+  public BigInteger getUnlockedBalance(String assetType, Integer accountIdx, Integer subaddressIdx);
+  
+  /**
+   * Get the state of the Zephyr reserve as the core reports it.
+   * 
+   * @return the reserve state (amounts in atomic units, ratios dimensionless)
+   */
+  public ZephyrReserveInfo getReserveInfo();
+  
+  /**
+   * Get the circulating supply per asset.
+   * 
+   * @return the circulating supply per asset in atomic units (10^12 per coin for every asset)
+   */
+  public Map<String, BigInteger> getCirculatingSupply();
   
   /**
    * Get all accounts.

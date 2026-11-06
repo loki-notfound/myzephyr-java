@@ -46,6 +46,7 @@ import zephyr.daemon.model.ZephyrVersion;
 import zephyr.wallet.model.ZephyrAccount;
 import zephyr.wallet.model.ZephyrAccountTag;
 import zephyr.wallet.model.ZephyrAddressBookEntry;
+import zephyr.wallet.model.ZephyrBalance;
 import zephyr.wallet.model.ZephyrCheckReserve;
 import zephyr.wallet.model.ZephyrCheckTx;
 import zephyr.wallet.model.ZephyrIncomingTransfer;
@@ -58,6 +59,7 @@ import zephyr.wallet.model.ZephyrMultisigInitResult;
 import zephyr.wallet.model.ZephyrMultisigSignResult;
 import zephyr.wallet.model.ZephyrOutputQuery;
 import zephyr.wallet.model.ZephyrOutputWallet;
+import zephyr.wallet.model.ZephyrReserveInfo;
 import zephyr.wallet.model.ZephyrSubaddress;
 import zephyr.wallet.model.ZephyrSyncResult;
 import zephyr.wallet.model.ZephyrTransfer;
@@ -729,32 +731,88 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   }
 
   @Override
-  public BigInteger getBalance(Integer accountIdx, Integer subaddressIdx) {
+  public ZephyrBalance getBalance() {
     assertNotClosed();
     try {
-      if (accountIdx == null) {
-        if (subaddressIdx != null) throw new ZephyrError("Must provide account index with subaddress index");
-        return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, getBalanceWalletJni(), new TypeReference<Map<String, BigInteger>>(){}).getOrDefault("ZPH", BigInteger.ZERO); // temporary until R5
-      } else {
-        if (subaddressIdx == null) return new BigInteger(getBalanceAssetAccountJni("ZPH", accountIdx)); // temporary until R5
-        else return new BigInteger(getBalanceAssetSubaddressJni("ZPH", accountIdx, subaddressIdx)); // temporary until R5
-      }
+      return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, getBalanceWalletJni(), ZephyrBalance.class);
     } catch (ZephyrError e) {
       throw new ZephyrError(e.getMessage());
     }
   }
   
   @Override
-  public BigInteger getUnlockedBalance(Integer accountIdx, Integer subaddressIdx) {
+  public Map<Integer, ZephyrBalance> getBalance(Integer accountIdx) {
     assertNotClosed();
     try {
-      if (accountIdx == null) {
-        if (subaddressIdx != null) throw new ZephyrError("Must provide account index with subaddress index");
-        return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, getUnlockedBalanceWalletJni(), new TypeReference<Map<String, BigInteger>>(){}).getOrDefault("ZPH", BigInteger.ZERO); // temporary until R5
-      } else {
-        if (subaddressIdx == null) return new BigInteger(getUnlockedBalanceAssetAccountJni("ZPH", accountIdx)); // temporary until R5
-        else return new BigInteger(getUnlockedBalanceAssetSubaddressJni("ZPH", accountIdx, subaddressIdx)); // temporary until R5
-      }
+      if (accountIdx == null) throw new ZephyrError("Must provide account index");
+      return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, getBalanceAccountJni(accountIdx), new TypeReference<Map<Integer, ZephyrBalance>>(){});
+    } catch (ZephyrError e) {
+      throw new ZephyrError(e.getMessage());
+    }
+  }
+  
+  @Override
+  public BigInteger getBalance(String assetType, Integer accountIdx, Integer subaddressIdx) {
+    assertNotClosed();
+    try {
+      if (assetType == null) throw new ZephyrError("Must provide asset type");
+      if (accountIdx == null) throw new ZephyrError("Must provide account index");
+      if (subaddressIdx == null) return new BigInteger(getBalanceAssetAccountJni(assetType, accountIdx));
+      else return new BigInteger(getBalanceAssetSubaddressJni(assetType, accountIdx, subaddressIdx));
+    } catch (ZephyrError e) {
+      throw new ZephyrError(e.getMessage());
+    }
+  }
+  
+  @Override
+  public ZephyrBalance getUnlockedBalance() {
+    assertNotClosed();
+    try {
+      return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, getUnlockedBalanceWalletJni(), ZephyrBalance.class);
+    } catch (ZephyrError e) {
+      throw new ZephyrError(e.getMessage());
+    }
+  }
+  
+  @Override
+  public Map<Integer, ZephyrBalance> getUnlockedBalance(Integer accountIdx) {
+    assertNotClosed();
+    try {
+      if (accountIdx == null) throw new ZephyrError("Must provide account index");
+      return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, getUnlockedBalanceAccountJni(accountIdx), new TypeReference<Map<Integer, ZephyrBalance>>(){});
+    } catch (ZephyrError e) {
+      throw new ZephyrError(e.getMessage());
+    }
+  }
+  
+  @Override
+  public BigInteger getUnlockedBalance(String assetType, Integer accountIdx, Integer subaddressIdx) {
+    assertNotClosed();
+    try {
+      if (assetType == null) throw new ZephyrError("Must provide asset type");
+      if (accountIdx == null) throw new ZephyrError("Must provide account index");
+      if (subaddressIdx == null) return new BigInteger(getUnlockedBalanceAssetAccountJni(assetType, accountIdx));
+      else return new BigInteger(getUnlockedBalanceAssetSubaddressJni(assetType, accountIdx, subaddressIdx));
+    } catch (ZephyrError e) {
+      throw new ZephyrError(e.getMessage());
+    }
+  }
+  
+  @Override
+  public ZephyrReserveInfo getReserveInfo() {
+    assertNotClosed();
+    try {
+      return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, getReserveInfoJni(), ZephyrReserveInfo.class);
+    } catch (ZephyrError e) {
+      throw new ZephyrError(e.getMessage());
+    }
+  }
+  
+  @Override
+  public Map<String, BigInteger> getCirculatingSupply() {
+    assertNotClosed();
+    try {
+      return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, getCirculatingSupplyJni(), new TypeReference<Map<String, BigInteger>>(){});
     } catch (ZephyrError e) {
       throw new ZephyrError(e.getMessage());
     }

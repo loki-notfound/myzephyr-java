@@ -126,23 +126,13 @@ abstract class ZephyrWalletDefault implements ZephyrWallet {
   }
   
   @Override
-  public BigInteger getBalance() {
-    return getBalance(null, null);
-  }
-
-  @Override
-  public BigInteger getBalance(Integer accountIdx) {
-    return getBalance(accountIdx, null);
+  public BigInteger getBalance(String assetType, Integer accountIdx) {
+    return getBalance(assetType, accountIdx, null);
   }
   
   @Override
-  public BigInteger getUnlockedBalance() {
-    return getUnlockedBalance(null, null);
-  }
-
-  @Override
-  public BigInteger getUnlockedBalance(Integer accountIdx) {
-    return getUnlockedBalance(accountIdx, null);
+  public BigInteger getUnlockedBalance(String assetType, Integer accountIdx) {
+    return getUnlockedBalance(assetType, accountIdx, null);
   }
   
   @Override
