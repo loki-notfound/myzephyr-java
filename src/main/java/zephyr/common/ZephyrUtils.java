@@ -344,6 +344,23 @@ public class ZephyrUtils {
     }
   }
 
+  /**
+   * Validates the given address with the native core (monero_utils::validate_address).
+   * 
+   * Test cross-check of the pure-Java decoder; validateAddress does not use it.
+   * 
+   * @param address is the address to validate
+   * @param networkType is the address's network type
+   * @throws ZephyrError if the core rejects the address
+   */
+  static void validateAddressNative(String address, ZephyrNetworkType networkType) {
+    try {
+      validateAddressJni(address, networkType.ordinal());
+    } catch (Exception err) {
+      throw new ZephyrError(err.getMessage());
+    }
+  }
+
   // TODO: improve validation
   public static void validatePaymentId(String paymentId) {
     GenUtils.assertTrue(paymentId.length() == 16 || paymentId.length() == 64);
@@ -534,6 +551,7 @@ public class ZephyrUtils {
   // ---------------------------- NATIVE BINDINGS -----------------------------
   
   private native static String getIntegratedAddressJni(int networkType, String standardAddress, String paymentId);
+  private native static void validateAddressJni(String address, int networkType);
   private native static byte[] jsonToBinaryJni(String json);
   private native static String binaryToJsonJni(byte[] bin);
   private native static String binaryBlocksToJsonJni(byte[] binBlocks);

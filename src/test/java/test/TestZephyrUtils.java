@@ -2,6 +2,7 @@ package test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -12,6 +13,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import zephyr.common.NativeAddressCheck;
 import zephyr.common.ZephyrError;
 import zephyr.common.ZephyrUtils;
 import zephyr.daemon.model.ZephyrNetworkType;
@@ -162,6 +164,19 @@ public class TestZephyrUtils {
     for (String malformed : new String[] { "11", "111", "11111", "zzzzzzzzzzz", "11111111111zz" }) {
       testInvalidAddress(malformed, ZephyrNetworkType.MAINNET);
     }
+  }
+  
+  // The native core agrees with the pure-Java decoder on the Zephyr vectors
+  @Test
+  public void testNativeAddressCrossCheck() {
+    for (Object[] vector : ZEPHYR_ADDRESSES) {
+      String address = (String) vector[2];
+      ZephyrNetworkType networkType = (ZephyrNetworkType) vector[0];
+      ZephyrNetworkType otherNetworkType = ZephyrNetworkType.values()[(networkType.ordinal() + 1) % ZephyrNetworkType.values().length];
+      NativeAddressCheck.validate(address, networkType);
+      assertThrows(ZephyrError.class, () -> NativeAddressCheck.validate(address, otherNetworkType), address + " on " + otherNetworkType);
+    }
+    assertThrows(ZephyrError.class, () -> NativeAddressCheck.validate(changeChar(MAINNET_PRIMARY, MAINNET_PRIMARY.length() - 1), ZephyrNetworkType.MAINNET));
   }
   
   // The base58 decoder handles every last-block size without a NullPointerException

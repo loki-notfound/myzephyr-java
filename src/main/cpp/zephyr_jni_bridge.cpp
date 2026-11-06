@@ -351,6 +351,19 @@ JNIEXPORT jstring JNICALL Java_zephyr_common_ZephyrUtils_getIntegratedAddressJni
   }
 }
 
+JNIEXPORT void JNICALL Java_zephyr_common_ZephyrUtils_validateAddressJni(JNIEnv *env, jclass clazz, jstring jaddress, jint jnetwork_type) {
+
+  // convert jstring to string
+  string address = jstring2string(env, jaddress);
+
+  // validate address with the core
+  try {
+    monero_utils::validate_address(address, static_cast<monero_network_type>(jnetwork_type));
+  } catch (...) {
+    rethrow_cpp_exception_as_java_exception(env);
+  }
+}
+
 JNIEXPORT jbyteArray JNICALL Java_zephyr_common_ZephyrUtils_jsonToBinaryJni(JNIEnv *env, jclass clazz, jstring json) {
 
   // convert json jstring to string

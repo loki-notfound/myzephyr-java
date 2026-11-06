@@ -47,6 +47,8 @@ extern "C" {
 
 JNIEXPORT jstring JNICALL Java_zephyr_common_ZephyrUtils_getIntegratedAddressJni(JNIEnv *, jclass, jint, jstring, jstring);
 
+JNIEXPORT void JNICALL Java_zephyr_common_ZephyrUtils_validateAddressJni(JNIEnv *, jclass, jstring, jint);
+
 JNIEXPORT jbyteArray JNICALL Java_zephyr_common_ZephyrUtils_jsonToBinaryJni(JNIEnv *, jclass, jstring);
 
 JNIEXPORT jstring JNICALL Java_zephyr_common_ZephyrUtils_binaryToJsonJni(JNIEnv *, jclass, jbyteArray);
