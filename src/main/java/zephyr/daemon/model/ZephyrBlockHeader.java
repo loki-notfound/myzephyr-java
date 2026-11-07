@@ -55,6 +55,15 @@ public class ZephyrBlockHeader {
     this.pricingRecord = header.pricingRecord == null ? null : header.pricingRecord.copy();
   }
   
+  /**
+   * Returns a deep copy of this header (the pricing record is copied as well).
+   *
+   * @return the copy
+   */
+  public ZephyrBlockHeader copy() {
+    return new ZephyrBlockHeader(this);
+  }
+  
   public String getHash() {
     return hash;
   }

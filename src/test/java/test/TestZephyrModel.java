@@ -326,4 +326,38 @@ public class TestZephyrModel {
     assertEquals("bb".repeat(32), copy.getMinerTxHash());
     assertNotSame(header.getPricingRecord(), copy.getPricingRecord());
   }
+
+  // 11. an absent asset equals a zero entry (wallet-level map versus account map, R8-7)
+  @Test
+  public void testBalanceAbsentEqualsZero() {
+    ZephyrBalance account = new ZephyrBalance().set(ZephyrAssets.ZPH, BigInteger.ONE);
+    ZephyrBalance wallet = new ZephyrBalance().set(ZephyrAssets.ZPH, BigInteger.ONE).set(ZephyrAssets.ZRS, BigInteger.ZERO);
+    assertEquals(account, wallet);
+    assertEquals(wallet, account);
+    assertEquals(account.hashCode(), wallet.hashCode());
+    assertEquals(new ZephyrBalance(), new ZephyrBalance().set(ZephyrAssets.ZSD, BigInteger.ZERO));
+    assertEquals(new ZephyrBalance().hashCode(), new ZephyrBalance().set(ZephyrAssets.ZSD, BigInteger.ZERO).hashCode());
+    assertNotEquals(account, new ZephyrBalance().set(ZephyrAssets.ZPH, BigInteger.ONE).set(ZephyrAssets.ZRS, BigInteger.ONE));
+    assertNotEquals(account, new ZephyrBalance().set(ZephyrAssets.ZPH, BigInteger.TWO));
+    assertNotEquals(account, new ZephyrBalance());
+    // toMap() is the representation and stays unchanged: the zero entry is still listed
+    assertEquals(Arrays.asList("ZPH", "ZRS"), Arrays.asList(wallet.toMap().keySet().toArray()));
+    assertEquals(Arrays.asList("ZPH"), Arrays.asList(account.toMap().keySet().toArray()));
+    assertEquals("{\"ZPH\":1,\"ZRS\":0}", JsonUtils.serialize(ZephyrRpcConnection.MAPPER, wallet));
+  }
+
+  // 12. copy() of a block header equals the original
+  @Test
+  public void testBlockHeaderCopyMethod() {
+    ZephyrBlockHeader header = new ZephyrBlockHeader()
+        .setHash("aa".repeat(32))
+        .setHeight(536000L)
+        .setMinerTxHash("bb".repeat(32))
+        .setPricingRecord(new ZephyrPricingRecord().setSpot(new BigInteger("1500000000000")));
+    ZephyrBlockHeader copy = header.copy();
+    assertNotSame(header, copy);
+    assertEquals(header, copy);
+    assertEquals(header.hashCode(), copy.hashCode());
+    assertNotSame(header.getPricingRecord(), copy.getPricingRecord());
+  }
 }

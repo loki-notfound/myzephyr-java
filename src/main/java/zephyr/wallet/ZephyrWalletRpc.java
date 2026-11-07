@@ -1999,12 +1999,21 @@ public class ZephyrWalletRpc extends ZephyrWalletDefault {
     rpc.sendJsonRequest("close_wallet", params);
   }
   
+  /**
+   * {@inheritDoc}
+   *
+   * The wallet counts as closed when the RPC server answers "No wallet file" with error code -8
+   * (monero-wallet-rpc) or -13 (zephyr-wallet-rpc v2.3.0).
+   */
   @Override
   public boolean isClosed() {
     try {
       this.getPrimaryAddress();
     } catch (Exception e) {
-      return e instanceof ZephyrRpcError && Integer.valueOf(-8).equals(((ZephyrRpcError) e).getCode()) && ((ZephyrRpcError) e).getMessage().indexOf("No wallet file") > -1;
+      if (!(e instanceof ZephyrRpcError)) return false;
+      ZephyrRpcError err = (ZephyrRpcError) e;
+      boolean closedCode = Integer.valueOf(-8).equals(err.getCode()) || Integer.valueOf(-13).equals(err.getCode());
+      return closedCode && err.getMessage() != null && err.getMessage().indexOf("No wallet file") > -1;
     }
     return false;
   }

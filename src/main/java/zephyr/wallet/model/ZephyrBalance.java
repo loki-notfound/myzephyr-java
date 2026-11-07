@@ -117,23 +117,49 @@ public class ZephyrBalance {
     return str.isEmpty() ? str : str.substring(0, str.length() - 1);  // strip last newline
   }
 
+  /**
+   * Returns a hash code consistent with {@link #equals(Object)}: entries with a zero amount do not
+   * contribute, so a balance that lists an asset at zero hashes like one that omits it.
+   */
   @Override
   public int hashCode() {
-    final int prime = 31;
-    int result = 1;
-    result = prime * result + ((balances == null) ? 0 : balances.hashCode());
+    int result = 0;
+    for (Map.Entry<String, BigInteger> entry : balances.entrySet()) {
+      if (isZero(entry.getValue())) continue;
+      result += (entry.getKey() == null ? 0 : entry.getKey().hashCode()) ^ entry.getValue().hashCode();
+    }
     return result;
   }
 
+  /**
+   * Compares two balances per asset. An asset that is absent from one balance counts as zero, so
+   * the wallet-level balance (which lists every asset, zeros included) equals an account or
+   * subaddress balance (which lists only the assets it holds) when the amounts agree.
+   *
+   * @param obj is the object to compare with
+   * @return true if obj is a {@code ZephyrBalance} with the same amount for every asset
+   */
   @Override
   public boolean equals(Object obj) {
     if (this == obj) return true;
     if (obj == null) return false;
     if (getClass() != obj.getClass()) return false;
     ZephyrBalance other = (ZephyrBalance) obj;
-    if (balances == null) {
-      if (other.balances != null) return false;
-    } else if (!balances.equals(other.balances)) return false;
+    for (Map.Entry<String, BigInteger> entry : balances.entrySet()) {
+      if (!amountEquals(entry.getValue(), other.balances.get(entry.getKey()))) return false;
+    }
+    for (Map.Entry<String, BigInteger> entry : other.balances.entrySet()) {
+      if (!balances.containsKey(entry.getKey()) && !isZero(entry.getValue())) return false;
+    }
     return true;
+  }
+
+  private static boolean isZero(BigInteger amount) {
+    return amount == null || amount.signum() == 0;
+  }
+
+  private static boolean amountEquals(BigInteger a, BigInteger b) {
+    if (isZero(a)) return isZero(b);
+    return a.equals(b);
   }
 }
