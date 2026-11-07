@@ -13,9 +13,12 @@
 # ZEPHYR_JAVA_CONTAINER set to the image, which bin/build_linux.sh records in
 # build/natives/linux-<arch>/build-env for the manifest.
 # The depends prefixes, the build directories and the outputs stay under the checkout, as for a
-# host build, so they persist between runs; the packages built in the image have their own
-# depends build ids (the compiler versions are part of them). A host build and a container build
-# write the same build/natives/linux-<arch>/, so the last one wins.
+# host build, so they persist between container runs. The packages built in the image have their
+# own depends build ids (the compiler versions are part of them), but depends keeps one build per
+# package and host, so a switch between host and container rebuilds the depends packages, and
+# bin/build_linux.sh wipes build directories configured for the other path. A host build and a
+# container build write the same build/natives/linux-<arch>/, so the last one wins; releases build
+# Linux in the container only.
 # podman (rootless: files written in the container belong to the calling user) or, when podman
 # is absent, docker.
 #
@@ -48,7 +51,10 @@ if [ -z "${SOURCE_DATE_EPOCH:-}" ]; then
 fi
 echo "$ENGINE $IMAGE, SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
 
-ENV_ARGS=(-e "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" -e "ZEPHYR_JAVA_CONTAINER=$IMAGE")
+# TAR_OPTIONS: rootless podman maps root in the container to the calling user with 65,536
+# subordinate ids, and GNU tar running as root restores the archives' owners, some of which lie
+# outside that range ("Cannot change ownership ... Invalid argument" in depends' extraction)
+ENV_ARGS=(-e "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" -e "ZEPHYR_JAVA_CONTAINER=$IMAGE" -e TAR_OPTIONS=--no-same-owner)
 [ -n "${BUILD_LINUX_ARCHES+x}" ] && ENV_ARGS+=(-e "BUILD_LINUX_ARCHES=$BUILD_LINUX_ARCHES")
 
 "$ENGINE" run --rm -v "$ROOT":/work -w /work "${ENV_ARGS[@]}" "$IMAGE" bash -c '

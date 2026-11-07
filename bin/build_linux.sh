@@ -29,6 +29,12 @@
 #    (container image or none, glibc, compiler) for the manifest.
 # The release natives are built in the debian:12 image: bin/build_linux_container.sh runs this
 # script there; run directly, it builds on the host.
+# Host and container builds share the checkout under different paths (/work in the container).
+# A zephyr build directory or build-linux/<arch>/ whose CMake cache records another source path
+# is wiped before configuring. A switch between host and container also evicts the depends
+# package cache of the other side (depends' funcs.mk removes a package's cache directory before
+# storing a new build), so each switch costs a depends rebuild. Releases build Linux in the
+# container only (R13).
 #
 # Reproducibility: SOURCE_DATE_EPOCH is exported (the commit time of this checkout unless set),
 # and zephyr and the JNI library are compiled with -ffile-prefix-map=<this checkout>=. and
@@ -137,6 +143,20 @@ for P in "$ROOT"/patches/depends/*.patch; do
   fi
 done
 
+# Wipes a CMake build directory whose top-level CMakeCache.txt records a source directory other
+# than the given one: host and container builds share the checkout under different paths, and
+# nested ExternalProject caches (zephyr's translations) record the path too, so a stale tree from
+# another path cannot be reconfigured in place.
+wipe_if_other_source() {
+  local DIR="$1" SRC="$2" HOME_DIR
+  [ -f "$DIR/CMakeCache.txt" ] || return 0
+  HOME_DIR="$(sed -n 's/^CMAKE_HOME_DIRECTORY:INTERNAL=//p' "$DIR/CMakeCache.txt")"
+  if [ "$HOME_DIR" != "$SRC" ]; then
+    echo "$DIR: configured for $HOME_DIR, not $SRC: wiped"
+    rm -rf "$DIR"
+  fi
+}
+
 for ARCH in $ARCHES; do
   TRIPLET="$(triplet_of "$ARCH")"
   PREFIX="$ROOT/$Z/contrib/depends/$TRIPLET"
@@ -156,6 +176,7 @@ for ARCH in $ARCHES; do
   # also -march, -marm, -mfpu, -mfloat-abi), which -DCMAKE_C_FLAGS on a first configure would
   # replace; zephyr's CMakeLists.txt only appends to CMAKE_C_FLAGS/CMAKE_CXX_FLAGS. Objects whose
   # flags did not change are not rebuilt.
+  wipe_if_other_source "$ZB" "$ROOT/$Z"
   mkdir -p "$ZB" && cd "$ZB"
   rm -f CMakeCache.txt
   CFLAGS="$PREFIX_MAPS" CXXFLAGS="$PREFIX_MAPS" cmake -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DCMAKE_BUILD_TYPE=Release -DUSE_CCACHE=ON ../../..
@@ -177,6 +198,7 @@ for ARCH in $ARCHES; do
 
   # 5. JNI library; configured afresh: host and container builds (bin/build_linux_container.sh)
   # share this directory, and its CMake cache records the checkout path (/work in the container)
+  wipe_if_other_source "build-linux/$ARCH" "$ROOT"
   mkdir -p "build-linux/$ARCH" && cd "build-linux/$ARCH"
   rm -f CMakeCache.txt
   cmake -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DDEPENDS_PREFIX="$PREFIX" \
