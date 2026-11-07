@@ -1,6 +1,7 @@
 /target/
 /build/
 /build-android/
+/build-linux/
 /android/build/
 /android/.gradle/
 /android/local.properties

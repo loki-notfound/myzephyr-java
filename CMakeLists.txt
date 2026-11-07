@@ -31,6 +31,15 @@ endif()
 
 set(ZEPHYR_CPP "${CMAKE_SOURCE_DIR}/external/zephyr-cpp" CACHE STRING "zephyr-cpp source directory")
 set(MONERO_PROJECT "${ZEPHYR_CPP}/external/zephyr" CACHE STRING "zephyr source directory")
+# Linux release build (bin/build_linux.sh): DEPENDS_PREFIX is zephyr's contrib/depends/<triplet>
+# prefix; zephyr is built with its toolchain in build/<triplet>/release and every library comes
+# from the prefix as static archive
+set(DEPENDS_PREFIX "" CACHE PATH "Linux: zephyr's contrib/depends/<triplet> prefix (release build); empty for the system libraries")
+if (DEPENDS_PREFIX AND NOT ANDROID AND UNIX AND NOT APPLE)
+  set(LINUX_DEPENDS ON)
+else()
+  set(LINUX_DEPENDS OFF)
+endif()
 if (ANDROID)
   # Android: zephyr is built with its contrib/depends toolchain in build/<triplet>/release
   # (bin/build_android.sh); ANDROID_HOST is that depends triplet
@@ -39,6 +48,10 @@ if (ANDROID)
     message(FATAL_ERROR "ANDROID_HOST (the depends triplet) must be set for an Android build")
   endif()
   set(MONERO_PROJECT_BUILD "${MONERO_PROJECT}/build/${ANDROID_HOST}/release" CACHE STRING "zephyr build directory")
+elseif (LINUX_DEPENDS)
+  get_filename_component(DEPENDS_HOST "${DEPENDS_PREFIX}" NAME)
+  set(MONERO_PROJECT_BUILD "${MONERO_PROJECT}/build/${DEPENDS_HOST}/release" CACHE STRING "zephyr build directory")
+  message(STATUS "Linux with depends: ${DEPENDS_PREFIX}")
 else()
   set(MONERO_PROJECT_BUILD "${MONERO_PROJECT}/build/release" CACHE STRING "zephyr build directory")
 endif()
@@ -115,7 +128,10 @@ endif()
 # LibUSB
 ############
 
-if (NOT ANDROID)
+if (LINUX_DEPENDS)
+  set(usb_LIBRARY "${DEPENDS_PREFIX}/lib/libusb-1.0.a")
+  set(LibUSB_LIBRARIES ${usb_LIBRARY})
+elseif (NOT ANDROID)
   find_library(usb_LIBRARY NAMES usb-1.0 libusb usb)
   set(LibUSB_LIBRARIES ${usb_LIBRARY})
 endif()
@@ -126,7 +142,7 @@ endif()
 
 set(Boost_NO_BOOST_CMAKE 1)
 set(Boost_USE_MULTITHREADED ON)
-if (ANDROID)
+if (ANDROID OR LINUX_DEPENDS)
   # the depends prefix holds static boost only (runtime-link=static)
   set(Boost_USE_STATIC_LIBS ON)
   set(Boost_USE_STATIC_RUNTIME ON)
@@ -149,7 +165,7 @@ if (APPLE AND NOT IOS)
   endif()
 endif()
 
-if (ANDROID)
+if (ANDROID OR LINUX_DEPENDS)
   set(OPENSSL_USE_STATIC_LIBS ON)
 endif()
 find_package(OpenSSL REQUIRED)
@@ -170,7 +186,11 @@ endif()
 # libsodium
 ############
 
-find_library(SODIUM_LIBRARY sodium REQUIRED)
+if (LINUX_DEPENDS)
+  set(SODIUM_LIBRARY "${DEPENDS_PREFIX}/lib/libsodium.a")
+else()
+  find_library(SODIUM_LIBRARY sodium REQUIRED)
+endif()
 message(STATUS "Using libsodium library at ${SODIUM_LIBRARY}")
 
 ############
@@ -224,7 +244,7 @@ else()
   if(UNBOUND_LIBRARIES)
     message(STATUS "Found libunbound library")
     include_directories(${UNBOUND_INCLUDE_DIR})
-    if (WIN32 OR ANDROID)
+    if (WIN32 OR ANDROID OR LINUX_DEPENDS)
       add_library(unbound STATIC IMPORTED)
     else()
       add_library(unbound SHARED IMPORTED)
@@ -353,10 +373,10 @@ target_compile_options(zephyr-java PRIVATE -include map)
 # carries visibility("default") itself, so the bridge's entry points and JNI_OnLoad stay exported.
 target_compile_options(zephyr-java PRIVATE -fvisibility=hidden -fvisibility-inlines-hidden)
 
-# Android: OpenSSL comes only from the depends prefix (OPENSSL_LIBRARIES); protobuf is the depends
-# libprotobuf.a that the toolchain file sets as Protobuf_LIBRARY (zephyr builds device_trezor with
-# protobuf there, without libusb and hidapi)
-if (ANDROID)
+# Android and Linux with depends: OpenSSL comes only from the depends prefix (OPENSSL_LIBRARIES);
+# protobuf is the depends libprotobuf.a that the toolchain file sets as Protobuf_LIBRARY (on
+# Android zephyr builds device_trezor with protobuf, without libusb and hidapi)
+if (ANDROID OR LINUX_DEPENDS)
   set(JNI_SSL_NAMES "")
 else()
   set(JNI_SSL_NAMES ssl crypto)
@@ -436,6 +456,13 @@ if (ANDROID)
   target_link_options(zephyr-java PRIVATE -static-libstdc++ -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384)
   target_link_libraries(zephyr-java log)
   message(STATUS "Android ABI ${CMAKE_ANDROID_ARCH_ABI}, zephyr build ${MONERO_PROJECT_BUILD}")
+endif()
+
+# Linux with depends: one self-contained library per architecture in the JAR, so libstdc++ and
+# libgcc are linked statically and the library needs only the C runtime of the host
+if (LINUX_DEPENDS)
+  target_link_options(zephyr-java PRIVATE -static-libstdc++ -static-libgcc -Wl,-z,noexecstack)
+  message(STATUS "Linux with depends ${DEPENDS_HOST}, zephyr build ${MONERO_PROJECT_BUILD}")
 endif()
 
 INSTALL(TARGETS zephyr-java

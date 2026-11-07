@@ -2,6 +2,11 @@
 #
 # Builds libzephyr-java from pinned sources.
 #
+# This is the quick developer build: zephyr and the JNI library link against the host's shared
+# system libraries (boost, OpenSSL, unbound, sodium, hidapi, protobuf), so the result runs only
+# on hosts like this one. Releases use bin/build_linux.sh, which builds the Linux natives through
+# zephyr's contrib/depends and needs only the C runtime of the host.
+#
 # 1. Checks that the zephyr-cpp submodule is at the pinned sha (bin/pins.env).
 #    Both pinned trees: when the pin tag (PIN_TAG) is present locally, it must point at the pin
 #    and git verify-tag must pass; without gpg or the release key that is only a warning.

@@ -1,0 +1,21 @@
+Description: build OpenSSL with OPENSSLDIR /etc/ssl instead of a directory in the depends prefix
+ OpenSSL compiles OPENSSLDIR into the library as the default location of cert.pem and certs/.
+ The depends default is $(host_prefix)/etc/openssl, an absolute path on the build host, which
+ does not exist on a user's machine (so the default CA store is empty) and makes the library
+ depend on where it was built. /etc/ssl is the CA directory of the Linux distributions; on
+ Android it does not exist and the app sets SSL_CERT_FILE or SSL_CERT_DIR. Applies to every host.
+Origin: zephyr-java
+Forwarded: not-needed
+Drop-when: the depends tree builds OpenSSL with a neutral OPENSSLDIR itself
+
+--- a/contrib/depends/packages/openssl.mk
++++ b/contrib/depends/packages/openssl.mk
+@@ -8,7 +8,7 @@
+ $(package)_config_env=AR="$($(package)_ar)" ARFLAGS=$($(package)_arflags) RANLIB="$($(package)_ranlib)" CC="$($(package)_cc)"
+ $(package)_config_env_android=ANDROID_NDK_ROOT="$(host_prefix)/native" PATH="$(host_prefix)/native/bin" CC=clang AR=ar RANLIB=ranlib
+ $(package)_build_env_android=ANDROID_NDK_ROOT="$(host_prefix)/native"
+-$(package)_config_opts=--prefix=$(host_prefix) --openssldir=$(host_prefix)/etc/openssl --libdir=$(host_prefix)/lib
++$(package)_config_opts=--prefix=$(host_prefix) --openssldir=/etc/ssl --libdir=$(host_prefix)/lib
+ $(package)_config_opts+=no-capieng
+ $(package)_config_opts+=no-dso
+ $(package)_config_opts+=no-dtls1
