@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- No permissions and no components: the app that uses zephyr-java declares INTERNET itself.
+     The namespace is set in build.gradle.kts. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" />

@@ -2537,7 +2537,10 @@ public class ZephyrWalletRpc extends ZephyrWalletDefault {
   }
   
   /**
-   * Receives ZMQ notifications directly from zephyr-wallet-rpc.
+   * Receives ZMQ notifications directly from zephyr-wallet-rpc (used when the RPC connection has a
+   * ZMQ URI).
+   * 
+   * Needs jeromq on the class path; the AAR declares it compile-only.
    */
   private class WalletRpcZmqListener {
     

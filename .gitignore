@@ -1,6 +1,10 @@
 /target/
 /build/
 /build-android/
+/android/build/
+/android/.gradle/
+/android/local.properties
+/android/testapp/build/
 **/pom.xml.versionsBackup
 **/logs
 /test_wallets
