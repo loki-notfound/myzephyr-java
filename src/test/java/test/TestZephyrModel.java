@@ -283,4 +283,47 @@ public class TestZephyrModel {
     assertEquals(Long.valueOf(100), header.getHeight());
     assertEquals(header, new ZephyrBlockHeader(header));
   }
+
+  // 10. the block header copy constructor copies every field, minerTxHash included
+  @Test
+  public void testBlockHeaderCopy() {
+    ZephyrPricingRecord record = new ZephyrPricingRecord()
+        .setSpot(new BigInteger("1500000000000"))
+        .setMovingAverage(new BigInteger("1490000000000"))
+        .setStable(new BigInteger("1000000000000"))
+        .setStableMa(new BigInteger("1000000000001"))
+        .setReserve(new BigInteger("2000000000000"))
+        .setReserveMa(new BigInteger("2000000000001"))
+        .setReserveRatio(new BigInteger("4000000000000"))
+        .setReserveRatioMa(new BigInteger("4100000000000"))
+        .setYieldPrice(new BigInteger("1000000000002"))
+        .setTimestamp(new BigInteger("1700000000"))
+        .setSignature("0123456789abcdef".repeat(8));
+    ZephyrBlockHeader header = new ZephyrBlockHeader()
+        .setHash("aa".repeat(32))
+        .setHeight(536000L)
+        .setTimestamp(1750000000L)
+        .setSize(1234L)
+        .setWeight(1235L)
+        .setLongTermWeight(1236L)
+        .setDepth(7L)
+        .setDifficulty(new BigInteger("123456789"))
+        .setCumulativeDifficulty(new BigInteger("987654321987654321"))
+        .setMajorVersion(11)
+        .setMinorVersion(11)
+        .setNonce(42L)
+        .setMinerTxHash("bb".repeat(32))
+        .setNumTxs(3)
+        .setOrphanStatus(false)
+        .setPrevHash("cc".repeat(32))
+        .setReward(new BigInteger("2000000000000"))
+        .setPowHash("dd".repeat(32))
+        .setPricingRecord(record);
+    ZephyrBlockHeader copy = new ZephyrBlockHeader(header);
+    assertNotSame(header, copy);
+    assertEquals(header, copy);
+    assertEquals(header.hashCode(), copy.hashCode());
+    assertEquals("bb".repeat(32), copy.getMinerTxHash());
+    assertNotSame(header.getPricingRecord(), copy.getPricingRecord());
+  }
 }

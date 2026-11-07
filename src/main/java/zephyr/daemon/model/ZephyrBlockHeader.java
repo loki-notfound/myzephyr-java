@@ -46,6 +46,7 @@ public class ZephyrBlockHeader {
     this.majorVersion = header.majorVersion;
     this.minorVersion = header.minorVersion;
     this.nonce = header.nonce;
+    this.minerTxHash = header.minerTxHash;
     this.numTxs = header.numTxs;
     this.orphanStatus = header.orphanStatus;
     this.prevHash = header.prevHash;
