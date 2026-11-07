@@ -2,7 +2,7 @@
 #
 # Installs, in the pinned debian:12 build image, every Debian 12 package the native builds need,
 # from one Debian snapshot, so CI and a later local build get the same toolchain packages
-# (QUESTIONS R13-6): the image digest pins only the base image, apt's live mirror moves on.
+# the image digest pins only the base image, and apt's live mirror moves on.
 #   1. apt's sources are replaced by snapshot.debian.org at DEBIAN_SNAPSHOT (below) for bookworm,
 #      bookworm-updates and bookworm-security, over plain http: the base image has no
 #      ca-certificates, so apt cannot use an https source before anything is installed, and
@@ -20,7 +20,7 @@
 #        file);
 #      both: a JDK for jni.h/jni_md.h (the JNI headers; jni_md.h is per OS, not per
 #        architecture) and git (the build scripts place the zephyr tree by sha);
-#      packaging (bin/package_release_container.sh, the CI package job; QUESTIONS R13b-4): the
+#      packaging (bin/package_release_container.sh, the CI package job): the
 #        same OpenJDK 17 runs javac, javadoc, Maven and Gradle, and maven (Debian 12: 3.8.7) builds
 #        the JAR; Gradle comes through the wrapper (pinned distribution, sha256 checked) and the
 #        Android SDK from outside the image (bin/package_release_container.sh mounts it, the CI

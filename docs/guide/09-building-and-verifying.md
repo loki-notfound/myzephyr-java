@@ -50,9 +50,8 @@ libraries from pinned archives):
 | `0005-neutral-engines-and-unbound-sysconfdir` | neutral `ENGINESDIR`, `MODULESDIR` and unbound `sysconfdir` | they embedded the build directory, which breaks reproducibility across paths |
 
 Two more build-layer settings: the JNI library is compiled with `-include map`, because
-zephyr-cpp's model header relies on boost to include `<map>` and newer boost does not (register
-D20); and zephyr's dead `blocks` library is not linked, because the pinned tree never builds it
-(D22).
+zephyr-cpp's model header relies on boost to include `<map>` and newer boost does not; and
+zephyr's dead `blocks` library is not linked, because the pinned tree never builds it.
 
 ## The builds
 

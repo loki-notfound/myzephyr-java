@@ -8,7 +8,7 @@
 #    of the pin tag when it is present locally (the same script as bin/build_linux.sh and the CI
 #    package job).
 # 2. The same script applies the build-layer patches under patches/depends/ to the zephyr tree
-#    (build tooling under contrib/depends/ only, register D21), idempotently.
+#    (build tooling under contrib/depends/ only, never zephyr or zephyr-cpp sources), idempotently.
 # 3. Builds contrib/depends for the ABI's host triplet into contrib/depends/<triplet>/ (this
 #    downloads the NDK and the package sources; depends checks their sha256). A stalled download
 #    fails after 120 s below 1000 bytes/s, and depends retries it from downloads.getmonero.org.
@@ -30,7 +30,7 @@
 # -fdebug-prefix-map=<depends prefix>=/depends. NDK r18b's clang 7.0.2 has no -ffile-prefix-map
 # and no -fmacro-prefix-map, so __FILE__ strings (assertion and exception messages) stay
 # absolute paths of the build host: the Android libraries are reproducible for the same build
-# path only, until the core moves to a newer NDK (docs RELEASES §7, option 2).
+# path only, until the core moves to a newer NDK.
 #
 # Usage: bin/build_android.sh <arm64-v8a|armeabi-v7a|x86_64|--all>
 #   --all  all three ABIs, or the ABIs in BUILD_ANDROID_ABIS (for example "arm64-v8a")
@@ -100,7 +100,7 @@ for ABI in $ABIS; do
   # 3. depends for this host. The download command is depends' own (builders/linux.mk, build_os
   # is the build machine's, linux) plus a low-speed limit: a fetch that stays below 1000 bytes/s
   # for 120 s fails instead of hanging, and depends then falls back to downloads.getmonero.org,
-  # whose archives it checks by sha256 like the primary ones (QUESTIONS R13d-5). $(...) is left
+  # whose archives it checks by sha256 like the primary ones. $(...) is left
   # to make, so depends' DOWNLOAD_CONNECT_TIMEOUT and DOWNLOAD_RETRIES still apply.
   # shellcheck disable=SC2016
   make -C "$Z/contrib/depends" HOST="$TRIPLET" -j"$(nproc)" \

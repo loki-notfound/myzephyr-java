@@ -1,6 +1,6 @@
 # zephyr-java CI: the Java build with its pure tests, the native matrix through zephyr's depends,
 # and the release package with the build manifest.
-# NOT RUN YET: written in round 11 (2026-11-07); the first run is after the first push (R14).
+# NOT RUN YET: written on 2026-11-07; the first run is after the first push.
 # Every job calls the repository's own scripts, the same ones F-Droid and a local release run.
 name: build
 
@@ -33,8 +33,8 @@ jobs:
           java-version: "21"
           cache: maven
       - name: System libraries of the developer build
-        # the -dev packages whose libraries and headers the developer build found on the round-1
-        # build host (Debian 13; derived from its CMake caches with dpkg -S, round 11), with the
+        # the -dev packages whose libraries and headers the developer build found on its first
+        # build host (Debian 13; derived from its CMake caches with dpkg -S), with the
         # unversioned boost names, which are 1.83 on Ubuntu 24.04 as on Debian 13
         run: |
           sudo apt-get update
@@ -144,7 +144,7 @@ jobs:
     # bin/package_release.sh, the same packaging script bin/build_release.sh calls, in the same
     # pinned debian:12 image at /work with the same Debian snapshot (JDK 17 and Maven from it),
     # umask 022 and the same three Android SDK packages, step for step what
-    # bin/package_release_container.sh does locally (QUESTIONS R13b-4), so the CI release files
+    # bin/package_release_container.sh does locally, so the CI release files
     # and a local build can match byte for byte: the JAR (Linux natives, tests on the
     # depends-built x86_64 library), sources and Javadoc jars, the AAR (Android natives) with its
     # sources jar and POM, the debug symbols, the Maven repository, the site, the manifest and

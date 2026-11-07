@@ -3,7 +3,7 @@
 # Packages a zephyr-java release (bin/package_release.sh) in the pinned debian:12 image, the same
 # image, Debian snapshot and path (/work) as the native builds and the CI package job, so the jars,
 # the AAR and the archives of a local build can be compared with CI's byte for byte
-# (QUESTIONS R13b-4): one environment produces every release file.
+# one environment produces every release file.
 #
 # Runs, inside the image with this checkout mounted at /work:
 #   bin/container-build-deps.sh          the Debian 12 packages from the pinned Debian snapshot,
@@ -29,7 +29,8 @@
 #                       toolchain.packaging_container (toolchain.packaging_env = container)
 #   TAR_OPTIONS         --no-same-owner, as in bin/build_linux_container.sh
 #   LANG                C.UTF-8 (in Debian's libc): the image sets no locale, and JDK 17 then
-#                       writes files such as Javadoc's options file in ASCII (QUESTIONS R13c-3)
+#                       writes files such as Javadoc's options file in ASCII, and the © of
+#                       the Javadoc footer fails
 #   BUILD_LINUX_ARCHES, BUILD_ANDROID_ABIS, RELEASE_TAG   passed through when set
 # podman (rootless: files written in the container belong to the calling user) or, when podman
 # is absent, docker.

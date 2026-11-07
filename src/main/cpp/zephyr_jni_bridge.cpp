@@ -421,14 +421,14 @@ JNIEXPORT jstring JNICALL Java_zephyr_common_ZephyrUtils_binaryBlocksToJsonJni(J
 }
 
 JNIEXPORT void JNICALL Java_zephyr_common_ZephyrUtils_setLogLevelJni(JNIEnv* env, jclass clazz, jint level) {
-  mlog_set_log_level(level); // D3: zephyr-cpp is at monero-cpp 686fbdc, before ad7be65 added the monero_utils logging wrappers
+  mlog_set_log_level(level); // zephyr-cpp is at monero-cpp 686fbdc, before ad7be65 added the monero_utils logging wrappers
 }
 
 JNIEXPORT void JNICALL Java_zephyr_common_ZephyrUtils_configureLoggingJni(JNIEnv* env, jclass clazz, jstring jpath, jboolean console) {
   const char* _path = jpath ? env->GetStringUTFChars(jpath, NULL) : nullptr;
   string path = string(_path ? _path : "");
   env->ReleaseStringUTFChars(jpath, _path);
-  mlog_configure(path, console); // D3: zephyr-cpp is at monero-cpp 686fbdc, before ad7be65 added the monero_utils logging wrappers
+  mlog_configure(path, console); // zephyr-cpp is at monero-cpp 686fbdc, before ad7be65 added the monero_utils logging wrappers
 }
 
 // --------------------------- STATIC WALLET UTILS ----------------------------

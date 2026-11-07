@@ -11,7 +11,7 @@ import zephyr.wallet.ZephyrWallet;
 import zephyr.wallet.model.ZephyrAssets;
 import zephyr.wallet.model.ZephyrTxWallet;
 
-// temporary until R8: wallet balance calls read the base coin ZPH until the tests cover assets
+// the balance checks read the base coin ZPH only; the tests do not cover the other assets yet
 
 /**
  * Tracks wallets which are in sync with the tx pool and therefore whose txs in the pool

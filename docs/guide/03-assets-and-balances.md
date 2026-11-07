@@ -77,7 +77,7 @@ for (ZephyrAccount account : wallet.getAccounts(true)) {          // true: with 
 }
 ```
 
-On the R8 mainnet run, a wallet holding 101 ZPH reported eight entries from `getBalance()`
+On the mainnet test run, a wallet holding 101 ZPH reported eight entries from `getBalance()`
 (`ZPH=101000000000000` and seven zeros) and `{ZPH=101000000000000}` for its account. Per asset
 they agree, and with the absent-equals-zero rule the two objects are equal.
 
@@ -88,14 +88,14 @@ The **balance** counts everything the wallet owns, including funds that are not 
 
 - **Received funds** (including the change of your own transactions) unlock 10 blocks after the
   block that contains them. At the network's two-minute block target that is about 20 minutes;
-  on the R8 run the waits until the change of a transfer and the output of a conversion were
-  spendable were 982, 1,203 and 1,684 seconds.
+  on the mainnet test run the waits until the change of a transfer and the output of a conversion
+  were spendable were 982, 1,203 and 1,684 seconds.
 - **Converted funds** follow the same rule: the ZRS from a mint was spendable 10 blocks after the
   mint was mined. [Chapter 4](04-sending-and-converting.md) covers conversions.
 
 Funds in the pool (sent to you but not yet in a block) count in the balance, not in the unlocked
-balance. On the R8 run a receiving wallet showed `onBalancesChanged` with `ZPH 10000000000000/0`
-(balance 10 ZPH, unlocked 0) as soon as the transfer reached the pool.
+balance. On the mainnet test run a receiving wallet showed `onBalancesChanged` with
+`ZPH 10000000000000/0` (balance 10 ZPH, unlocked 0) as soon as the transfer reached the pool.
 
 A send can only use unlocked funds. An app that shows one number should show the balance and,
 next to it, how much of it is still locked.

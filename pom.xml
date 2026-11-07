@@ -114,7 +114,7 @@
 			</plugin>
 			<!-- the plugins Maven would otherwise take from its own default bindings, pinned: the output
 			     must not depend on the Maven that runs it (Debian 12's Maven 3.8.7 binds resources 2.6,
-			     which drops the natives' exec bit, and deploy 2.7, which rejects id::url; QUESTIONS R13c-2) -->
+			     which drops the natives' exec bit, and deploy 2.7, which rejects id::url) -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-resources-plugin</artifactId>
@@ -216,7 +216,7 @@
 							<source>8</source>
 							<!-- the javadoc jar of mvn package (the release profile has the same); no generation date in the pages: the javadoc jar is reproducible -->
 							<notimestamp>true</notimestamp>
-							<!-- instead of the plugin's default "All rights reserved" footer (QUESTIONS R12-2) -->
+							<!-- the MIT licence, not the plugin's default "All rights reserved" footer -->
 							<bottom>Copyright &#169; the zephyr-java contributors. MIT licence.</bottom>
 						</configuration>
 						<executions>
@@ -226,7 +226,7 @@
 									<goal>jar</goal>
 								</goals>
 								<configuration>
-									<!-- a Javadoc failure stops the build: never an empty Javadoc jar (QUESTIONS R13c-3) -->
+									<!-- a Javadoc failure stops the build: never an empty Javadoc jar -->
 									<failOnError>true</failOnError>
 								</configuration>
 							</execution>
@@ -319,7 +319,7 @@
 							<source>8</source>
 							<!-- no generation date in the pages: the javadoc jar is reproducible -->
 							<notimestamp>true</notimestamp>
-							<!-- instead of the plugin's default "All rights reserved" footer (QUESTIONS R12-2) -->
+							<!-- the MIT licence, not the plugin's default "All rights reserved" footer -->
 							<bottom>Copyright &#169; the zephyr-java contributors. MIT licence.</bottom>
 						</configuration>
 						<executions>
@@ -329,7 +329,7 @@
 									<goal>jar</goal>
 								</goals>
 								<configuration>
-									<!-- a Javadoc failure stops the build: never an empty Javadoc jar (QUESTIONS R13c-3) -->
+									<!-- a Javadoc failure stops the build: never an empty Javadoc jar -->
 									<failOnError>true</failOnError>
 								</configuration>
 							</execution>

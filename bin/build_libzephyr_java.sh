@@ -39,7 +39,8 @@ ROOT="$(pwd)"
 . bin/pins.env
 
 # Verifies a tree's own pin tag (ZEPHYR_TAG or ZEPHYR_CPP_TAG) when it is present locally
-# (PLAN §2): the tag must point at the pinned commit and carry a good signature. Without gpg or
+# (releases come only from the signed backports tags): the tag must point at the pinned commit and
+# carry a good signature. Without gpg or
 # without the release key in the keyring this is a one-line warning, so a build without the keys
 # still works; a bad signature is an error.
 verify_pin_tag() {

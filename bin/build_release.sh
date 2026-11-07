@@ -5,8 +5,8 @@
 #
 #  1. bin/build_linux_container.sh --all
 #                                    Linux natives through depends (x86_64, arm64) in the pinned
-#                                    debian:12 image (RELEASES §4: the release natives come from
-#                                    that image, the same as CI's, glibc floor 2.36);
+#                                    debian:12 image (the release natives come from that image,
+#                                    the same as CI's, glibc floor 2.36);
 #                                    LINUX_BUILD=host builds them on the host with
 #                                    bin/build_linux.sh instead, for development only
 #  2. bin/build_android_container.sh --all
@@ -19,7 +19,8 @@
 #  3. bin/strip_natives.sh           stripped natives in place, debug files in build/debug/
 #  4. bin/package_release_container.sh
 #                                    bin/package_release.sh in the same image at /work (JDK, Maven
-#                                    from the Debian snapshot, umask 022; QUESTIONS R13b-4), the
+#                                    from the Debian snapshot, umask 022, so CI and local jars
+#                                    can match), the
 #                                    packaging step the CI package job runs in that image too;
 #                                    PACKAGE_BUILD=host runs bin/package_release.sh on the host
 #                                    instead, for development only.

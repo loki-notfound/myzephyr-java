@@ -11,7 +11,7 @@ android {
     buildToolsVersion = "36.0.0"
 
     defaultConfig {
-        minSdk = 24 // RELEASES §6, final; Jackson 2.13.5 is the last line for API 24 and 25
+        minSdk = 24 // final; Jackson 2.13.5 is the last line for API 24 and 25
         consumerProguardFiles("consumer-rules.pro")
     }
 

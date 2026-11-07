@@ -16,7 +16,7 @@ import zephyr.daemon.model.ZephyrTx;
 import zephyr.wallet.ZephyrWallet;
 import zephyr.wallet.ZephyrWalletRpc.IncomingTransferComparator;
 import zephyr.wallet.model.ZephyrAccount;
-import zephyr.wallet.model.ZephyrAssets; // temporary until R8
+import zephyr.wallet.model.ZephyrAssets; // base coin ZPH only
 import zephyr.wallet.model.ZephyrIncomingTransfer;
 import zephyr.wallet.model.ZephyrOutgoingTransfer;
 import zephyr.wallet.model.ZephyrOutputQuery;
@@ -78,14 +78,14 @@ public class WalletEqualityUtils {
         testAccountEqualOnChain(accounts1.get(i), accounts2.get(i));
       } else if (i >= accounts1.size()) {
         for (int j = i; j < accounts2.size(); j++) {
-          assertEquals(BigInteger.valueOf(0), accounts2.get(j).getBalance().get(ZephyrAssets.ZPH)); // temporary until R8
+          assertEquals(BigInteger.valueOf(0), accounts2.get(j).getBalance().get(ZephyrAssets.ZPH)); // base coin ZPH only
           assertTrue(accounts2.get(j).getSubaddresses().size() >= 1);
           for (ZephyrSubaddress subaddress : accounts2.get(j).getSubaddresses()) assertFalse(subaddress.isUsed());
         }
         return;
       } else {
         for (int j = i; j < accounts1.size(); j++) {
-          assertEquals(BigInteger.valueOf(0), accounts1.get(j).getBalance().get(ZephyrAssets.ZPH)); // temporary until R8
+          assertEquals(BigInteger.valueOf(0), accounts1.get(j).getBalance().get(ZephyrAssets.ZPH)); // base coin ZPH only
           assertTrue(accounts1.get(j).getSubaddresses().size() >= 1);
           for (ZephyrSubaddress subaddress : accounts1.get(j).getSubaddresses()) assertFalse(subaddress.isUsed());
         }
@@ -115,13 +115,13 @@ public class WalletEqualityUtils {
         testSubaddressesEqualOnChain(subaddresses1.get(i), subaddresses2.get(i));
       } else if (i >= subaddresses1.size()) {
         for (int j = i; j < subaddresses2.size(); j++) {
-          assertEquals(BigInteger.valueOf(0), subaddresses2.get(j).getBalance().get(ZephyrAssets.ZPH)); // temporary until R8
+          assertEquals(BigInteger.valueOf(0), subaddresses2.get(j).getBalance().get(ZephyrAssets.ZPH)); // base coin ZPH only
           assertFalse(subaddresses2.get(j).isUsed());
         }
         return;
       } else {
         for (int j = i; j < subaddresses1.size(); j++) {
-          assertEquals(BigInteger.valueOf(0), subaddresses1.get(i).getBalance().get(ZephyrAssets.ZPH)); // temporary until R8
+          assertEquals(BigInteger.valueOf(0), subaddresses1.get(i).getBalance().get(ZephyrAssets.ZPH)); // base coin ZPH only
           assertFalse(subaddresses1.get(j).isUsed());
         }
         return;

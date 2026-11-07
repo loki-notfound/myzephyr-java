@@ -311,7 +311,8 @@ add_library(blockchain_db STATIC IMPORTED)
 set_target_properties(blockchain_db PROPERTIES IMPORTED_LOCATION
     ${MONERO_PROJECT_BUILD}/src/blockchain_db/libblockchain_db.a)
 
-# D22: no blocks library; zephyr builds with PER_BLOCK_CHECKPOINT 0, so libblocks.a never exists
+# no blocks library: zephyr builds with PER_BLOCK_CHECKPOINT 0, so libblocks.a never exists, and
+# the wallet path does not use it
 
 add_library(checkpoints STATIC IMPORTED)
 set_target_properties(checkpoints PROPERTIES IMPORTED_LOCATION
@@ -345,7 +346,8 @@ set_target_properties(randomx PROPERTIES IMPORTED_LOCATION
 # Build the JNI library: bridge plus zephyr-cpp
 ###############################################
 
-# zephyr-cpp's LIBRARY_SRC_FILES, compiled into this library; no separate libmonero-cpp (D17)
+# zephyr-cpp's LIBRARY_SRC_FILES, compiled into this library; no separate libmonero-cpp, so the
+# library can sit next to monero-java's in one process
 set(
     ZEPHYR_CPP_SRC_FILES
     ${ZEPHYR_CPP}/src/utils/gen_utils.cpp
@@ -364,11 +366,12 @@ set(
 
 add_library(zephyr-java SHARED ${JNI_SRC_FILES} ${ZEPHYR_CPP_SRC_FILES})
 
-# D20: zephyr-cpp's monero_wallet_model.h uses std::map without including <map>;
+# zephyr-cpp's monero_wallet_model.h uses std::map without including <map>;
 # boost 1.77 and later no longer include it transitively
 target_compile_options(zephyr-java PRIVATE -include map)
 
-# D17: the zephyr-cpp sources compiled into this library would otherwise export every monero::
+# only JNI symbols are exported: the zephyr-cpp sources compiled into this library would otherwise
+# export every monero::
 # symbol with default visibility; --exclude-libs,ALL covers only the static archives. JNIEXPORT
 # carries visibility("default") itself, so the bridge's entry points and JNI_OnLoad stay exported.
 target_compile_options(zephyr-java PRIVATE -fvisibility=hidden -fvisibility-inlines-hidden)
@@ -422,11 +425,11 @@ target_link_libraries(zephyr-java
     ${EXTRA_LIBRARIES}
 )
 
-# D17: symbols of the statically linked libraries stay local, so only the bridge's
+# symbols of the statically linked libraries stay local, so only the bridge's
 # JNI entry points are exported from libzephyr-java
 target_link_options(zephyr-java PRIVATE "-Wl,--exclude-libs,ALL")
 
-# D17: exact export list (Java_zephyr_* and JNI_OnLoad) from src/main/cpp/zephyr-java.map
+# exact export list (Java_zephyr_* and JNI_OnLoad) from src/main/cpp/zephyr-java.map
 if (NOT APPLE AND NOT WIN32)
   target_link_options(zephyr-java PRIVATE "-Wl,--version-script=${CMAKE_SOURCE_DIR}/src/main/cpp/zephyr-java.map")
   set_property(TARGET zephyr-java APPEND PROPERTY LINK_DEPENDS "${CMAKE_SOURCE_DIR}/src/main/cpp/zephyr-java.map")
@@ -439,7 +442,8 @@ endif()
 # Android and Linux (UNIX AND NOT APPLE covers both): an unresolved symbol is a link error here.
 # Android's linker resolves every symbol at load time, so it would be a crash on the device; on
 # Linux the JVM loads the library with lazy binding, so it would be a crash at the first call
-# (R9-5: the pricing-record symbols failed only at the first sync)
+# (an earlier Linux library had such a gap: lazy binding hid the missing pricing-record symbols,
+# which would have failed only at the first sync)
 if (UNIX AND NOT APPLE)
   target_link_options(zephyr-java PRIVATE -Wl,--no-undefined)
   # zephyr's liboracle.a (pricing records; not in zephyr-cpp's import list) and, after

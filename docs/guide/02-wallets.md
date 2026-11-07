@@ -146,7 +146,7 @@ monero-java that overrides it fails to compile instead of silently never being c
 **the asset of an unconfirmed output is empty.** When an incoming payment is seen in the pool,
 `onOutputReceived` arrives with `getAssetType()` equal to `""`, because the core's callback for
 pool payments carries no asset. The notification for the same output once it is in a block
-carries the asset (from the core's code; the R8 mainnet run did not get to observe it). Use
+carries the asset (from the core's code; the mainnet test run did not get to observe it). Use
 `onBalancesChanged` or `getTxs()` for the asset of a pending payment.
 
 The callbacks run on a native thread; keep them short and never call the wallet from inside one

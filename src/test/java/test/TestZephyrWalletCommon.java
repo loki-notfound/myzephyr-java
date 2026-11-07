@@ -41,7 +41,7 @@ import zephyr.wallet.ZephyrWallet;
 import zephyr.wallet.ZephyrWalletRpc;
 import zephyr.wallet.model.ZephyrAccount;
 import zephyr.wallet.model.ZephyrAddressBookEntry;
-import zephyr.wallet.model.ZephyrAssets; // temporary until R8
+import zephyr.wallet.model.ZephyrAssets; // base coin ZPH only
 import zephyr.wallet.model.ZephyrCheckReserve;
 import zephyr.wallet.model.ZephyrCheckTx;
 import zephyr.wallet.model.ZephyrDestination;
@@ -81,7 +81,7 @@ import utils.StartMining;
 import utils.TestUtils;
 import utils.WalletEqualityUtils;
 
-// temporary until R8: wallet balance calls read the base coin ZPH until the tests cover assets
+// the balance checks read the base coin ZPH only; the tests do not cover the other assets yet
 
 /**
  * Runs common tests that every Zephyr wallet implementation should support.
@@ -783,19 +783,19 @@ public abstract class TestZephyrWalletCommon {
     BigInteger accountsBalance = BigInteger.valueOf(0);
     BigInteger accountsUnlockedBalance = BigInteger.valueOf(0);
     for (ZephyrAccount account : accounts) {
-      accountsBalance = accountsBalance.add(account.getBalance().get(ZephyrAssets.ZPH)); // temporary until R8
-      accountsUnlockedBalance = accountsUnlockedBalance.add(account.getUnlockedBalance().get(ZephyrAssets.ZPH)); // temporary until R8
+      accountsBalance = accountsBalance.add(account.getBalance().get(ZephyrAssets.ZPH)); // base coin ZPH only
+      accountsUnlockedBalance = accountsUnlockedBalance.add(account.getUnlockedBalance().get(ZephyrAssets.ZPH)); // base coin ZPH only
       
       // test that balances add up between subaddresses and accounts
       BigInteger subaddressesBalance = BigInteger.valueOf(0);
       BigInteger subaddressesUnlockedBalance = BigInteger.valueOf(0);
       for (ZephyrSubaddress subaddress : account.getSubaddresses()) {
-        subaddressesBalance = subaddressesBalance.add(subaddress.getBalance().get(ZephyrAssets.ZPH)); // temporary until R8
-        subaddressesUnlockedBalance = subaddressesUnlockedBalance.add(subaddress.getUnlockedBalance().get(ZephyrAssets.ZPH)); // temporary until R8
+        subaddressesBalance = subaddressesBalance.add(subaddress.getBalance().get(ZephyrAssets.ZPH)); // base coin ZPH only
+        subaddressesUnlockedBalance = subaddressesUnlockedBalance.add(subaddress.getUnlockedBalance().get(ZephyrAssets.ZPH)); // base coin ZPH only
         
         // test that balances are consistent with getAccounts() call
-        assertEquals((wallet.getBalance(ZephyrAssets.ZPH, subaddress.getAccountIndex(), subaddress.getIndex())).toString(), subaddress.getBalance().get(ZephyrAssets.ZPH).toString()); // temporary until R8
-        assertEquals((wallet.getUnlockedBalance(ZephyrAssets.ZPH, subaddress.getAccountIndex(), subaddress.getIndex())).toString(), subaddress.getUnlockedBalance().get(ZephyrAssets.ZPH).toString()); // temporary until R8
+        assertEquals((wallet.getBalance(ZephyrAssets.ZPH, subaddress.getAccountIndex(), subaddress.getIndex())).toString(), subaddress.getBalance().get(ZephyrAssets.ZPH).toString()); // base coin ZPH only
+        assertEquals((wallet.getUnlockedBalance(ZephyrAssets.ZPH, subaddress.getAccountIndex(), subaddress.getIndex())).toString(), subaddress.getUnlockedBalance().get(ZephyrAssets.ZPH).toString()); // base coin ZPH only
       }
       assertEquals((wallet.getBalance(ZephyrAssets.ZPH, account.getIndex())).toString(), subaddressesBalance.toString());
       assertEquals((wallet.getUnlockedBalance(ZephyrAssets.ZPH, account.getIndex())).toString(), subaddressesUnlockedBalance.toString());
@@ -1920,8 +1920,8 @@ public abstract class TestZephyrWalletCommon {
     BigInteger accountsUnlockedBalance = BigInteger.valueOf(0);
     for (ZephyrAccount account : accounts) {
       testAccount(account); // test that account balance equals sum of subaddress balances
-      accountsBalance = accountsBalance.add(account.getBalance().get(ZephyrAssets.ZPH)); // temporary until R8
-      accountsUnlockedBalance = accountsUnlockedBalance.add(account.getUnlockedBalance().get(ZephyrAssets.ZPH)); // temporary until R8
+      accountsBalance = accountsBalance.add(account.getBalance().get(ZephyrAssets.ZPH)); // base coin ZPH only
+      accountsUnlockedBalance = accountsUnlockedBalance.add(account.getUnlockedBalance().get(ZephyrAssets.ZPH)); // base coin ZPH only
     }
     assertEquals(0, walletBalance.compareTo(accountsBalance));
     assertEquals(0, walletUnlockedBalance.compareTo(accountsUnlockedBalance));
@@ -1977,14 +1977,14 @@ public abstract class TestZephyrWalletCommon {
       BigInteger accountSum = BigInteger.valueOf(0);
       List<ZephyrOutputWallet> accountOutputs = wallet.getOutputs(new ZephyrOutputQuery().setAccountIndex(account.getIndex()).setIsSpent(false));
       for (ZephyrOutputWallet output : accountOutputs) accountSum = accountSum.add(output.getAmount());
-      if (!account.getBalance().get(ZephyrAssets.ZPH).equals(accountSum)) assertTrue(hasUnconfirmedTx, "Account balance must equal sum of its unspent outputs if no unconfirmed txs"); // temporary until R8
+      if (!account.getBalance().get(ZephyrAssets.ZPH).equals(accountSum)) assertTrue(hasUnconfirmedTx, "Account balance must equal sum of its unspent outputs if no unconfirmed txs"); // base coin ZPH only
       
       // subaddress balances are sum of their unspent outputs
       for (ZephyrSubaddress subaddress : account.getSubaddresses()) {
         BigInteger subaddressSum = BigInteger.valueOf(0);
         List<ZephyrOutputWallet> subaddressOutputs = wallet.getOutputs(new ZephyrOutputQuery().setAccountIndex(account.getIndex()).setSubaddressIndex(subaddress.getIndex()).setIsSpent(false));
         for (ZephyrOutputWallet output : subaddressOutputs) subaddressSum = subaddressSum.add(output.getAmount());
-        if (!subaddress.getBalance().get(ZephyrAssets.ZPH).equals(subaddressSum)) assertTrue(hasUnconfirmedTx, "Subaddress balance must equal sum of its unspent outputs if no unconfirmed txs"); // temporary until R8
+        if (!subaddress.getBalance().get(ZephyrAssets.ZPH).equals(subaddressSum)) assertTrue(hasUnconfirmedTx, "Subaddress balance must equal sum of its unspent outputs if no unconfirmed txs"); // base coin ZPH only
       }
     }
   }
@@ -2263,8 +2263,8 @@ public abstract class TestZephyrWalletCommon {
     List<ZephyrAccount> accounts = wallet.getAccounts();
     String signature = null;
     for (ZephyrAccount account : accounts) {
-      if (account.getBalance().get(ZephyrAssets.ZPH).compareTo(BigInteger.valueOf(0)) > 0) { // temporary until R8
-        BigInteger checkAmount = (account.getBalance().get(ZephyrAssets.ZPH)).divide(BigInteger.valueOf(2)); // temporary until R8
+      if (account.getBalance().get(ZephyrAssets.ZPH).compareTo(BigInteger.valueOf(0)) > 0) { // base coin ZPH only
+        BigInteger checkAmount = (account.getBalance().get(ZephyrAssets.ZPH)).divide(BigInteger.valueOf(2)); // base coin ZPH only
         signature = wallet.getReserveProofAccount(account.getIndex(), checkAmount, msg);
         ZephyrCheckReserve check = wallet.checkReserveProof(wallet.getPrimaryAddress(), msg, signature);
         assertTrue(check.isGood());
@@ -2273,7 +2273,7 @@ public abstract class TestZephyrWalletCommon {
         numNonZeroTests++;
       } else {
         try {
-          wallet.getReserveProofAccount(account.getIndex(), account.getBalance().get(ZephyrAssets.ZPH), msg); // temporary until R8
+          wallet.getReserveProofAccount(account.getIndex(), account.getBalance().get(ZephyrAssets.ZPH), msg); // base coin ZPH only
           throw new RuntimeException("Should have thrown exception");
         } catch (ZephyrError e) {
           assertEquals(-1, (int) e.getCode());
@@ -2290,12 +2290,12 @@ public abstract class TestZephyrWalletCommon {
     
     // test error when not enough balance for requested minimum reserve amount
     try {
-      String proof = wallet.getReserveProofAccount(0, accounts.get(0).getBalance().get(ZephyrAssets.ZPH).add(TestUtils.MAX_FEE), "Test message"); // temporary until R8
+      String proof = wallet.getReserveProofAccount(0, accounts.get(0).getBalance().get(ZephyrAssets.ZPH).add(TestUtils.MAX_FEE), "Test message"); // base coin ZPH only
       System.out.println("Account balance: " + wallet.getBalance(0));
       System.out.println("accounts.get(0) balance: " + accounts.get(0).getBalance());
       ZephyrCheckReserve reserve = wallet.checkReserveProof(wallet.getPrimaryAddress(), "Test message", proof);
       try {
-        wallet.getReserveProofAccount(0, accounts.get(0).getBalance().get(ZephyrAssets.ZPH).add(TestUtils.MAX_FEE), "Test message"); // temporary until R8
+        wallet.getReserveProofAccount(0, accounts.get(0).getBalance().get(ZephyrAssets.ZPH).add(TestUtils.MAX_FEE), "Test message"); // base coin ZPH only
         throw new RuntimeException("expecting this to succeed");
       } catch (Exception e) {
         assertEquals("expecting this to succeed", e.getMessage());
@@ -3175,8 +3175,8 @@ public abstract class TestZephyrWalletCommon {
       unlockedSubaddresses.clear();
       int numSubaddressBalances = 0;
       for (ZephyrSubaddress subaddress : account.getSubaddresses()) {
-        if (subaddress.getBalance().get(ZephyrAssets.ZPH).compareTo(TestUtils.MAX_FEE) > 0) numSubaddressBalances++; // temporary until R8
-        if (subaddress.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(TestUtils.MAX_FEE) > 0) unlockedSubaddresses.add(subaddress); // temporary until R8
+        if (subaddress.getBalance().get(ZephyrAssets.ZPH).compareTo(TestUtils.MAX_FEE) > 0) numSubaddressBalances++; // base coin ZPH only
+        if (subaddress.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(TestUtils.MAX_FEE) > 0) unlockedSubaddresses.add(subaddress); // base coin ZPH only
       }
       if (numSubaddressBalances >= NUM_SUBADDRESSES + 1) hasBalance = true;
       if (unlockedSubaddresses.size() >= NUM_SUBADDRESSES + 1) {
@@ -3196,7 +3196,7 @@ public abstract class TestZephyrWalletCommon {
     // determine the amount to send
     BigInteger sendAmount = BigInteger.valueOf(0);
     for (int fromSubaddressIdx : fromSubaddressIndices) {
-      sendAmount = sendAmount.add(srcAccount.getSubaddresses().get(fromSubaddressIdx).getUnlockedBalance().get(ZephyrAssets.ZPH)); // temporary until R8
+      sendAmount = sendAmount.add(srcAccount.getSubaddresses().get(fromSubaddressIdx).getUnlockedBalance().get(ZephyrAssets.ZPH)); // base coin ZPH only
     }
     sendAmount = sendAmount.divide(BigInteger.valueOf(SEND_DIVISOR));
     
@@ -3204,8 +3204,8 @@ public abstract class TestZephyrWalletCommon {
     BigInteger fromUnlockedBalance = BigInteger.valueOf(0);
     for (int subaddressIdx : fromSubaddressIndices) {
       ZephyrSubaddress subaddress = wallet.getSubaddress(srcAccount.getIndex(), subaddressIdx);
-      fromBalance = fromBalance.add(subaddress.getBalance().get(ZephyrAssets.ZPH)); // temporary until R8
-      fromUnlockedBalance = fromUnlockedBalance.add(subaddress.getUnlockedBalance().get(ZephyrAssets.ZPH)); // temporary until R8
+      fromBalance = fromBalance.add(subaddress.getBalance().get(ZephyrAssets.ZPH)); // base coin ZPH only
+      fromUnlockedBalance = fromUnlockedBalance.add(subaddress.getUnlockedBalance().get(ZephyrAssets.ZPH)); // base coin ZPH only
     }
     
     // send from the first subaddresses with unlocked balances
@@ -3234,9 +3234,9 @@ public abstract class TestZephyrWalletCommon {
         ZephyrSubaddress subaddressBefore = accounts.get(i).getSubaddresses().get(j);
         ZephyrSubaddress subaddressAfter = accountsAfter.get(i).getSubaddresses().get(j);
         if (i == srcAccount.getIndex() && fromSubaddressIndices.contains(j)) {
-          if (subaddressAfter.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(subaddressBefore.getUnlockedBalance().get(ZephyrAssets.ZPH)) < 0) srcUnlockedBalancedDecreased = true; // temporary until R8
+          if (subaddressAfter.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(subaddressBefore.getUnlockedBalance().get(ZephyrAssets.ZPH)) < 0) srcUnlockedBalancedDecreased = true; // base coin ZPH only
         } else {
-          assertTrue(subaddressAfter.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(subaddressBefore.getUnlockedBalance().get(ZephyrAssets.ZPH)) == 0, "Subaddress [" + i + "," + j + "] unlocked balance should not have changed"); // temporary until R8
+          assertTrue(subaddressAfter.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(subaddressBefore.getUnlockedBalance().get(ZephyrAssets.ZPH)) == 0, "Subaddress [" + i + "," + j + "] unlocked balance should not have changed"); // base coin ZPH only
         }
       }
     }
@@ -3326,8 +3326,8 @@ public abstract class TestZephyrWalletCommon {
     for (ZephyrAccount account : accounts) {
       List<ZephyrSubaddress> subaddresses = account.getSubaddresses();
       for (int i = 1; i < subaddresses.size(); i++) {
-        if (subaddresses.get(i).getBalance().get(ZephyrAssets.ZPH).compareTo(TestUtils.MAX_FEE) > 0) sufficientBalance = true; // temporary until R8
-        if (subaddresses.get(i).getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(TestUtils.MAX_FEE) > 0) { // temporary until R8
+        if (subaddresses.get(i).getBalance().get(ZephyrAssets.ZPH).compareTo(TestUtils.MAX_FEE) > 0) sufficientBalance = true; // base coin ZPH only
+        if (subaddresses.get(i).getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(TestUtils.MAX_FEE) > 0) { // base coin ZPH only
           fromAccount = account;
           fromSubaddress = subaddresses.get(i);
           break;
@@ -3339,8 +3339,8 @@ public abstract class TestZephyrWalletCommon {
     assertTrue(fromSubaddress != null, "Wallet is waiting on unlocked funds");
     
     // get balance before send
-    BigInteger balanceBefore = fromSubaddress.getBalance().get(ZephyrAssets.ZPH); // temporary until R8
-    BigInteger unlockedBalanceBefore  = fromSubaddress.getUnlockedBalance().get(ZephyrAssets.ZPH); // temporary until R8
+    BigInteger balanceBefore = fromSubaddress.getBalance().get(ZephyrAssets.ZPH); // base coin ZPH only
+    BigInteger unlockedBalanceBefore  = fromSubaddress.getUnlockedBalance().get(ZephyrAssets.ZPH); // base coin ZPH only
     
     // init tx config
     BigInteger sendAmount = unlockedBalanceBefore.subtract(TestUtils.MAX_FEE).divide(BigInteger.valueOf(SEND_DIVISOR));
@@ -3410,8 +3410,8 @@ public abstract class TestZephyrWalletCommon {
     // test that balance and unlocked balance decreased
     // TODO: test that other balances did not decrease
     ZephyrSubaddress subaddress = wallet.getSubaddress(fromAccount.getIndex(), fromSubaddress.getIndex());
-    assertTrue(subaddress.getBalance().get(ZephyrAssets.ZPH).compareTo(balanceBefore) < 0); // temporary until R8
-    assertTrue(subaddress.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(unlockedBalanceBefore) < 0); // temporary until R8
+    assertTrue(subaddress.getBalance().get(ZephyrAssets.ZPH).compareTo(balanceBefore) < 0); // base coin ZPH only
+    assertTrue(subaddress.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(unlockedBalanceBefore) < 0); // base coin ZPH only
     
     // query locked txs
     List<ZephyrTxWallet> lockedTxs = getAndTestTxs(wallet, new ZephyrTxQuery().setIsLocked(true), null, true);
@@ -3506,16 +3506,16 @@ public abstract class TestZephyrWalletCommon {
     ZephyrAccount srcAccount = null;
     boolean hasBalance = false;
     for (ZephyrAccount account : wallet.getAccounts()) {
-      if (account.getBalance().get(ZephyrAssets.ZPH).compareTo(minAccountAmount) > 0) hasBalance = true; // temporary until R8
-      if (account.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(minAccountAmount) > 0) { // temporary until R8
+      if (account.getBalance().get(ZephyrAssets.ZPH).compareTo(minAccountAmount) > 0) hasBalance = true; // base coin ZPH only
+      if (account.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(minAccountAmount) > 0) { // base coin ZPH only
         srcAccount = account;
         break;
       }
     }
     assertTrue(hasBalance, "Wallet does not have enough balance; load '" + TestUtils.WALLET_NAME + "' with coins in order to test sending");
     assertNotNull(srcAccount, "Wallet is waiting on unlocked funds");
-    BigInteger balance = srcAccount.getBalance().get(ZephyrAssets.ZPH); // temporary until R8
-    BigInteger unlockedBalance = srcAccount.getUnlockedBalance().get(ZephyrAssets.ZPH); // temporary until R8
+    BigInteger balance = srcAccount.getBalance().get(ZephyrAssets.ZPH); // base coin ZPH only
+    BigInteger unlockedBalance = srcAccount.getUnlockedBalance().get(ZephyrAssets.ZPH); // base coin ZPH only
     
     // get amount to send total and per subaddress
     BigInteger sendAmount = null;
@@ -3564,8 +3564,8 @@ public abstract class TestZephyrWalletCommon {
     
     // test that wallet balance decreased
     ZephyrAccount account = wallet.getAccount(srcAccount.getIndex());
-    assertTrue(account.getBalance().get(ZephyrAssets.ZPH).compareTo(balance) < 0); // temporary until R8
-    assertTrue(account.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(unlockedBalance) < 0); // temporary until R8
+    assertTrue(account.getBalance().get(ZephyrAssets.ZPH).compareTo(balance) < 0); // base coin ZPH only
+    assertTrue(account.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(unlockedBalance) < 0); // base coin ZPH only
     
     // build test context
     config.setCanSplit(canSplit);
@@ -4307,8 +4307,8 @@ public abstract class TestZephyrWalletCommon {
       if (account.getIndex() == 0) continue;  // skip default account
       for (ZephyrSubaddress subaddress : account.getSubaddresses()) {
         subaddresses.add(subaddress);
-        if (subaddress.getBalance().get(ZephyrAssets.ZPH).compareTo(TestUtils.MAX_FEE) > 0) subaddressesBalance.add(subaddress); // temporary until R8
-        if (subaddress.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(TestUtils.MAX_FEE) > 0) subaddressesUnlocked.add(subaddress); // temporary until R8
+        if (subaddress.getBalance().get(ZephyrAssets.ZPH).compareTo(TestUtils.MAX_FEE) > 0) subaddressesBalance.add(subaddress); // base coin ZPH only
+        if (subaddress.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(TestUtils.MAX_FEE) > 0) subaddressesUnlocked.add(subaddress); // base coin ZPH only
       }
     }
     
@@ -4342,7 +4342,7 @@ public abstract class TestZephyrWalletCommon {
       
       // assert unlocked balance is less than max fee
       ZephyrSubaddress subaddress = wallet.getSubaddress(unlockedSubaddress.getAccountIndex(), unlockedSubaddress.getIndex());
-      assertTrue(subaddress.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(TestUtils.MAX_FEE) < 0); // temporary until R8
+      assertTrue(subaddress.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(TestUtils.MAX_FEE) < 0); // base coin ZPH only
     }
     
     // test subaddresses after sweeping
@@ -4369,9 +4369,9 @@ public abstract class TestZephyrWalletCommon {
       
       // assert unlocked balance is less than max fee if swept, unchanged otherwise
       if (swept) {
-        assertTrue(subaddressAfter.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(TestUtils.MAX_FEE) < 0); // temporary until R8
+        assertTrue(subaddressAfter.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(TestUtils.MAX_FEE) < 0); // base coin ZPH only
       } else {
-        assertTrue(subaddressBefore.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(subaddressAfter.getUnlockedBalance().get(ZephyrAssets.ZPH)) == 0); // temporary until R8
+        assertTrue(subaddressBefore.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(subaddressAfter.getUnlockedBalance().get(ZephyrAssets.ZPH)) == 0); // base coin ZPH only
       }
     }
   }
@@ -4390,8 +4390,8 @@ public abstract class TestZephyrWalletCommon {
     List<ZephyrAccount> accountsUnlocked = new ArrayList<ZephyrAccount>();
     for (ZephyrAccount account : accounts) {
       if (account.getIndex() == 0) continue;  // skip default account
-      if (account.getBalance().get(ZephyrAssets.ZPH).compareTo(TestUtils.MAX_FEE) > 0) accountsBalance.add(account); // temporary until R8
-      if (account.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(TestUtils.MAX_FEE) > 0) accountsUnlocked.add(account); // temporary until R8
+      if (account.getBalance().get(ZephyrAssets.ZPH).compareTo(TestUtils.MAX_FEE) > 0) accountsBalance.add(account); // base coin ZPH only
+      if (account.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(TestUtils.MAX_FEE) > 0) accountsUnlocked.add(account); // base coin ZPH only
     }
     
     // test requires at least one more accounts than the number being swept to verify it does not change
@@ -4421,7 +4421,7 @@ public abstract class TestZephyrWalletCommon {
       
       // assert unlocked account balance less than max fee
       ZephyrAccount account = wallet.getAccount(unlockedAccount.getIndex());
-      assertTrue(account.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(TestUtils.MAX_FEE) < 0); // temporary until R8
+      assertTrue(account.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(TestUtils.MAX_FEE) < 0); // base coin ZPH only
     }
     
     // test accounts after sweeping
@@ -4442,9 +4442,9 @@ public abstract class TestZephyrWalletCommon {
       
       // assert unlocked balance is less than max fee if swept, unchanged otherwise
       if (swept) {
-        assertTrue(accountAfter.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(TestUtils.MAX_FEE) < 0); // temporary until R8
+        assertTrue(accountAfter.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(TestUtils.MAX_FEE) < 0); // base coin ZPH only
       } else {
-        assertTrue(accountBefore.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(accountAfter.getUnlockedBalance().get(ZephyrAssets.ZPH)) == 0); // temporary until R8
+        assertTrue(accountBefore.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(accountAfter.getUnlockedBalance().get(ZephyrAssets.ZPH)) == 0); // base coin ZPH only
       }
     }
   }
@@ -4473,8 +4473,8 @@ public abstract class TestZephyrWalletCommon {
     List<ZephyrSubaddress> subaddressesUnlocked = new ArrayList<ZephyrSubaddress>();
     for (ZephyrAccount account : wallet.getAccounts(true)) {
       for (ZephyrSubaddress subaddress : account.getSubaddresses()) {
-        if (subaddress.getBalance().get(ZephyrAssets.ZPH).compareTo(TestUtils.MAX_FEE) > 0) subaddressesBalance.add(subaddress); // temporary until R8
-        if (subaddress.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(TestUtils.MAX_FEE) > 0) subaddressesUnlocked.add(subaddress); // temporary until R8
+        if (subaddress.getBalance().get(ZephyrAssets.ZPH).compareTo(TestUtils.MAX_FEE) > 0) subaddressesBalance.add(subaddress); // base coin ZPH only
+        if (subaddress.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(TestUtils.MAX_FEE) > 0) subaddressesUnlocked.add(subaddress); // base coin ZPH only
       }
     }
     assertTrue(subaddressesBalance.size() >= 2, "Test requires multiple accounts with a balance greater than the fee; run send to multiple first");
@@ -4518,7 +4518,7 @@ public abstract class TestZephyrWalletCommon {
     subaddressesUnlocked.clear();
     for (ZephyrAccount account : wallet.getAccounts(true)) {
       for (ZephyrSubaddress subaddress : account.getSubaddresses()) {
-        assertTrue(subaddress.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(TestUtils.MAX_FEE) < 0, "No subaddress should have more unlocked than the fee"); // temporary until R8
+        assertTrue(subaddress.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(TestUtils.MAX_FEE) < 0, "No subaddress should have more unlocked than the fee"); // base coin ZPH only
       }
     }
   }
@@ -5256,8 +5256,8 @@ public abstract class TestZephyrWalletCommon {
     assertNotNull(account);
     assertTrue(account.getIndex() >= 0);
     ZephyrUtils.validateAddress(account.getPrimaryAddress(), TestUtils.NETWORK_TYPE);
-    TestUtils.testUnsignedBigInteger(account.getBalance().get(ZephyrAssets.ZPH)); // temporary until R8
-    TestUtils.testUnsignedBigInteger(account.getUnlockedBalance().get(ZephyrAssets.ZPH)); // temporary until R8
+    TestUtils.testUnsignedBigInteger(account.getBalance().get(ZephyrAssets.ZPH)); // base coin ZPH only
+    TestUtils.testUnsignedBigInteger(account.getUnlockedBalance().get(ZephyrAssets.ZPH)); // base coin ZPH only
     
     // if given, test subaddresses and that their balances add up to account balances
     if (account.getSubaddresses() != null) {
@@ -5267,11 +5267,11 @@ public abstract class TestZephyrWalletCommon {
         testSubaddress(account.getSubaddresses().get(i));
         assertEquals(account.getIndex(), account.getSubaddresses().get(i).getAccountIndex());
         assertEquals(i, (int) account.getSubaddresses().get(i).getIndex());
-        balance = balance.add(account.getSubaddresses().get(i).getBalance().get(ZephyrAssets.ZPH)); // temporary until R8
-        unlockedBalance = unlockedBalance.add(account.getSubaddresses().get(i).getUnlockedBalance().get(ZephyrAssets.ZPH)); // temporary until R8
+        balance = balance.add(account.getSubaddresses().get(i).getBalance().get(ZephyrAssets.ZPH)); // base coin ZPH only
+        unlockedBalance = unlockedBalance.add(account.getSubaddresses().get(i).getUnlockedBalance().get(ZephyrAssets.ZPH)); // base coin ZPH only
       }
-      assertTrue(account.getBalance().get(ZephyrAssets.ZPH).equals(balance), "Subaddress balances " + balance + " != account " + account.getIndex() + " balance " + account.getBalance().get(ZephyrAssets.ZPH)); // temporary until R8
-      assertTrue(account.getUnlockedBalance().get(ZephyrAssets.ZPH).equals(unlockedBalance), "Subaddress unlocked balances " + unlockedBalance + " != account " + account.getIndex() + " unlocked balance " + account.getUnlockedBalance().get(ZephyrAssets.ZPH)); // temporary until R8
+      assertTrue(account.getBalance().get(ZephyrAssets.ZPH).equals(balance), "Subaddress balances " + balance + " != account " + account.getIndex() + " balance " + account.getBalance().get(ZephyrAssets.ZPH)); // base coin ZPH only
+      assertTrue(account.getUnlockedBalance().get(ZephyrAssets.ZPH).equals(unlockedBalance), "Subaddress unlocked balances " + unlockedBalance + " != account " + account.getIndex() + " unlocked balance " + account.getUnlockedBalance().get(ZephyrAssets.ZPH)); // base coin ZPH only
     }
     
     // tag must be undefined or non-empty
@@ -5284,11 +5284,11 @@ public abstract class TestZephyrWalletCommon {
     assertTrue(subaddress.getIndex() >= 0);
     assertNotNull(subaddress.getAddress());
     assertTrue(subaddress.getLabel() == null || !subaddress.getLabel().isEmpty());
-    TestUtils.testUnsignedBigInteger(subaddress.getBalance().get(ZephyrAssets.ZPH)); // temporary until R8
-    TestUtils.testUnsignedBigInteger(subaddress.getUnlockedBalance().get(ZephyrAssets.ZPH)); // temporary until R8
+    TestUtils.testUnsignedBigInteger(subaddress.getBalance().get(ZephyrAssets.ZPH)); // base coin ZPH only
+    TestUtils.testUnsignedBigInteger(subaddress.getUnlockedBalance().get(ZephyrAssets.ZPH)); // base coin ZPH only
     assertTrue(subaddress.getNumUnspentOutputs() >= 0);
     assertNotNull(subaddress.isUsed());
-    if (subaddress.getBalance().get(ZephyrAssets.ZPH).compareTo(BigInteger.valueOf(0)) > 0) assertTrue(subaddress.isUsed()); // temporary until R8
+    if (subaddress.getBalance().get(ZephyrAssets.ZPH).compareTo(BigInteger.valueOf(0)) > 0) assertTrue(subaddress.isUsed()); // base coin ZPH only
     assertTrue(subaddress.getNumBlocksToUnlock() >= 0);
   }
   

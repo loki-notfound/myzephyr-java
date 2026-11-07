@@ -18,7 +18,7 @@ payments has no asset parameter, and zephyr-cpp passes an empty string. The noti
 confirmation goes through a callback that carries the asset. Use `onBalancesChanged` (which names
 the asset) or `getTxs()` (which reports the right asset for the same pool transfer). The official
 Zephyr wallets do the same and leave `onOutputReceived` unused. *Status:* core behaviour, not a
-security matter, so it stays; documented in the Javadoc of `onOutputReceived` (register D23).
+security matter, so it stays; documented in the Javadoc of `onOutputReceived`.
 Observed on mainnet on 2026-11-07.
 
 **`changePassword` fails for a wallet opened from bytes.** On a wallet opened with
@@ -26,7 +26,7 @@ Observed on mainnet on 2026-11-07.
 `failed to read file ".keys"`: the core verifies the old password against the keys file on disk,
 which such a wallet does not have. The same call on a wallet with files is not affected. No stray
 file is written. *Status:* core behaviour (the core took only half of a later monero-cpp fix),
-confirmed on mainnet in R8. Apps that store bytes can keep the password stable, or restore the
+confirmed on mainnet. Apps that store bytes can keep the password stable, or restore the
 wallet from its mnemonic under the new password (which costs a re-sync).
 
 **`checkTxKey` returns amount 0.** `checkTxKey` (and, from the same code, `checkTxProof`) reads the
@@ -61,7 +61,7 @@ core's network tables.
 balance calls, the per-subaddress map, `getReserveInfo` and `getCirculatingSupply` throw a clear
 "not supported" error until the port to `zephyr-wallet-rpc` is done. `ZephyrDaemonRpc` reads the
 pricing record of block headers. The full wallet (`ZephyrWalletFull`) is the complete API.
-*Status:* planned work (register D11).
+*Status:* planned work (the port to `zephyr-wallet-rpc`).
 
 **`isClosed()` of `ZephyrWalletRpc` and error code -13.** monero-java recognises a closed RPC
 wallet by error code -8 with "No wallet file"; `zephyr-wallet-rpc` v2.3.0 answers -13, so

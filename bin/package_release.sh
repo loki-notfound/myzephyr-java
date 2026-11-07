@@ -4,8 +4,8 @@
 # stripped. bin/build_release.sh calls it after its native phases (through
 # bin/package_release_container.sh, in the pinned debian:12 image at /work), and the CI package
 # job calls it in the same image at /work after downloading the natives jobs' artifacts, so a
-# local release and the CI release run the same packaging steps (QUESTIONS R13-3) in the same
-# environment (QUESTIONS R13b-4).
+# local release and the CI release run the same packaging steps in the same environment, and
+# their files can be compared byte for byte.
 #
 # Inputs (per platform, from bin/build_linux.sh or bin/build_linux_container.sh,
 # bin/build_android.sh and bin/strip_natives.sh):
@@ -27,7 +27,7 @@
 #                                    repository as site/maven/ (the only copy: the top-level
 #                                    maven/ is removed afterwards)
 #  7. site-<version>.tar.gz          the site as one reproducible archive, a release asset
-#                                    (QUESTIONS R13-4): sorted names, mtime SOURCE_DATE_EPOCH,
+#                                    (reproducible: sorted names, mtime SOURCE_DATE_EPOCH,
 #                                    numeric owner 0, no atime/ctime pax records, gzip -n
 #  8. bin/make_manifest.sh           manifest.json in dist/<version>/
 #  9. bin/make_manifest.sh --sums-only
@@ -43,11 +43,10 @@
 # target/natives/ mode 0755, every other file it copies and the debug files it packs 0644, and
 # writes both tars with
 # --mode=u+rwX,go+rX,go-w: the entries read -rw-r--r--, -rwxr-xr-x and drwxr-xr-x whatever the
-# caller's umask or the modes of the downloaded natives (QUESTIONS R13b-4). The archivers take the
+# caller's umask or the modes of the downloaded natives. The archivers take the
 # modes of the checkout's own files straight from the file system, so the tracked inputs the jars
 # package (pom.xml as META-INF/maven/.../pom.xml, src/main/java and src/main/resources) get
-# u+rwX,go+rX,go-w first: the umask the checkout was made with must not reach the jars
-# (QUESTIONS R13c-4).
+# u+rwX,go+rX,go-w first: the umask the checkout was made with must not reach the jars.
 #
 # Environment:
 #   JAVA_HOME           a JDK (the image's OpenJDK 17 for releases)
@@ -131,8 +130,8 @@ case " $LINUX_ARCHES " in
   *) echo "no linux-x86_64 library in this build: the tests are skipped"; MVN_TESTS=(-DskipTests) ;;
 esac
 mvn -q "-Dproject.build.outputTimestamp=$OUTPUT_TIMESTAMP" "${MVN_TESTS[@]}" package
-# never an empty Javadoc jar (QUESTIONS R13c-3: under a POSIX locale JDK 17's javadoc failed and
-# the jar held only its manifest)
+# never an empty Javadoc jar (under a POSIX locale JDK 17's javadoc once failed and the jar held
+# only its manifest)
 # (the listing first: grep -q in a pipe would end unzip with SIGPIPE, a failure under pipefail)
 JAVADOC_LIST="$(unzip -l "target/zephyr-java-$VERSION-javadoc.jar")"
 if ! grep -q ' index\.html$' <<< "$JAVADOC_LIST"; then

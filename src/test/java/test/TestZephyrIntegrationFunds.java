@@ -632,7 +632,7 @@ public class TestZephyrIntegrationFunds {
       try {
         txs = walletA.sweepUnlocked(sweep);
       } catch (ZephyrError e) {
-        log("FINDING: sweepUnlocked ZPH -> ZRS refused: " + e.getMessage() + "; question R8-9; fallback to createTxs");
+        log("FINDING: sweepUnlocked ZPH -> ZRS refused: " + e.getMessage() + "; fallback to createTxs");
         fallback = true;
         BigInteger unlocked = unl(walletA, ZPH);
         fallbackAmount = unlocked.subtract(MAX_FEE);

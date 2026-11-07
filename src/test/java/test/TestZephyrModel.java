@@ -327,7 +327,7 @@ public class TestZephyrModel {
     assertNotSame(header.getPricingRecord(), copy.getPricingRecord());
   }
 
-  // 11. an absent asset equals a zero entry (wallet-level map versus account map, R8-7)
+  // 11. an absent asset equals a zero entry (wallet-level map versus account map)
   @Test
   public void testBalanceAbsentEqualsZero() {
     ZephyrBalance account = new ZephyrBalance().set(ZephyrAssets.ZPH, BigInteger.ONE);

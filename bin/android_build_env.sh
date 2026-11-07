@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
 # Writes build/debug/android-<abi>/build-env, the build environment of one Android native for the
-# manifest (QUESTIONS R13c-5), read from the depends prefix and the NDK where the build ran:
+# manifest, read from the depends prefix and the NDK where the build ran (so CI's package job,
+# which has no NDK, records the same facts as a local build):
 #   container        the image (ZEPHYR_JAVA_CONTAINER, set by bin/build_android_container.sh and
 #                    the CI natives job) or none
 #   debian_snapshot  DEBIAN_SNAPSHOT of bin/container-build-deps.sh in a container, else none

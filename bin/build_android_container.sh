@@ -2,7 +2,7 @@
 #
 # Builds the Android release natives in the pinned debian:12 image, the same image and the same
 # path (/work) as the CI natives job and bin/build_linux_container.sh, so a local build can be
-# compared with the CI build (QUESTIONS R13-6): NDK r18b's clang 7 cannot rewrite __FILE__, so
+# compared with the CI build: NDK r18b's clang 7 cannot rewrite __FILE__, so
 # the Android libraries keep the absolute source paths of the build and are reproducible at the
 # same build path only; with the checkout at /work on both sides those paths read /work/...
 #

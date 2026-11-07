@@ -858,7 +858,7 @@ public class ZephyrWalletRpc extends ZephyrWalletDefault {
       // these fields are not initialized if subaddress is unused and therefore not returned from `get_balance`
       for (ZephyrAccount account : accounts) {
         for (ZephyrSubaddress subaddress : account.getSubaddresses()) {
-          // base coin, first pass (D11)
+          // base coin only: the per-asset calls are not ported to zephyr-wallet-rpc yet
           subaddress.setBalance(new ZephyrBalance().set(ZephyrAssets.ZPH, BigInteger.valueOf(0)));
           subaddress.setUnlockedBalance(new ZephyrBalance().set(ZephyrAssets.ZPH, BigInteger.valueOf(0)));
           subaddress.setNumUnspentOutputs(0l);
@@ -917,7 +917,7 @@ public class ZephyrWalletRpc extends ZephyrWalletDefault {
     params.put("label", label);
     Map<String, Object> resp = rpc.sendJsonRequest("create_account", params);
     Map<String, Object> result = (Map<String, Object>) resp.get("result");
-    // base coin, first pass (D11)
+    // base coin only: the per-asset calls are not ported to zephyr-wallet-rpc yet
     return new ZephyrAccount(((BigInteger) result.get("account_index")).intValue(), (String) result.get("address"), new ZephyrBalance().set(ZephyrAssets.ZPH, BigInteger.valueOf(0)), new ZephyrBalance().set(ZephyrAssets.ZPH, BigInteger.valueOf(0)), null);
   }
   
@@ -949,7 +949,7 @@ public class ZephyrWalletRpc extends ZephyrWalletDefault {
       
       // these fields are not initialized if subaddress is unused and therefore not returned from `get_balance`
       for (ZephyrSubaddress subaddress : subaddresses) {
-        // base coin, first pass (D11)
+        // base coin only: the per-asset calls are not ported to zephyr-wallet-rpc yet
         subaddress.setBalance(new ZephyrBalance().set(ZephyrAssets.ZPH, BigInteger.valueOf(0)));
         subaddress.setUnlockedBalance(new ZephyrBalance().set(ZephyrAssets.ZPH, BigInteger.valueOf(0)));
         subaddress.setNumUnspentOutputs(0l);
@@ -1006,7 +1006,7 @@ public class ZephyrWalletRpc extends ZephyrWalletDefault {
     subaddress.setIndex(((BigInteger) result.get("address_index")).intValue());
     subaddress.setAddress((String) result.get("address"));
     subaddress.setLabel(label);
-    // base coin, first pass (D11)
+    // base coin only: the per-asset calls are not ported to zephyr-wallet-rpc yet
     subaddress.setBalance(new ZephyrBalance().set(ZephyrAssets.ZPH, BigInteger.valueOf(0)));
     subaddress.setUnlockedBalance(new ZephyrBalance().set(ZephyrAssets.ZPH, BigInteger.valueOf(0)));
     subaddress.setNumUnspentOutputs(0l);
@@ -1375,7 +1375,7 @@ public class ZephyrWalletRpc extends ZephyrWalletDefault {
         List<Integer> subaddressIndices = new ArrayList<Integer>();
         indices.put(config.getAccountIndex(), subaddressIndices);
         for (ZephyrSubaddress subaddress : getSubaddresses(config.getAccountIndex())) { // TODO: wallet rpc sweep_all now supports req.subaddr_indices_all
-          // base coin, first pass (D11)
+          // base coin only: the per-asset calls are not ported to zephyr-wallet-rpc yet
           if (subaddress.getUnlockedBalance().get(ZephyrAssets.ZPH).compareTo(BigInteger.valueOf(0)) > 0) subaddressIndices.add(subaddress.getIndex());
         }
       }
@@ -2075,7 +2075,7 @@ public class ZephyrWalletRpc extends ZephyrWalletDefault {
       BigInteger balance = BigInteger.valueOf(0);
       BigInteger unlockedBalance = BigInteger.valueOf(0);
       for (ZephyrAccount account : getAccounts()) {
-        // base coin, first pass (D11)
+        // base coin only: the per-asset calls are not ported to zephyr-wallet-rpc yet
         balance = balance.add(account.getBalance().get(ZephyrAssets.ZPH));
         unlockedBalance = unlockedBalance.add(account.getUnlockedBalance().get(ZephyrAssets.ZPH));
       }
@@ -2537,7 +2537,7 @@ public class ZephyrWalletRpc extends ZephyrWalletDefault {
       BigInteger[] balances = getBalances(null, null);
       if (!balances[0].equals(prevBalances[0]) || !balances[1].equals(prevBalances[1])) {
         prevBalances = balances;
-        // base coin, first pass (D11)
+        // base coin only: the per-asset calls are not ported to zephyr-wallet-rpc yet
         for (ZephyrWalletListenerI listener : wallet.getListeners()) listener.onBalancesChanged(balances[0], balances[1], ZephyrAssets.ZPH);
         return true;
       }
@@ -2563,7 +2563,7 @@ public class ZephyrWalletRpc extends ZephyrWalletDefault {
     private List<String> prevLockedTxHashes = new ArrayList<String>();
     
     public WalletRpcZmqListener() {
-      // base coin, first pass (D11)
+      // base coin only: the per-asset calls are not ported to zephyr-wallet-rpc yet
       prevBalance = getBalance().get(ZephyrAssets.ZPH);
       prevUnlockedBalance = getUnlockedBalance().get(ZephyrAssets.ZPH);
     }
@@ -2721,7 +2721,7 @@ public class ZephyrWalletRpc extends ZephyrWalletDefault {
     }
     
     private boolean checkForChangedBalances() {
-      // base coin, first pass (D11)
+      // base coin only: the per-asset calls are not ported to zephyr-wallet-rpc yet
       BigInteger balance = getBalance().get(ZephyrAssets.ZPH);
       BigInteger unlockedBalance = getUnlockedBalance().get(ZephyrAssets.ZPH);
       if (!balance.equals(prevBalance) || !unlockedBalance.equals(prevUnlockedBalance)) {
@@ -2819,7 +2819,7 @@ public class ZephyrWalletRpc extends ZephyrWalletDefault {
     for (String key : rpcAccount.keySet()) {
       Object val = rpcAccount.get(key);
       if (key.equals("account_index")) account.setIndex(((BigInteger) val).intValue());
-      // base coin, first pass (D11)
+      // base coin only: the per-asset calls are not ported to zephyr-wallet-rpc yet
       else if (key.equals("balance")) account.setBalance(new ZephyrBalance().set(ZephyrAssets.ZPH, (BigInteger) val));
       else if (key.equals("unlocked_balance")) account.setUnlockedBalance(new ZephyrBalance().set(ZephyrAssets.ZPH, (BigInteger) val));
       else if (key.equals("base_address")) account.setPrimaryAddress((String) val);
@@ -2838,7 +2838,7 @@ public class ZephyrWalletRpc extends ZephyrWalletDefault {
       if (key.equals("account_index")) subaddress.setAccountIndex(((BigInteger) val).intValue());
       else if (key.equals("address_index")) subaddress.setIndex(((BigInteger) val).intValue());
       else if (key.equals("address")) subaddress.setAddress((String) val);
-      // base coin, first pass (D11)
+      // base coin only: the per-asset calls are not ported to zephyr-wallet-rpc yet
       else if (key.equals("balance")) subaddress.setBalance(new ZephyrBalance().set(ZephyrAssets.ZPH, (BigInteger) val));
       else if (key.equals("unlocked_balance")) subaddress.setUnlockedBalance(new ZephyrBalance().set(ZephyrAssets.ZPH, (BigInteger) val));
       else if (key.equals("num_unspent_outputs")) subaddress.setNumUnspentOutputs(((BigInteger) val).longValue());

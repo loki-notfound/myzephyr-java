@@ -2,8 +2,7 @@
 #
 # Places the pinned zephyr tree and applies the build-layer patches, the first two steps of every
 # depends build, shared by bin/build_linux.sh, bin/build_android.sh and the CI package job (which
-# needs the tree for bin/make_manifest.sh: the depends package recipes and android_ndk.mk;
-# QUESTIONS R13c-5):
+# needs the tree for bin/make_manifest.sh: the depends package recipes and android_ndk.mk):
 #
 # 1. Checks that the zephyr-cpp submodule is at the pinned sha (bin/pins.env) and places the
 #    zephyr tree at external/zephyr-cpp/external/zephyr by sha (git init, fetch --depth 1 of the
@@ -13,11 +12,11 @@
 #    A tree placed earlier at another pin is moved: its applied build-layer patches are reversed
 #    first (highest number first, each one only when it reverses cleanly in a dry run), since they
 #    are local changes that would block the checkout. When the tree has any change that is not one
-#    of those patches, or a change is left after reversing them, the script stops and moves nothing
-#    (QUESTIONS R13d-4).
+#    of those patches, or a change is left after reversing them, the script stops and moves
+#    nothing.
 # 2. Applies the build-layer patches under patches/depends/ to the zephyr tree, in name order,
 #    with patch -p1. They touch build tooling under contrib/depends/ only, never zephyr or
-#    zephyr-cpp sources (register D21; each patch has a DEP-3 header). Idempotent: a patch that
+#    zephyr-cpp sources (each patch has a DEP-3 header). Idempotent: a patch that
 #    is already applied is skipped; one that neither applies nor is applied stops the script.
 #      0001-android-ndk-python3                     NDK r18b's toolchain script with python3
 #      0002-boost-1.64-b2-engine-declarations       boost's build engine under gcc 14
@@ -37,7 +36,8 @@ ROOT="$(pwd)"
 . bin/pins.env
 
 # Verifies a tree's own pin tag (ZEPHYR_TAG or ZEPHYR_CPP_TAG) when it is present locally
-# (PLAN §2): the tag must point at the pinned commit and carry a good signature. Without gpg or
+# (releases come only from the signed backports tags): the tag must point at the pinned commit and
+# carry a good signature. Without gpg or
 # without the release key in the keyring this is a one-line warning, so a build without the keys
 # still works; a bad signature is an error.
 verify_pin_tag() {
@@ -127,7 +127,8 @@ EXCLUDE="$(git -C external/zephyr-cpp rev-parse --path-format=absolute --git-pat
 mkdir -p "$(dirname "$EXCLUDE")"
 grep -qxF 'external/zephyr' "$EXCLUDE" 2>/dev/null || echo 'external/zephyr' >> "$EXCLUDE"
 
-# 2. build-layer patches (D21), idempotent: an applied patch reverses cleanly in a dry run
+# 2. build-layer patches (build tooling only), idempotent: an applied patch reverses cleanly in a
+# dry run
 for P in "$ROOT"/patches/depends/*.patch; do
   [ -e "$P" ] || continue
   if patch -d "$Z" -p1 -R --dry-run -s -f < "$P" >/dev/null 2>&1; then

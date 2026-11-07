@@ -123,7 +123,7 @@ public class TestZephyrIntegration {
   }
 
   private static void log(String msg) {
-    System.out.println("[R8] " + msg);
+    System.out.println("[integration] " + msg);
   }
 
   /** git status --short of the working directory (the fork), one entry per line. */

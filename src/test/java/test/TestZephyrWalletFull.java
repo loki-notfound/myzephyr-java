@@ -46,7 +46,7 @@ import utils.TestUtils;
 import utils.WalletEqualityUtils;
 import utils.WalletSyncPrinter;
 
-// temporary until R8: wallet balance calls read the base coin ZPH until the tests cover assets
+// the balance checks read the base coin ZPH only; the tests do not cover the other assets yet
 
 /**
  * Tests specific to the fully client-side wallet.

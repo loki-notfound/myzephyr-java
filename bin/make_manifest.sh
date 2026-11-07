@@ -25,7 +25,7 @@
 #                environment that bin/build_linux.sh recorded (build/natives/linux-<arch>/build-env:
 #                container image or none, glibc, compiler). The platforms are those of
 #                BUILD_LINUX_ARCHES and BUILD_ANDROID_ABIS (defaults as in bin/package_release.sh);
-#                a missing build-env file of one of them is an error (QUESTIONS R13c-5), so the
+#                a missing build-env file of one of them is an error, so the
 #                CI package job and a local build record the same facts, from the natives'
 #                builds, not from the packaging host; linux_container: that image when every Linux native
 #                was built in the same one, null when all were built on the host, else the list;
@@ -39,8 +39,8 @@
 #                site/maven/) is not listed: the archive holds it (bin/package_release.sh builds
 #                both before the manifest).
 # SHA256SUMS is sha256sum over the top-level files of dist/<version>/, the release assets: the
-# manifest and the site archive included, nothing below site/ (QUESTIONS R13-4: sha256sum -c
-# works on the downloaded assets), one line per file.
+# manifest and the site archive included, nothing below site/ (so sha256sum -c works on the
+# downloaded assets), one line per file.
 # With --sums-only, only SHA256SUMS is rewritten (bin/package_release.sh does that last).
 # A tool that is not installed is recorded as null.
 #
@@ -179,7 +179,8 @@ def platforms(var, default):
 
 
 def build_env(path):
-    """KEY=VALUE lines of a build-env file; a missing file is an error (QUESTIONS R13c-5)."""
+    """KEY=VALUE lines of a build-env file; a missing file is an error, so CI and a local build
+    record the same facts."""
     full = os.path.join(ROOT, path)
     if not os.path.isfile(full):
         sys.exit(f"no {path}: the build environment of a packaged native is missing")

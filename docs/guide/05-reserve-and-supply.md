@@ -37,14 +37,14 @@ with the full precision of the core's `double`.
 | `getZyieldRsv()` | `zyield_rsv` | the yield reserve (the supply's `YIELD` entry) | atomic units |
 
 **Do not divide by `assetsMa` or `equityMa`.** In the core's code path for every hard fork after
-version 4 they are set to 0, and the R8 mainnet runs (hard fork 11) reported 0 every time. The
+version 4 they are set to 0, and the mainnet test runs (hard fork 11) reported 0 every time. The
 moving average that matters for the conversion rules is `reserveRatioMa`, which is populated.
 
 Two more edge cases come from the same code. When no ZSD circulates, both ratios are 0 (not
 infinite). When the core cannot get the pricing record of the tip, it returns before computing,
 and every value except `hfVersion` stays 0.
 
-An example from the R8 run on mainnet, at wallet height 902123, hard fork 11 (amounts shown in
+An example from the mainnet test run, at wallet height 902123, hard fork 11 (amounts shown in
 whole units here):
 
 | Field | Value |
@@ -86,7 +86,7 @@ properties of the reserve. Older names may appear on other networks or heights; 
 accepts both eras when it reads the map (`ZEPH` or `DJED` for the reserve, `ZEPHUSD` or `ZSD` and
 so on).
 
-On the R8 run at height 902123 the six values were, in whole units: ZPH 12,356,073.23,
+On the mainnet test run at height 902123 the six values were, in whole units: ZPH 12,356,073.23,
 ZSD 362,406.29, ZRS 3,229,813.95, ZYS 157,437.68, DJED 4,926,112.04 and YIELD 313,963.17.
 
 ## Pricing records on block headers

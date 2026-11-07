@@ -68,7 +68,7 @@ String hash = wallet.relayTx(txs.get(0));                 // now it is sent
 config that must fit in one transaction.
 
 **Fees are paid in the source asset.** A ZPH transfer pays its fee in ZPH, a ZRS transfer in ZRS,
-and a ZPH → ZRS mint in ZPH. On the R8 mainnet run a 10 ZPH transfer paid 0.000308 ZPH, a 50 ZPH
+and a ZPH → ZRS mint in ZPH. On the mainnet test run a 10 ZPH transfer paid 0.000308 ZPH, a 50 ZPH
 mint 0.0004574 ZPH and a ZRS sweep 0.0004456 ZRS.
 
 ## Conversions
@@ -110,7 +110,7 @@ rate     = rate - rate mod 10^4
 minted   = amount * rate / 10^12
 ```
 
-Both mints of the R8 mainnet run match it exactly, with the pricing record at the wallet's tip
+Both mints of the mainnet test run match it exactly, with the pricing record at the wallet's tip
 (height h0 − 1, where h0 was the node's height when the transaction was built) and
 `reserve_ma` as the larger price both times:
 
@@ -137,9 +137,9 @@ List<ZephyrTxWallet> txs = wallet.sweepUnlocked(new ZephyrTxConfig()
     .setRelay(true));
 ```
 
-On the R8 run this left exactly 0 ZPH: 40.9987 ZPH was converted, and the unconvertible residue
-went into the fee (0.0005346 ZPH, against 0.0004574 for the 50 ZPH `createTxs` mint). Set the
-account index: without one, the core's subaddress selection for a sweep has a slip that sweeps
+On the mainnet test run this left exactly 0 ZPH: 40.9987 ZPH was converted, and the unconvertible
+residue went into the fee (0.0005346 ZPH, against 0.0004574 for the 50 ZPH `createTxs` mint). Set
+the account index: without one, the core's subaddress selection for a sweep has a slip that sweeps
 every subaddress of a funded account.
 
 `sweepOutput` (one output by key image) is a different path and does not work for V2 assets; see

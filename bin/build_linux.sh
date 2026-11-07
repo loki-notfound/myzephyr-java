@@ -35,7 +35,7 @@
 # is wiped before configuring. A switch between host and container also evicts the depends
 # package cache of the other side (depends' funcs.mk removes a package's cache directory before
 # storing a new build), so each switch costs a depends rebuild. Releases build Linux in the
-# container only (R13).
+# container only.
 #
 # Reproducibility: SOURCE_DATE_EPOCH is exported (the commit time of this checkout unless set),
 # and zephyr and the JNI library are compiled with -ffile-prefix-map=<this checkout>=. and
@@ -112,7 +112,7 @@ for ARCH in $ARCHES; do
   # 3. depends for this host. The download command is depends' own (builders/linux.mk, build_os
   # is the build machine's, linux) plus a low-speed limit: a fetch that stays below 1000 bytes/s
   # for 120 s fails instead of hanging, and depends then falls back to downloads.getmonero.org,
-  # whose archives it checks by sha256 like the primary ones (QUESTIONS R13d-5). $(...) is left
+  # whose archives it checks by sha256 like the primary ones. $(...) is left
   # to make, so depends' DOWNLOAD_CONNECT_TIMEOUT and DOWNLOAD_RETRIES still apply.
   # shellcheck disable=SC2016
   make -C "$Z/contrib/depends" HOST="$TRIPLET" -j"$(nproc)" \
