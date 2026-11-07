@@ -43,8 +43,8 @@ GitHub Pages, `https://loki-notfound.github.io/zephyr-java/maven` (available wit
 release). Maven Central may follow once the API has settled.
 <!-- RELEASES §5; PLAN §2 "Distribution" -->
 
-Android (Gradle, Kotlin DSL). The `@aar` notation turns transitive dependencies off, so
-`isTransitive = true` brings the POM's dependencies (Jackson and the Apache HTTP client) along:
+Android (Gradle, Kotlin DSL). The AAR has its own artifactId, `zephyr-java-android`, and brings
+its POM's dependencies (Jackson and the Apache HTTP client) along:
 
 ```kotlin
 repositories {
@@ -52,10 +52,10 @@ repositories {
 }
 
 dependencies {
-    implementation("io.github.loki-notfound:zephyr-java:2.3.0-sec.1-java.1@aar") { isTransitive = true }
+    implementation("io.github.loki-notfound:zephyr-java-android:2.3.0-sec.1-java.1")
 }
 ```
-<!-- AAR POM dependencies: android/build.gradle.kts (jackson-core, jackson-databind, httpclient5); PLAN §5 R10 result -->
+<!-- artifactId: android/gradle.properties ARTIFACT_ID (QUESTIONS R12-3 answer); AAR POM dependencies: android/build.gradle.kts (jackson-core, jackson-databind, httpclient5); PLAN §5 R10 result -->
 
 Every Android app that uses the AAR also needs this line in its `android { }` block:
 

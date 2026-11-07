@@ -16,15 +16,16 @@ android {
 }
 
 dependencies {
-    implementation("io.github.loki-notfound:zephyr-java:2.3.0-sec.1-java.1@aar") { isTransitive = true }
+    implementation("io.github.loki-notfound:zephyr-java-android:2.3.0-sec.1-java.1")
 }
 ```
 
-The repository goes live with the first release. The AAR brings three dependencies: Jackson
+The repository goes live with the first release. The AAR is published as `zephyr-java-android`
+(the JAR for the JVM is `zephyr-java`) and brings three dependencies: Jackson
 (`jackson-core`, `jackson-databind`, 2.13.5) and the Apache HTTP client 5 (`httpclient5` 5.2.1,
 used by the RPC classes). It brings no Kotlin standard library, no Bouncy Castle and no Apache
 commons-codec.
-<!-- README "Coordinates"; android/build.gradle.kts (api jackson-core, jackson-databind 2.13.5, httpclient5 5.2.1; compileOnly jeromq); QUESTIONS R10-2 answer (android.builtInKotlin=false, POM and module metadata with exactly three dependencies); register D24 -->
+<!-- README "Coordinates"; android/gradle.properties ARTIFACT_ID (QUESTIONS R12-3 answer); android/build.gradle.kts (api jackson-core, jackson-databind 2.13.5, httpclient5 5.2.1; compileOnly jeromq); QUESTIONS R10-2 answer (android.builtInKotlin=false, POM and module metadata with exactly three dependencies); register D24 -->
 
 **The packaging line is required.** `httpclient5`, `httpcore5` and `httpcore5-h2` each carry a
 file `META-INF/DEPENDENCIES`, and without the exclude the app's build stops in

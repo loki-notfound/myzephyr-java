@@ -51,14 +51,20 @@
 			<scope>test</scope>
 		</dependency>
 		<dependency>
+			<!-- a logging binding for the tests only: a library must not force one on its users;
+			     src/main does not use slf4j -->
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-simple</artifactId>
 			<version>1.7.25</version>
+			<scope>test</scope>
 		</dependency>
 		<dependency>
+			<!-- optional: only ZephyrWalletRpc's ZMQ listener uses it; an application that uses that
+			     listener adds jeromq itself (the AAR declares it compileOnly) -->
 			<groupId>org.zeromq</groupId>
 			<artifactId>jeromq</artifactId>
 			<version>0.5.2</version>
+			<optional>true</optional>
 		</dependency>
 	</dependencies>
 
@@ -192,6 +198,8 @@
 							<source>8</source>
 							<!-- the javadoc jar of mvn package (the release profile has the same); no generation date in the pages: the javadoc jar is reproducible -->
 							<notimestamp>true</notimestamp>
+							<!-- instead of the plugin's default "All rights reserved" footer (QUESTIONS R12-2) -->
+							<bottom>Copyright &#169; the zephyr-java contributors. MIT licence.</bottom>
 						</configuration>
 						<executions>
 							<execution>
@@ -292,6 +300,8 @@
 							<source>8</source>
 							<!-- no generation date in the pages: the javadoc jar is reproducible -->
 							<notimestamp>true</notimestamp>
+							<!-- instead of the plugin's default "All rights reserved" footer (QUESTIONS R12-2) -->
+							<bottom>Copyright &#169; the zephyr-java contributors. MIT licence.</bottom>
 						</configuration>
 						<executions>
 							<execution>

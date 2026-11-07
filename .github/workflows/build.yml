@@ -18,7 +18,7 @@ permissions:
 jobs:
   java:
     # the developer build (bin/build_libzephyr_java.sh) against the distribution's libraries,
-    # then the pure test suites (mvn test, 27 tests)
+    # then the pure test suites (mvn test, 30 tests)
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:

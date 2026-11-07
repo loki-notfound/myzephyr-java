@@ -8,7 +8,9 @@
 #  3. bin/strip_natives.sh           stripped natives in place, debug files in build/debug/
 #  4. mvn package                    the JAR (with the Linux natives), sources and Javadoc jars;
 #                                    the pure tests run on the depends-built x86_64 library
-#  5. android/ ./gradlew             the AAR (with the Android natives), its sources jar and POM
+#  5. android/ ./gradlew             the AAR (with the Android natives), its sources jar and POM,
+#                                    artifactId zephyr-java-android (ARTIFACT_ID in
+#                                    android/gradle.properties; the JAR is zephyr-java)
 #  6. dist/<version>/                the artifacts under release names, the debug symbols as a
 #                                    reproducible tar.gz
 #  7. bin/make_manifest.sh           manifest.json and SHA256SUMS in dist/<version>/
@@ -106,16 +108,17 @@ cp "target/zephyr-java-$VERSION-sources.jar" "$DIST/zephyr-java-$VERSION-sources
 cp "target/zephyr-java-$VERSION-javadoc.jar" "$DIST/zephyr-java-$VERSION-javadoc.jar"
 if [ -n "$ANDROID_ABIS" ]; then
   # a SNAPSHOT version is published with a timestamped file name; the repository is fresh
-  REPO="android/build/repo/io/github/loki-notfound/zephyr-java"
+  AAR_ID="$(sed -n 's/^ARTIFACT_ID=//p' android/gradle.properties)"
+  REPO="android/build/repo/io/github/loki-notfound/$AAR_ID"
   one() {
     local F
     F="$(find "$REPO" -type f -name "$1" | sort)"
     [ "$(printf '%s\n' "$F" | grep -c .)" = 1 ] || { echo "expected one $1 in $REPO, found: $F" >&2; exit 1; }
     printf '%s\n' "$F"
   }
-  cp "$(one '*.aar')" "$DIST/zephyr-java-$VERSION.aar"
-  cp "$(one '*-sources.jar')" "$DIST/zephyr-java-$VERSION-android-sources.jar"
-  cp "$(one '*.pom')" "$DIST/zephyr-java-$VERSION-android.pom"
+  cp "$(one '*.aar')" "$DIST/$AAR_ID-$VERSION.aar"
+  cp "$(one '*-sources.jar')" "$DIST/$AAR_ID-$VERSION-sources.jar"
+  cp "$(one '*.pom')" "$DIST/$AAR_ID-$VERSION.pom"
 fi
 # the debug files of the platforms built in this run, with their platform directories,
 # reproducible: sorted, fixed times and owners, gzip without name and time

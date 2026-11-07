@@ -49,7 +49,7 @@ publishing {
     publications {
         register<MavenPublication>("release") {
             groupId = providers.gradleProperty("GROUP").get()
-            artifactId = "zephyr-java"
+            artifactId = providers.gradleProperty("ARTIFACT_ID").get()
             version = providers.gradleProperty("VERSION_NAME").get()
             afterEvaluate {
                 from(components["release"])
