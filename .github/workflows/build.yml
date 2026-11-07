@@ -1,0 +1,194 @@
+# zephyr-java CI: the Java build with its pure tests, the native matrix through zephyr's depends,
+# and the release package with the build manifest.
+# NOT RUN YET: written in round 11 (2026-11-07); the first run is after the first push (R14).
+# Every job calls the repository's own scripts, the same ones F-Droid and a local release run.
+name: build
+
+on:
+  - push
+  - pull_request
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  java:
+    # the developer build (bin/build_libzephyr_java.sh) against the distribution's libraries,
+    # then the pure test suites (mvn test, 27 tests)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: System libraries of the developer build
+        # the -dev packages whose libraries and headers the developer build found on the round-1
+        # build host (Debian 13; derived from its CMake caches with dpkg -S, round 11), with the
+        # unversioned boost names, which are 1.83 on Ubuntu 24.04 as on Debian 13
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential cmake ccache pkg-config python3 libboost-atomic-dev libboost-chrono-dev libboost-date-time-dev libboost-filesystem-dev libboost-program-options-dev libboost-regex-dev libboost-serialization-dev libboost-system-dev libboost-thread-dev libssl-dev libunbound-dev libsodium-dev libzmq3-dev libpgm-dev libnorm-dev libkrb5-dev libbsd-dev libmd-dev zlib1g-dev libhidapi-dev libusb-1.0-0-dev libudev-dev libprotobuf-dev protobuf-compiler libreadline-dev libncurses-dev
+      - uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-java-${{ github.sha }}
+          restore-keys: |
+            ccache-java-
+      - name: Native library against the system libraries
+        run: bin/build_libzephyr_java.sh
+      - name: Pure tests
+        run: mvn -q test
+
+  natives:
+    # one release native per platform through zephyr's contrib/depends, stripped, with debug
+    # symbols. The Linux natives are built in the pinned debian:12 image, the same image as the
+    # local verification build (bin/build_linux_container.sh): an identical environment for CI and
+    # the second build that must match, and a glibc floor of 2.36 (Debian 12, Ubuntu 23.04 and
+    # later, RHEL 10). The Android natives are built on the runner (depends builds them against
+    # the NDK, so the host's libraries do not reach them).
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    container: ${{ matrix.container }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x86_64
+            build: bin/build_linux.sh x86_64
+            container: docker.io/library/debian:12@sha256:366a6da5efcceffbaa19c560a101b97b87a1a9664eeeac8bc3d24395ddbf14f3
+          - platform: linux-arm64
+            build: bin/build_linux.sh arm64
+            container: docker.io/library/debian:12@sha256:366a6da5efcceffbaa19c560a101b97b87a1a9664eeeac8bc3d24395ddbf14f3
+          - platform: android-arm64-v8a
+            build: bin/build_android.sh arm64-v8a
+            container: ""
+          - platform: android-armeabi-v7a
+            build: bin/build_android.sh armeabi-v7a
+            container: ""
+          - platform: android-x86_64
+            build: bin/build_android.sh x86_64
+            container: ""
+    steps:
+      - name: git for the checkout (container)
+        # actions/checkout needs git in the image to fetch the submodules
+        if: matrix.container != ''
+        run: apt-get update -q && apt-get install -y -q --no-install-recommends git ca-certificates
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Debian 12 build packages and JAVA_HOME (container)
+        # the workspace belongs to the runner's user, the container runs as root
+        if: matrix.container != ''
+        run: |
+          git config --global --add safe.directory "*"
+          bin/linux-build-deps.sh
+          echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-$(dpkg --print-architecture)" >> "$GITHUB_ENV"
+          echo "ZEPHYR_JAVA_CONTAINER=${{ matrix.container }}" >> "$GITHUB_ENV"
+      - uses: actions/setup-java@v4
+        # JAVA_HOME (jni.h) for the Android builds on the runner
+        if: matrix.container == ''
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Host tools of zephyr's depends (runner)
+        # depends builds its Android packages with these host tools; no Android SDK, no Java packages
+        if: matrix.container == ''
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends gperf bison flex libtool-bin autoconf automake unzip ccache python3 patch
+      - name: ccache directory
+        # github.workspace is the runner's path, not the container's: take the working directory
+        run: echo "CCACHE_DIR=$PWD/.ccache" >> "$GITHUB_ENV"
+      - uses: actions/cache@v4
+        # depends' package cache and downloaded sources; bin/pins.env fixes the zephyr tree and with
+        # it every recipe in contrib/depends/packages/, and patches/depends/ changes the recipes
+        # on top: together they decide the depends packages' hashes
+        with:
+          path: |
+            external/zephyr-cpp/external/zephyr/contrib/depends/built
+            external/zephyr-cpp/external/zephyr/contrib/depends/sources
+          key: depends-${{ matrix.platform }}-${{ hashFiles('bin/pins.env', 'patches/depends/**') }}
+      - uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-${{ matrix.platform }}-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ matrix.platform }}-
+      - name: Build ${{ matrix.platform }}
+        run: ${{ matrix.build }}
+      - name: Strip, keep the debug symbols
+        run: bin/strip_natives.sh
+      - uses: actions/upload-artifact@v4
+        # paths relative to build/: natives/ (with build-env for the manifest), android/, debug/
+        with:
+          name: natives-${{ matrix.platform }}
+          path: |
+            build/natives/**
+            build/android/**
+            build/debug/**
+          if-no-files-found: error
+
+  package:
+    # the JAR (Linux natives, tests on the depends-built x86_64 library), sources and Javadoc
+    # jars, the AAR (Android natives) with its sources jar and POM, the debug symbols, under the
+    # release names of bin/build_release.sh (step 6), then the manifest and SHA256SUMS
+    needs: natives
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: natives-*
+          merge-multiple: true
+          path: build
+      - name: Android SDK platform and build-tools of the AAR build
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" > /dev/null
+      - name: Versions agree
+        run: bin/check_versions.sh
+      - name: JAR, sources and Javadoc jars
+        run: |
+          export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct HEAD)"
+          for ARCH in x86_64 arm64; do
+            mkdir -p "target/natives/linux-$ARCH"
+            cp "build/natives/linux-$ARCH/libzephyr-java.so" "target/natives/linux-$ARCH/"
+          done
+          mvn -q "-Dproject.build.outputTimestamp=$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)" "-Dnative.library.path=$PWD/build/natives/linux-x86_64" package
+      - name: AAR, its sources jar and POM
+        run: cd android && ./gradlew --no-daemon -q assembleRelease publishReleasePublicationToLocalRepository
+      - name: dist/<version>/ with the manifest and SHA256SUMS
+        run: |
+          export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct HEAD)"
+          VERSION="$(sed -n 's/^VERSION_NAME=//p' android/gradle.properties)"
+          DIST="dist/$VERSION"
+          REPO="android/build/repo/io/github/loki-notfound/zephyr-java"
+          mkdir -p "$DIST"
+          cp "target/zephyr-java-$VERSION.jar" "target/zephyr-java-$VERSION-sources.jar" "target/zephyr-java-$VERSION-javadoc.jar" "$DIST/"
+          cp "$(find "$REPO" -type f -name '*.aar')" "$DIST/zephyr-java-$VERSION.aar"
+          cp "$(find "$REPO" -type f -name '*-sources.jar')" "$DIST/zephyr-java-$VERSION-android-sources.jar"
+          cp "$(find "$REPO" -type f -name '*.pom')" "$DIST/zephyr-java-$VERSION-android.pom"
+          tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 --numeric-owner --format=gnu -C build/debug -cf - linux-x86_64 linux-arm64 android-arm64-v8a android-armeabi-v7a android-x86_64 | gzip -9n > "$DIST/debug-symbols-$VERSION.tar.gz"
+          bin/make_manifest.sh "$DIST"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
