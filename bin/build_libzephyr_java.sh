@@ -14,6 +14,7 @@
 #    zephyr's "make release-static" target plus ccache, library targets only. cmake is skipped
 #    when the build directory has a CMakeCache.txt; make always runs (a no-op when up to date).
 # 4. Builds the JNI library in build/ (CMakeLists.txt of this repo).
+# 5. Copies it to target/natives/linux-x86_64/, which Maven packages into the JAR.
 #
 # Usage: bin/build_libzephyr_java.sh [--keep-going]
 #   --keep-going  pass -k to the JNI build so every compile error is collected
@@ -116,3 +117,11 @@ if [ "$KEEP_GOING" = 1 ]; then
 else
   cmake --build . -j"$(nproc)"
 fi
+cd "$ROOT"
+
+# 5. the library as a JAR resource: Maven packages target/natives/<os>-<arch>/ (pom.xml), and
+# ZephyrUtils.loadNativeLibrary() loads it from there when it is not on java.library.path.
+# target/ is Maven's output, so a clean build needs this step again before the package.
+mkdir -p target/natives/linux-x86_64
+cp build/libzephyr-java.so target/natives/linux-x86_64/libzephyr-java.so
+echo "copied build/libzephyr-java.so to target/natives/linux-x86_64/"

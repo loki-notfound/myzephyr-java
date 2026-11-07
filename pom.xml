@@ -103,6 +103,12 @@
 				<directory>src/main/resources</directory>
 				<filtering>true</filtering>
 			</resource>
+			<resource>
+				<!-- native libraries for the JAR, placed by bin/build_libzephyr_java.sh as
+				     <os>-<arch>/libzephyr-java.so; skipped when absent; never filtered (binary) -->
+				<directory>${project.build.directory}/natives</directory>
+				<filtering>false</filtering>
+			</resource>
 		</resources>
 	</build>
 
@@ -149,6 +155,12 @@
 						<groupId>org.apache.maven.plugins</groupId>
 						<artifactId>maven-source-plugin</artifactId>
 						<version>3.0.1</version>
+						<configuration>
+							<!-- the natives under target/natives are a resource of the JAR, not a source -->
+							<excludes>
+								<exclude>**/*.so</exclude>
+							</excludes>
+						</configuration>
 						<executions>
 							<execution>
 								<id>attach-sources</id>
@@ -196,6 +208,12 @@
 						<groupId>org.apache.maven.plugins</groupId>
 						<artifactId>maven-source-plugin</artifactId>
 						<version>3.0.1</version>
+						<configuration>
+							<!-- the natives under target/natives are a resource of the JAR, not a source -->
+							<excludes>
+								<exclude>**/*.so</exclude>
+							</excludes>
+						</configuration>
 						<executions>
 							<execution>
 								<id>attach-sources</id>

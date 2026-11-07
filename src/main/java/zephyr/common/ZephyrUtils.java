@@ -5,6 +5,9 @@ import zephyr.lib.utils.GenUtils;
 import zephyr.lib.utils.JsonUtils;
 import zephyr.lib.utils.Keccak256;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.URI;
@@ -25,10 +28,8 @@ import zephyr.wallet.model.ZephyrIntegratedAddress;
 public class ZephyrUtils {
   
   // load JNI binding if available
-  private static boolean JNI_LOADED = false;
   static {
-    try { loadNativeLibrary(); }
-    catch (UnsatisfiedLinkError e) { }
+    tryLoadNativeLibrary();
   }
   
   /**
@@ -47,12 +48,77 @@ public class ZephyrUtils {
   }
   
   /**
-   * Load the native library.
+   * Try to load the native library if not already loaded.
+   */
+  public static void tryLoadNativeLibrary() {
+    if (!ZephyrUtils.isNativeLibraryLoaded()) {
+      try { ZephyrUtils.loadNativeLibrary(); }
+      catch (Exception | UnsatisfiedLinkError e) { }
+    }
+  }
+  
+  /**
+   * Load the native library: from the Java library path first (Android loads it from the APK's
+   * native libraries this way), else from the resources of the JAR, which carry one library per
+   * operating system and architecture.
    */
   public static void loadNativeLibrary() {
-    String libName = (System.getProperty("os.name").toLowerCase().contains("windows") ? "lib" : "") + "zephyr-java";
-    System.loadLibrary(libName);
-    JNI_LOADED = true;
+    
+    // skip if already loaded
+    if (isNativeLibraryLoaded()) return;
+    
+    // try to load from java library path
+    Throwable libraryPathError = null;
+    try {
+      String libName = (System.getProperty("os.name").toLowerCase().contains("windows") ? "lib" : "") + "zephyr-java";
+      System.loadLibrary(libName);
+      if (isNativeLibraryLoaded()) return;
+    } catch (Exception | UnsatisfiedLinkError e) {
+      libraryPathError = e; // reported with the resource error below if that fails too
+    }
+    
+    // try to load from resources (e.g. in jar); java.io only, java.nio.file needs Android API 26
+    File libraryFile = null;
+    try {
+      
+      // get system info
+      String osName = System.getProperty("os.name").toLowerCase();
+      String osArch = System.getProperty("os.arch").toLowerCase();
+      
+      // get library resource path (zephyr-cpp is linked statically into zephyr-java)
+      String libraryPath;
+      if (osName.contains("linux")) {
+        if (osArch.equals("amd64") || osArch.equals("x86_64")) libraryPath = "/linux-x86_64/libzephyr-java.so";
+        else if (osArch.equals("aarch64") || osArch.equals("arm64")) libraryPath = "/linux-arm64/libzephyr-java.so";
+        else throw new ZephyrError("Unsupported architecture for the packaged native library: " + osArch);
+      } else if (osName.contains("windows") || osName.contains("mac")) {
+        throw new ZephyrError("Native library for " + osName + " is not packaged yet; put zephyr-java on java.library.path");
+      } else {
+        throw new ZephyrError("Unsupported operating system: " + osName);
+      }
+      
+      // copy the library to a temporary file
+      libraryFile = File.createTempFile("libzephyr-java", ".so");
+      try (InputStream inputStream = ZephyrUtils.class.getResourceAsStream(libraryPath); OutputStream outputStream = new FileOutputStream(libraryFile)) {
+        if (inputStream == null) throw new ZephyrError("Missing native library for zephyr-java: " + libraryPath);
+        byte[] buffer = new byte[8192];
+        int bytesRead;
+        while ((bytesRead = inputStream.read(buffer)) != -1) {
+          outputStream.write(buffer, 0, bytesRead);
+        }
+      }
+      
+      // load native library
+      System.load(libraryFile.getAbsolutePath());
+    } catch (Exception | UnsatisfiedLinkError e) {
+      ZephyrError err = e instanceof ZephyrError ? (ZephyrError) e : new ZephyrError(e);
+      if (libraryPathError != null) err.addSuppressed(libraryPathError);
+      throw err;
+    } finally {
+      
+      // try to delete the temporary file (a loaded library stays mapped)
+      if (libraryFile != null) libraryFile.delete();
+    }
   }
   
   /**
@@ -61,7 +127,12 @@ public class ZephyrUtils {
    * @return true if the native library is loaded, false otherwise
    */
   public static boolean isNativeLibraryLoaded() {
-    return JNI_LOADED;
+    try {
+      jsonToBinaryJni(JsonUtils.serialize(new HashMap<>()));
+      return true;
+    } catch (Exception | UnsatisfiedLinkError e) {
+      return false;
+    }
   }
   
   public static final int RING_SIZE = 16; // network-enforced ring size of the Zephyr core
@@ -497,7 +568,7 @@ public class ZephyrUtils {
   public static void setLogLevel(int level) {
     GenUtils.assertTrue("Log level must be an integer >= 0", level >= 0);
     ZephyrUtils.LOG_LEVEL = level;
-    if (JNI_LOADED) setLogLevelJni(level);
+    if (isNativeLibraryLoaded()) setLogLevelJni(level);
   }
   
   /**
