@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -16,6 +17,8 @@ import java.util.UUID;
 import zephyr.common.NativeAddressCheck;
 import zephyr.common.ZephyrError;
 import zephyr.common.ZephyrUtils;
+import zephyr.lib.utils.GenUtils;
+import zephyr.lib.utils.Keccak256;
 import zephyr.daemon.model.ZephyrNetworkType;
 import zephyr.wallet.ZephyrWallet;
 import zephyr.wallet.ZephyrWalletFull;
@@ -302,6 +305,18 @@ public class TestZephyrUtils {
     testInvalidAddress(changeChar(STAGENET_PRIMARY, 1), ZephyrNetworkType.STAGENET);
     testInvalidAddress(changeChar(STAGENET_INTEGRATED, 1), ZephyrNetworkType.STAGENET);
     testInvalidAddress(changeChar(STAGENET_SUBADDRESS, 1), ZephyrNetworkType.STAGENET);
+  }
+  
+  // Keccak-256 with the original padding (not SHA3-256), as the address checksum uses it; the
+  // address tests above exercise it through the checksum of every vector
+  @Test
+  public void testKeccak256Empty() {
+    assertEquals("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470", GenUtils.binToHex(Keccak256.hash(new byte[0])));
+  }
+  
+  @Test
+  public void testKeccak256Abc() {
+    assertEquals("4e03657aea45a94fc7d47ba826c8d667c0d1e6e33a64a036ec44f58fa12d6c45", GenUtils.binToHex(Keccak256.hash("abc".getBytes(StandardCharsets.US_ASCII))));
   }
   
   // Can validate keys

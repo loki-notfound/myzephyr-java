@@ -3,6 +3,7 @@ package zephyr.common;
 import com.fasterxml.jackson.core.type.TypeReference;
 import zephyr.lib.utils.GenUtils;
 import zephyr.lib.utils.JsonUtils;
+import zephyr.lib.utils.Keccak256;
 import java.io.File;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -17,8 +18,6 @@ import zephyr.daemon.model.ZephyrTx;
 import zephyr.wallet.model.ZephyrAddressType;
 import zephyr.wallet.model.ZephyrDecodedAddress;
 import zephyr.wallet.model.ZephyrIntegratedAddress;
-import org.apache.commons.codec.binary.Hex;
-import org.bouncycastle.jcajce.provider.digest.Keccak;
 
 /**
  * Collection of Zephyr utilities.
@@ -569,9 +568,7 @@ public class ZephyrUtils {
     String withoutChecksumStr = decodedAddrStr.substring(0, decodedAddrStr.length() - 8);
     byte[] withoutChecksumBytes = hexToBin(withoutChecksumStr);
 
-    Keccak.Digest256 digest256 = new Keccak.Digest256();
-    byte[] hashbytes = digest256.digest(withoutChecksumBytes);
-    String encodedStr = new String(Hex.encodeHex(hashbytes));
+    String encodedStr = GenUtils.binToHex(Keccak256.hash(withoutChecksumBytes));
 
     String hashChecksum = encodedStr.substring(0, 8);
     return hashChecksum != null && hashChecksum.equals(checksumCheck);
