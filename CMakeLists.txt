@@ -416,12 +416,11 @@ if (WIN32)
   target_link_options(zephyr-java PUBLIC "-Wl,--enable-auto-import,--export-all-symbols")
 endif()
 
-# Android: one self-contained .so per ABI in the AAR, so libc++ is linked statically; 16 KB page
-# alignment (a Google Play requirement for arm64 and x86_64, harmless on armeabi-v7a); liblog
-if (ANDROID)
-  target_link_options(zephyr-java PRIVATE -static-libstdc++ -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384)
-  # Android's linker resolves every symbol at load time, so an unresolved symbol is a link error
-  # here, not a crash on the device
+# Android and Linux (UNIX AND NOT APPLE covers both): an unresolved symbol is a link error here.
+# Android's linker resolves every symbol at load time, so it would be a crash on the device; on
+# Linux the JVM loads the library with lazy binding, so it would be a crash at the first call
+# (R9-5: the pricing-record symbols failed only at the first sync)
+if (UNIX AND NOT APPLE)
   target_link_options(zephyr-java PRIVATE -Wl,--no-undefined)
   # zephyr's liboracle.a (pricing records; not in zephyr-cpp's import list) and, after
   # device_trezor, cncrypto again (hmac_keccak_hash); then what liboracle.a needs
@@ -429,6 +428,12 @@ if (ANDROID)
   set_target_properties(oracle PROPERTIES IMPORTED_LOCATION
       ${MONERO_PROJECT_BUILD}/src/oracle/liboracle.a)
   target_link_libraries(zephyr-java oracle cncrypto easylogging epee ${OPENSSL_LIBRARIES})
+endif()
+
+# Android: one self-contained .so per ABI in the AAR, so libc++ is linked statically; 16 KB page
+# alignment (a Google Play requirement for arm64 and x86_64, harmless on armeabi-v7a); liblog
+if (ANDROID)
+  target_link_options(zephyr-java PRIVATE -static-libstdc++ -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384)
   target_link_libraries(zephyr-java log)
   message(STATUS "Android ABI ${CMAKE_ANDROID_ARCH_ABI}, zephyr build ${MONERO_PROJECT_BUILD}")
 endif()
