@@ -14,11 +14,12 @@ the builds, the manifest, the signatures and how to reproduce a release.
 | zephyr-cpp | `zephyr-backports/zephyr-cpp` | `v2.3.0-sec.1` | `3a2ee602ee28e6b7941b617ad4706349ad992641` |
 
 zephyr-cpp is the git submodule `external/zephyr-cpp`, at that commit. The zephyr tree is placed
-by the build scripts at `external/zephyr-cpp/external/zephyr`, fetched by commit; zephyr-cpp's
+by `bin/place_zephyr_tree.sh` (which the build scripts call) at
+`external/zephyr-cpp/external/zephyr`, fetched by commit; zephyr-cpp's
 own `bin/update_submodules.sh` is never used, because it checks out a branch. Nothing is ever
 built from a branch. When the pin tag is present locally, the scripts check that it points at the
 pinned commit and run `git verify-tag` on it (see "Signatures" below).
-<!-- bin/pins.env; bin/build_libzephyr_java.sh header steps 1-2 and verify_pin_tag; .gitmodules -->
+<!-- bin/pins.env; bin/place_zephyr_tree.sh (steps 1-2, verify_pin_tag); bin/build_libzephyr_java.sh header steps 1-2; .gitmodules -->
 
 The backports are ZephyrProtocol's Zephyr 2.3.0 plus Monero security fixes, with no changes to the
 headers that zephyr-java compiles against. A build against ZephyrProtocol's original release must
@@ -77,10 +78,13 @@ There are four entry points:
   **`bin/build_android_container.sh <abi|--all>`** runs it in the same pinned image.
 - **`bin/build_release.sh`**, everything: the natives, stripping with separate debug files, the JAR
   with sources and Javadoc jars (the pure tests run on the depends-built library), the AAR through
-  Gradle in `android/`, and `dist/<version>/` with `manifest.json` and `SHA256SUMS`. It needs a JDK
-  21 in `JAVA_HOME` and an Android SDK with platform 36 and build-tools 36.0.0 in `ANDROID_HOME`.
-  `BUILD_LINUX_ARCHES` and `BUILD_ANDROID_ABIS` choose the platforms; an empty value builds none.
-<!-- bin/build_libzephyr_java.sh, bin/build_linux.sh, bin/build_linux_container.sh, bin/build_android.sh, bin/build_android_container.sh, bin/build_release.sh header comments; .github/workflows/build.yml (java job "System libraries of the developer build"; natives job container debian:12@sha256:366a6da5...) -->
+  Gradle in `android/`, and `dist/<version>/` with `manifest.json` and `SHA256SUMS`. The packaging
+  runs in the same pinned image (`bin/package_release_container.sh`, with the image's own JDK and
+  Maven); it needs podman or docker and an Android SDK with cmdline-tools 22.0, platform 36 and
+  build-tools 36.0.0 in `ANDROID_HOME`, which it mounts read-only. `BUILD_LINUX_ARCHES` and
+  `BUILD_ANDROID_ABIS` choose the platforms; an empty value builds none. `SKIP_NATIVES=1` packages
+  the natives already in `build/` again.
+<!-- bin/build_libzephyr_java.sh, bin/build_linux.sh, bin/build_linux_container.sh, bin/build_android.sh, bin/build_android_container.sh, bin/package_release_container.sh, bin/build_release.sh header comments; .github/workflows/build.yml (java job "System libraries of the developer build"; natives job container debian:12@sha256:366a6da5...) -->
 
 Every step is a plain shell command, so the same scripts serve a developer, CI and an F-Droid
 build. The first depends build takes a while: about 14 minutes per Android ABI and 10 minutes
@@ -113,7 +117,7 @@ Two builds from the same commit give the same files:
 | `core` | zephyr and zephyr-cpp: repository URL, tag, commit |
 | `depends` | every package of zephyr's depends: archive name, version, sha256 |
 | `patches` | the build-layer patches: name, sha256 |
-| `toolchain` | gcc, binutils, CMake, glibc, JDK, Maven, NDK (version and sha256) and its clang, Android Gradle plugin, Gradle (distribution and sha256), compile and min SDK, build-tools; per Linux native its compiler, glibc and container |
+| `toolchain` | gcc, binutils, CMake, glibc, JDK and Maven of the packaging environment (`packaging_env`, `packaging_container`), NDK (version and sha256) and its clang, Android Gradle plugin, Gradle (distribution and sha256), compile and min SDK, build-tools, the Android SDK package revisions; per Linux native its compiler, glibc and container; per Android native its NDK, clang, API level, build path and container |
 | `zephyr_java` | the commit, its `SOURCE_DATE_EPOCH`, the version |
 | `artifacts` | every release file with its size and sha256 |
 <!-- bin/make_manifest.sh header; dist/2.3.0-sec.1-java.1-SNAPSHOT/manifest.json of the R11 run (keys core, depends, patches, toolchain, zephyr_java, artifacts) -->
@@ -150,22 +154,39 @@ The release flow is: CI builds the artifacts; a second build in the same environ
 same hashes; only then is `SHA256SUMS` signed, on the maintainer's machine. Anyone can repeat the
 second build:
 
+Every release file comes from one environment: the pinned `debian:12` image, with its packages
+(compilers, OpenJDK 17, Maven) from the Debian snapshot `20261107T000000Z`, the checkout at `/work`
+and `umask 022`, in CI and locally alike. The natives are built in it, and so is the packaging:
+CI's `package` job runs `bin/package_release.sh` in that image, and locally
+`bin/package_release_container.sh` does the same with the Android SDK mounted read-only. The jar
+entries and the tar archives carry normalised modes (`-rw-r--r--`, `-rwxr-xr-x` for the natives,
+`drwxr-xr-x`), so the jars, the AAR and the archives of the two builds can match byte for byte, not
+only the natives. The whole second build is two commands:
+
+```sh
+git submodule update --init external/zephyr-cpp
+ANDROID_HOME=/path/to/android-sdk bin/build_release.sh
+```
+
+`dist/<version>/SHA256SUMS` can then be compared with the release's. Step by step:
+
 1. Clone, check out the release tag, verify it, and fetch the submodule (above).
 2. Build the Linux natives with `bin/build_linux_container.sh --all` and compare each
    `build/natives/linux-<arch>/libzephyr-java.so` with the copy inside the release JAR
    (`unzip -p zephyr-java-<version>.jar linux-x86_64/libzephyr-java.so | sha256sum`).
 3. Build the Android natives with `bin/build_android_container.sh --all`, and compare with the
    libraries in the AAR (`jni/<abi>/libzephyr-java.so`).
-4. Compare the jars and the AAR the same way, file by file. `manifest.json` itself records the
-   build environment (compilers, glibc, container), so its hash matches only a build in the same
-   environment.
+4. Package with `bin/package_release_container.sh <version>` and compare the jars, the AAR and the
+   archives with the release's. `manifest.json` itself records the build environment (compilers,
+   glibc, JDK, Maven, the SDK packages, the container), so its hash matches only a build in the
+   same environment.
 
 Every native of a release is built in the pinned `debian:12` image with the checkout at `/work`,
 in CI and locally alike, so the source paths that NDK r18b leaves in the Android libraries read
 `/work/...` on both sides and the libraries match. The image installs its packages from the Debian
 snapshot `20261107T000000Z` (`snapshot.debian.org`, recorded in the manifest as
 `toolchain.debian_snapshot`), so both builds use the same compilers and binutils.
-<!-- RELEASES §4 "Release flow" and "Linux build environment"; bin/build_release.sh steps; PLAN §5 R10 result (JAR carries linux-x86_64/libzephyr-java.so) and R11 result; QUESTIONS R11-11 answer (R13 builds Linux in the container only); QUESTIONS R13-6 answer and bin/build_android_container.sh, bin/container-build-deps.sh (DEBIAN_SNAPSHOT), .github/workflows/build.yml natives job (/work) -->
+<!-- RELEASES §4 "Release flow" and "Linux build environment"; QUESTIONS R13b-4 answer (packaging in the pinned image, umask 022, tar modes); bin/package_release_container.sh, bin/package_release.sh header ("File modes"), .github/workflows/build.yml package job; bin/build_release.sh steps; PLAN §5 R10 result (JAR carries linux-x86_64/libzephyr-java.so) and R11 result; QUESTIONS R11-11 answer (R13 builds Linux in the container only); QUESTIONS R13-6 answer and bin/build_android_container.sh, bin/container-build-deps.sh (DEBIAN_SNAPSHOT), .github/workflows/build.yml natives job (/work) -->
 
 The stripped libraries carry a `gnu_debuglink` to their debug files, which ship in
 `debug-symbols-<version>.tar.gz`, so a crash report from a release can be symbolised without

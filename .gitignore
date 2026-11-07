@@ -6,6 +6,8 @@
 /android/build/
 /android/.gradle/
 /android/local.properties
+/.gradle-home/
+/.m2/
 **/pom.xml.versionsBackup
 **/logs
 /test_wallets

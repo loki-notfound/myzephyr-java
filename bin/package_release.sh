@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 #
 # Packages a zephyr-java release into dist/<version>/ from natives that are already built and
-# stripped. bin/build_release.sh calls it after its native phases, and the CI package job calls it
-# after downloading the natives jobs' artifacts, so a local release and the CI release run the
-# same packaging steps (QUESTIONS R13-3).
+# stripped. bin/build_release.sh calls it after its native phases (through
+# bin/package_release_container.sh, in the pinned debian:12 image at /work), and the CI package
+# job calls it in the same image at /work after downloading the natives jobs' artifacts, so a
+# local release and the CI release run the same packaging steps (QUESTIONS R13-3) in the same
+# environment (QUESTIONS R13b-4).
 #
 # Inputs (per platform, from bin/build_linux.sh or bin/build_linux_container.sh,
 # bin/build_android.sh and bin/strip_natives.sh):
@@ -36,9 +38,19 @@
 #
 # Reproducibility: SOURCE_DATE_EPOCH is the commit time of this checkout unless set; it is
 # exported to every step, and Maven gets it as project.build.outputTimestamp (ISO 8601).
+# File modes: the jar plugins store each entry's mode from the file system (with umask 022 applied)
+# and tar records modes, so the script runs with umask 022, gives the natives it copies into
+# target/natives/ mode 0755, every other file it copies and the debug files it packs 0644, and
+# writes both tars with
+# --mode=u+rwX,go+rX,go-w: the entries read -rw-r--r--, -rwxr-xr-x and drwxr-xr-x whatever the
+# caller's umask or the modes of the downloaded natives (QUESTIONS R13b-4). The archivers take the
+# modes of the checkout's own files straight from the file system, so the tracked inputs the jars
+# package (pom.xml as META-INF/maven/.../pom.xml, src/main/java and src/main/resources) get
+# u+rwX,go+rX,go-w first: the umask the checkout was made with must not reach the jars
+# (QUESTIONS R13c-4).
 #
 # Environment:
-#   JAVA_HOME           a JDK (21)
+#   JAVA_HOME           a JDK (the image's OpenJDK 17 for releases)
 #   ANDROID_HOME        the Android SDK (platform 36, build-tools 36.0.0), when there are ABIs
 #   BUILD_LINUX_ARCHES  Linux architectures to package (default "x86_64 arm64"; empty: none)
 #   BUILD_ANDROID_ABIS  Android ABIs to package (default "arm64-v8a armeabi-v7a x86_64"; empty:
@@ -50,6 +62,7 @@
 # Usage: bin/package_release.sh <version>
 
 set -euo pipefail
+umask 022
 
 [ $# -eq 1 ] || { echo "usage: $0 <version>" >&2; exit 2; }
 
@@ -103,10 +116,14 @@ done
 
 # 2: the JAR, sources and Javadoc jars; the tests on the depends-built x86_64 library
 phase "mvn package"
+# the checkout's modes reach the jars (see "File modes" above); LICENCE.txt and README.md are in
+# no jar
+chmod -R u+rwX,go+rX,go-w pom.xml src/main
 rm -rf target
 for ARCH in $LINUX_ARCHES; do
   mkdir -p "target/natives/linux-$ARCH"
   cp "build/natives/linux-$ARCH/libzephyr-java.so" "target/natives/linux-$ARCH/libzephyr-java.so"
+  chmod 0755 "target/natives/linux-$ARCH/libzephyr-java.so"
 done
 MVN_TESTS=()
 case " $LINUX_ARCHES " in
@@ -114,6 +131,14 @@ case " $LINUX_ARCHES " in
   *) echo "no linux-x86_64 library in this build: the tests are skipped"; MVN_TESTS=(-DskipTests) ;;
 esac
 mvn -q "-Dproject.build.outputTimestamp=$OUTPUT_TIMESTAMP" "${MVN_TESTS[@]}" package
+# never an empty Javadoc jar (QUESTIONS R13c-3: under a POSIX locale JDK 17's javadoc failed and
+# the jar held only its manifest)
+# (the listing first: grep -q in a pipe would end unzip with SIGPIPE, a failure under pipefail)
+JAVADOC_LIST="$(unzip -l "target/zephyr-java-$VERSION-javadoc.jar")"
+if ! grep -q ' index\.html$' <<< "$JAVADOC_LIST"; then
+  echo "target/zephyr-java-$VERSION-javadoc.jar has no index.html: the Javadoc was not generated" >&2
+  exit 1
+fi
 
 # 3: the AAR, its sources jar and POM (a fresh local repository, so each file exists once)
 if [ -n "$ANDROID_ABIS" ]; then
@@ -143,9 +168,16 @@ if [ -n "$ANDROID_ABIS" ]; then
   cp "$(one '*-sources.jar')" "$DIST/$AAR_ID-$VERSION-sources.jar"
   cp "$(one '*.pom')" "$DIST/$AAR_ID-$VERSION.pom"
 fi
+chmod 0644 "$DIST"/*
 # the debug files of the packaged platforms, with their platform directories, reproducible:
-# sorted, fixed times and owners, gzip without name and time
+# sorted, fixed times, owners and modes, gzip without name and time; the Android build-env files
+# next to them are manifest inputs, not debug symbols; the debug files keep the exec bit of the
+# library objcopy wrote them from, which a CI artifact download drops: 0644 on both sides
+for P in "${PLATFORMS[@]}"; do
+  chmod 0644 "build/debug/$P/libzephyr-java.so.debug"
+done
 tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 --numeric-owner --format=gnu \
+    --mode=u+rwX,go+rX,go-w --exclude=build-env \
     -C build/debug -cf - "${PLATFORMS[@]}" | gzip -9n > "$DIST/debug-symbols-$VERSION.tar.gz"
 
 # 5, 6: the Maven repository and the Pages site; the repository lives in site/maven/ only
@@ -158,13 +190,14 @@ rm -rf "$DIST/maven"
 # 7: the site as one reproducible archive
 phase "site-$VERSION.tar.gz"
 tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 --numeric-owner \
+    --mode=u+rwX,go+rX,go-w \
     --pax-option=exthdr.name=%d/PaxHeaders/%f,delete=atime,delete=ctime \
     -C "$DIST" -cf - site | gzip -n -9 > "$DIST/site-$VERSION.tar.gz"
 echo "site-$VERSION.tar.gz: $(tar -tzf "$DIST/site-$VERSION.tar.gz" | wc -l) entries"
 
 # 8: manifest.json (of the release files above, the archive included)
 phase "make_manifest.sh"
-bin/make_manifest.sh "$DIST"
+BUILD_LINUX_ARCHES="$LINUX_ARCHES" BUILD_ANDROID_ABIS="$ANDROID_ABIS" bin/make_manifest.sh "$DIST"
 
 # 9: SHA256SUMS over the release assets (the top-level files)
 phase "make_manifest.sh --sums-only"

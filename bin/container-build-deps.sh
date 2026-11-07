@@ -18,12 +18,17 @@
 #      Android (bin/build_android.sh): depends' host tools for the NDK r18b builds (gperf, bison,
 #        flex, libtool-bin, autoconf, automake, unzip, ccache, python3, patch, curl, xz-utils,
 #        file);
-#      both: a JDK for jni.h/jni_md.h only (the JNI headers; jni_md.h is per OS, not per
-#        architecture) and git (the build scripts place the zephyr tree by sha).
-#   Nothing for Maven, Gradle or the Android SDK: packaging runs outside the container.
+#      both: a JDK for jni.h/jni_md.h (the JNI headers; jni_md.h is per OS, not per
+#        architecture) and git (the build scripts place the zephyr tree by sha);
+#      packaging (bin/package_release_container.sh, the CI package job; QUESTIONS R13b-4): the
+#        same OpenJDK 17 runs javac, javadoc, Maven and Gradle, and maven (Debian 12: 3.8.7) builds
+#        the JAR; Gradle comes through the wrapper (pinned distribution, sha256 checked) and the
+#        Android SDK from outside the image (bin/package_release_container.sh mounts it, the CI
+#        package job installs it from the pinned command-line tools; unzip is above).
 # bin/make_manifest.sh records DEBIAN_SNAPSHOT as toolchain.debian_snapshot.
 # Runs as root inside the container (bin/build_linux_container.sh, bin/build_android_container.sh,
-# the CI natives job); it is not meant for a developer host.
+# bin/package_release_container.sh, the CI natives and package jobs); it is not meant for a
+# developer host.
 #
 # Usage: bin/container-build-deps.sh
 
@@ -65,4 +70,4 @@ apt-get "${APT_OPTS[@]}" install -y -q --no-install-recommends \
   autoconf automake libtool-bin gperf bison flex python3 ccache patch \
   xz-utils bzip2 unzip file \
   g++-aarch64-linux-gnu \
-  openjdk-17-jdk-headless
+  openjdk-17-jdk-headless maven

@@ -141,34 +141,71 @@ jobs:
           if-no-files-found: error
 
   package:
-    # bin/package_release.sh, the same packaging script bin/build_release.sh calls, so the CI
-    # release and a local release cannot drift: the JAR (Linux natives, tests on the
+    # bin/package_release.sh, the same packaging script bin/build_release.sh calls, in the same
+    # pinned debian:12 image at /work with the same Debian snapshot (JDK 17 and Maven from it),
+    # umask 022 and the same three Android SDK packages, step for step what
+    # bin/package_release_container.sh does locally (QUESTIONS R13b-4), so the CI release files
+    # and a local build can match byte for byte: the JAR (Linux natives, tests on the
     # depends-built x86_64 library), sources and Javadoc jars, the AAR (Android natives) with its
     # sources jar and POM, the debug symbols, the Maven repository, the site, the manifest and
     # SHA256SUMS in dist/<version>/
     needs: natives
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    container: docker.io/library/debian:12@sha256:366a6da5efcceffbaa19c560a101b97b87a1a9664eeeac8bc3d24395ddbf14f3
+    env:
+      ZEPHYR_JAVA_CONTAINER: docker.io/library/debian:12@sha256:366a6da5efcceffbaa19c560a101b97b87a1a9664eeeac8bc3d24395ddbf14f3
+      TAR_OPTIONS: --no-same-owner
+      # the image sets no locale; JDK 17 would write Javadoc's options file in ASCII (R13c-3)
+      LANG: C.UTF-8
+      ANDROID_HOME: /opt/android-sdk
+      GRADLE_USER_HOME: /work/.gradle-home
+      MAVEN_OPTS: -Dmaven.repo.local=/work/.m2
     steps:
+      - uses: actions/checkout@v4
+        # the image has no git yet: the files only (REST API), enough for the next step
+      - name: Debian 12 packages from the pinned snapshot (JDK 17, Maven)
+        run: bash bin/container-build-deps.sh
       - uses: actions/checkout@v4
         with:
           submodules: true
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "21"
-          cache: maven
+      - name: git and the environment
+        run: |
+          git config --global --add safe.directory "*"
+          echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-$(dpkg --print-architecture)" >> "$GITHUB_ENV"
+      - name: Android SDK packages (cmdline-tools 22.0, platforms;android-36, build-tools;36.0.0)
+        # the pinned command-line tools zip (cmdline-tools 22.0), checked, as cmdline-tools/latest;
+        # its sdkmanager installs the other two; the local build mounts an SDK with the same three
+        run: |
+          curl -fsSLo /tmp/cmdline-tools.zip https://dl.google.com/android/repository/commandlinetools-linux-15859902_latest.zip
+          echo "4e4c464f145a7512b57d088ac6c278c03c9eea610886b35a5e0804e74eedf583  /tmp/cmdline-tools.zip" | sha256sum -c -
+          mkdir -p "$ANDROID_HOME/cmdline-tools"
+          unzip -q /tmp/cmdline-tools.zip -d /tmp/cmdline-tools
+          mv /tmp/cmdline-tools/cmdline-tools "$ANDROID_HOME/cmdline-tools/latest"
+          # licences from process substitution: "yes |" would fail the step under pipefail (SIGPIPE)
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses < <(yes) > /dev/null
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" > /dev/null
       - uses: actions/download-artifact@v4
         with:
           pattern: natives-*
           merge-multiple: true
           path: build
-      - name: Android SDK platform and build-tools of the AAR build
-        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" > /dev/null
-      - name: dist/<version>/ (bin/package_release.sh)
-        # the natives jobs' artifacts are in build/natives/, build/android/, build/debug/; the
-        # script checks the versions first (bin/check_versions.sh)
-        run: bin/package_release.sh "$(sed -n 's/^VERSION_NAME=//p' android/gradle.properties)"
+      - name: dist/<version>/ at /work (bin/package_release.sh)
+        # the checkout with the natives jobs' artifacts (build/natives/, build/android/,
+        # build/debug/) is copied to /work, the path of the local build; download-artifact drops
+        # the natives' exec bit, so they get 0755 back; the pinned zephyr tree with the patches
+        # is placed for bin/make_manifest.sh (the depends recipes; R13c-5); the script checks the
+        # versions first (bin/check_versions.sh); dist/ is copied back for the upload
+        run: |
+          mkdir -p /work
+          cp -a "$GITHUB_WORKSPACE"/. /work/
+          cd /work
+          chmod 0755 build/natives/linux-*/libzephyr-java.so build/android/*/libzephyr-java.so
+          bin/place_zephyr_tree.sh
+          umask 022
+          bin/package_release.sh "$(sed -n 's/^VERSION_NAME=//p' android/gradle.properties)"
+          rm -rf "$GITHUB_WORKSPACE/dist"
+          cp -a dist "$GITHUB_WORKSPACE/"
       - uses: actions/upload-artifact@v4
         with:
           name: dist

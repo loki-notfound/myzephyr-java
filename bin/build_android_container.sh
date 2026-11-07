@@ -14,7 +14,9 @@
 #                                                        library
 #   bin/strip_natives.sh                                 stripped natives and debug files, as in CI
 # with JAVA_HOME at the image's OpenJDK 17 (jni.h only), SOURCE_DATE_EPOCH passed through (the
-# commit time of this checkout unless set) and BUILD_ANDROID_ABIS passed through.
+# commit time of this checkout unless set), BUILD_ANDROID_ABIS passed through, and
+# ZEPHYR_JAVA_CONTAINER set to the image, which bin/android_build_env.sh records in
+# build/debug/android-<abi>/build-env for the manifest.
 # The depends prefixes, the build directories and the outputs stay under the checkout and are
 # shared with a host build of bin/build_android.sh: depends' package build ids contain the prefix
 # path and the compilers, so the first container run after a host build rebuilds the Android
@@ -58,7 +60,7 @@ echo "$ENGINE $IMAGE, SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
 
 # TAR_OPTIONS: as in bin/build_linux_container.sh (rootless podman maps root to the calling user
 # with 65,536 subordinate ids; GNU tar as root would restore archive owners outside that range)
-ENV_ARGS=(-e "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" -e TAR_OPTIONS=--no-same-owner)
+ENV_ARGS=(-e "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" -e "ZEPHYR_JAVA_CONTAINER=$IMAGE" -e TAR_OPTIONS=--no-same-owner)
 [ -n "${BUILD_ANDROID_ABIS+x}" ] && ENV_ARGS+=(-e "BUILD_ANDROID_ABIS=$BUILD_ANDROID_ABIS")
 
 "$ENGINE" run --rm -v "$ROOT":/work -w /work "${ENV_ARGS[@]}" "$IMAGE" bash -c '

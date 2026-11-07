@@ -112,6 +112,24 @@
 				<artifactId>maven-jar-plugin</artifactId>
 				<version>3.4.1</version>
 			</plugin>
+			<!-- the plugins Maven would otherwise take from its own default bindings, pinned: the output
+			     must not depend on the Maven that runs it (Debian 12's Maven 3.8.7 binds resources 2.6,
+			     which drops the natives' exec bit, and deploy 2.7, which rejects id::url; QUESTIONS R13c-2) -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-resources-plugin</artifactId>
+				<version>3.3.1</version>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-install-plugin</artifactId>
+				<version>3.1.2</version>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-deploy-plugin</artifactId>
+				<version>3.1.2</version>
+			</plugin>
 		</plugins>
 		<resources>
 			<resource>
@@ -208,7 +226,8 @@
 									<goal>jar</goal>
 								</goals>
 								<configuration>
-									<failOnError>false</failOnError>
+									<!-- a Javadoc failure stops the build: never an empty Javadoc jar (QUESTIONS R13c-3) -->
+									<failOnError>true</failOnError>
 								</configuration>
 							</execution>
 						</executions>
@@ -310,7 +329,8 @@
 									<goal>jar</goal>
 								</goals>
 								<configuration>
-									<failOnError>false</failOnError>
+									<!-- a Javadoc failure stops the build: never an empty Javadoc jar (QUESTIONS R13c-3) -->
+									<failOnError>true</failOnError>
 								</configuration>
 							</execution>
 						</executions>

@@ -17,7 +17,13 @@
 #                                    ANDROID_BUILD=host builds them on the host with
 #                                    bin/build_android.sh instead, for development only
 #  3. bin/strip_natives.sh           stripped natives in place, debug files in build/debug/
-#  4. bin/package_release.sh        everything after the natives, shared with the CI package job:
+#  4. bin/package_release_container.sh
+#                                    bin/package_release.sh in the same image at /work (JDK, Maven
+#                                    from the Debian snapshot, umask 022; QUESTIONS R13b-4), the
+#                                    packaging step the CI package job runs in that image too;
+#                                    PACKAGE_BUILD=host runs bin/package_release.sh on the host
+#                                    instead, for development only.
+#                                    bin/package_release.sh is everything after the natives:
 #                                    the JAR (with the Linux natives, the pure tests on the
 #                                    depends-built x86_64 library), sources and Javadoc jars; the
 #                                    AAR (artifactId zephyr-java-android) with its sources jar and
@@ -33,14 +39,19 @@
 # exported to every step, and Maven gets it as project.build.outputTimestamp (ISO 8601).
 #
 # Environment:
-#   JAVA_HOME           a JDK (21)
-#   ANDROID_HOME        the Android SDK (platform 36, build-tools 36.0.0)
+#   JAVA_HOME           a JDK, for PACKAGE_BUILD=host only (the container has its own)
+#   ANDROID_HOME        the Android SDK (cmdline-tools 22.0, platforms;android-36, build-tools
+#                       36.0.0), mounted read-only into the packaging container
 #   BUILD_LINUX_ARCHES  Linux architectures to build (default "x86_64 arm64"; empty: none)
 #   BUILD_ANDROID_ABIS  Android ABIs to build (default "arm64-v8a armeabi-v7a x86_64"; empty: none,
 #                       and then no AAR)
 #   SOURCE_DATE_EPOCH   optional, see above
 #   LINUX_BUILD         container (default; podman or docker) or host
 #   ANDROID_BUILD       container (default; podman or docker) or host
+#   PACKAGE_BUILD       container (default; podman or docker) or host
+#   SKIP_NATIVES        1: phases 1 to 3 are skipped and the natives already in build/ are packaged
+#                       (a repeat of the packaging, such as the release rehearsal); every named
+#                       platform's library and debug file must exist and none may contain /home/
 #
 # Usage: bin/build_release.sh
 
@@ -49,7 +60,15 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 
-: "${JAVA_HOME:?set JAVA_HOME to a JDK}"
+case "${PACKAGE_BUILD:=container}" in
+  container) ;;
+  host) : "${JAVA_HOME:?set JAVA_HOME to a JDK}" ;;
+  *) echo "PACKAGE_BUILD must be container or host, not $PACKAGE_BUILD" >&2; exit 2 ;;
+esac
+case "${SKIP_NATIVES:=0}" in
+  0|1) ;;
+  *) echo "SKIP_NATIVES must be 0 or 1, not $SKIP_NATIVES" >&2; exit 2 ;;
+esac
 
 bin/check_versions.sh
 
@@ -83,36 +102,66 @@ case "${LINUX_BUILD:=container}" in
   container|host) ;;
   *) echo "LINUX_BUILD must be container or host, not $LINUX_BUILD" >&2; exit 2 ;;
 esac
-if [ -n "$LINUX_ARCHES" ]; then
-  if [ "$LINUX_BUILD" = container ]; then
-    phase "build_linux_container.sh ($LINUX_ARCHES)"
-    BUILD_LINUX_ARCHES="$LINUX_ARCHES" bin/build_linux_container.sh --all
-  else
-    phase "build_linux.sh ($LINUX_ARCHES, on the host: not a release build)"
-    BUILD_LINUX_ARCHES="$LINUX_ARCHES" bin/build_linux.sh --all
-  fi
-fi
 case "${ANDROID_BUILD:=container}" in
   container|host) ;;
   *) echo "ANDROID_BUILD must be container or host, not $ANDROID_BUILD" >&2; exit 2 ;;
 esac
-if [ -n "$ANDROID_ABIS" ]; then
-  : "${ANDROID_HOME:?set ANDROID_HOME to the Android SDK}"
-  if [ "$ANDROID_BUILD" = container ]; then
-    phase "build_android_container.sh ($ANDROID_ABIS)"
-    BUILD_ANDROID_ABIS="$ANDROID_ABIS" bin/build_android_container.sh --all
-  else
-    phase "build_android.sh ($ANDROID_ABIS, on the host: not a release build)"
-    BUILD_ANDROID_ABIS="$ANDROID_ABIS" bin/build_android.sh --all
+if [ "$SKIP_NATIVES" = 1 ]; then
+  # 1 to 3 skipped: the natives of an earlier build, each with its debug file and no host path
+  phase "natives kept (SKIP_NATIVES=1)"
+  KEPT=()
+  for A in $LINUX_ARCHES; do
+    KEPT+=("build/natives/linux-$A/libzephyr-java.so" "build/debug/linux-$A/libzephyr-java.so.debug")
+  done
+  for A in $ANDROID_ABIS; do
+    KEPT+=("build/android/$A/libzephyr-java.so" "build/debug/android-$A/libzephyr-java.so.debug")
+  done
+  BAD=0
+  for F in "${KEPT[@]}"; do
+    if [ ! -f "$F" ]; then
+      echo "missing $F" >&2
+      BAD=1
+    elif grep -qa /home/ "$F"; then
+      echo "$F contains /home/: not a container build" >&2
+      BAD=1
+    else
+      echo "  $(sha256sum "$F")"
+    fi
+  done
+  [ "$BAD" = 0 ] || exit 1
+else
+  if [ -n "$LINUX_ARCHES" ]; then
+    if [ "$LINUX_BUILD" = container ]; then
+      phase "build_linux_container.sh ($LINUX_ARCHES)"
+      BUILD_LINUX_ARCHES="$LINUX_ARCHES" bin/build_linux_container.sh --all
+    else
+      phase "build_linux.sh ($LINUX_ARCHES, on the host: not a release build)"
+      BUILD_LINUX_ARCHES="$LINUX_ARCHES" bin/build_linux.sh --all
+    fi
   fi
+  if [ -n "$ANDROID_ABIS" ]; then
+    : "${ANDROID_HOME:?set ANDROID_HOME to the Android SDK}"
+    if [ "$ANDROID_BUILD" = container ]; then
+      phase "build_android_container.sh ($ANDROID_ABIS)"
+      BUILD_ANDROID_ABIS="$ANDROID_ABIS" bin/build_android_container.sh --all
+    else
+      phase "build_android.sh ($ANDROID_ABIS, on the host: not a release build)"
+      BUILD_ANDROID_ABIS="$ANDROID_ABIS" bin/build_android.sh --all
+    fi
+  fi
+
+  # 3: strip, debug symbols
+  phase "strip_natives.sh"
+  bin/strip_natives.sh
 fi
 
-# 3: strip, debug symbols
-phase "strip_natives.sh"
-bin/strip_natives.sh
-
-# 4: the packaging, the same script as the CI package job
-phase "package_release.sh $VERSION"
-BUILD_LINUX_ARCHES="$LINUX_ARCHES" BUILD_ANDROID_ABIS="$ANDROID_ABIS" bin/package_release.sh "$VERSION"
+# 4: the packaging, the same script as the CI package job, in the same image
+if [ "$PACKAGE_BUILD" = container ]; then
+  phase "package_release_container.sh $VERSION"
+  BUILD_LINUX_ARCHES="$LINUX_ARCHES" BUILD_ANDROID_ABIS="$ANDROID_ABIS" bin/package_release_container.sh "$VERSION"
+else
+  phase "package_release.sh $VERSION (on the host: not a release build)"
+  BUILD_LINUX_ARCHES="$LINUX_ARCHES" BUILD_ANDROID_ABIS="$ANDROID_ABIS" bin/package_release.sh "$VERSION"
+fi
 
 phase "done"

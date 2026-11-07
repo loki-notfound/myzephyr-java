@@ -5,12 +5,26 @@
 #   zephyr_java  version, commit sha of this checkout, SOURCE_DATE_EPOCH
 #   core         both pins of bin/pins.env: tag, sha, URL
 #   patches      every build-layer patch under patches/depends/: file name and sha256
-#   toolchain    gcc, aarch64-linux-gnu-g++, binutils, glibc of this host, NDK (version and
-#                sha256 from android_ndk.mk), the NDK standalone toolchain's clang, cmake, JDK,
-#                Maven, Gradle (wrapper distribution and sha256), AGP, compileSdk, minSdk,
-#                build-tools; linux_natives: per Linux native the build environment that
-#                bin/build_linux.sh recorded (build/natives/linux-<arch>/build-env: container image
-#                or none, glibc, compiler); linux_container: that image when every Linux native
+#   toolchain    gcc, aarch64-linux-gnu-g++, binutils, glibc, cmake, JDK ($JAVA_HOME) and Maven
+#                of the environment this script runs in, the packaging environment: the pinned
+#                image for a release (packaging_env "container", packaging_container the image
+#                from ZEPHYR_JAVA_CONTAINER, which bin/package_release_container.sh and the CI
+#                package job set), else packaging_env "host" and packaging_container null;
+#                Gradle (wrapper distribution and sha256), AGP, compileSdk, minSdk, build-tools;
+#                android_sdk_packages: Pkg.Revision of cmdline-tools/latest,
+#                platforms/android-<compileSdk> and build-tools/<build-tools> in $ANDROID_HOME
+#                (null without one); android_natives: per Android native the build environment
+#                that bin/android_build_env.sh recorded where it was built
+#                (build/debug/android-<abi>/build-env: container image or none, Debian snapshot,
+#                build path, triplet, API level, NDK, its sha256, clang); android_ndk (version and
+#                sha256) and ndk_clang from those files (the value when all agree, else the list;
+#                null without Android natives); linux_natives: per Linux native the build
+#                environment that bin/build_linux.sh recorded (build/natives/linux-<arch>/build-env:
+#                container image or none, glibc, compiler). The platforms are those of
+#                BUILD_LINUX_ARCHES and BUILD_ANDROID_ABIS (defaults as in bin/package_release.sh);
+#                a missing build-env file of one of them is an error (QUESTIONS R13c-5), so the
+#                CI package job and a local build record the same facts, from the natives'
+#                builds, not from the packaging host; linux_container: that image when every Linux native
 #                was built in the same one, null when all were built on the host, else the list;
 #                debian_snapshot: the Debian snapshot the container builds install their packages
 #                from (DEBIAN_SNAPSHOT in bin/container-build-deps.sh)
@@ -73,6 +87,8 @@ def first_line(*cmd):
                              text=True, check=True).stdout
     except (OSError, subprocess.CalledProcessError):
         return None
+    # without terminal colour codes (Debian's mvn writes them even with -B)
+    out = re.sub(r"\x1b\[[0-9;]*m", "", out)
     lines = [l.strip() for l in out.splitlines() if l.strip()]
     return lines[0] if lines else None
 
@@ -133,20 +149,42 @@ def depends_packages():
     return out
 
 
+def platforms(var, default):
+    """The platforms of this build: BUILD_LINUX_ARCHES or BUILD_ANDROID_ABIS (empty: none)."""
+    value = os.environ.get(var)
+    return (default if value is None else value).split()
+
+
+def build_env(path):
+    """KEY=VALUE lines of a build-env file; a missing file is an error (QUESTIONS R13c-5)."""
+    full = os.path.join(ROOT, path)
+    if not os.path.isfile(full):
+        sys.exit(f"no {path}: the build environment of a packaged native is missing")
+    with open(full, encoding="utf-8") as f:
+        return dict(l.rstrip("\n").split("=", 1) for l in f if "=" in l)
+
+
 def linux_natives():
-    out = {}
-    base = os.path.join(ROOT, "build/natives")
-    if os.path.isdir(base):
-        for d in sorted(os.listdir(base)):
-            env = os.path.join(base, d, "build-env")
-            if d.startswith("linux-") and os.path.isfile(env):
-                with open(env, encoding="utf-8") as f:
-                    out[d] = dict(l.rstrip("\n").split("=", 1) for l in f if "=" in l)
-    return out
+    return {f"linux-{a}": build_env(f"build/natives/linux-{a}/build-env")
+            for a in platforms("BUILD_LINUX_ARCHES", "x86_64 arm64")}
+
+
+def android_natives():
+    return {f"android-{a}": build_env(f"build/debug/android-{a}/build-env")
+            for a in platforms("BUILD_ANDROID_ABIS", "arm64-v8a armeabi-v7a x86_64")}
+
+
+def one_or_list(values):
+    """The value when every native agrees, else the sorted list; None without natives."""
+    values = sorted(set(values))
+    if not values:
+        return None
+    return values[0] if len(values) == 1 else values
 
 
 def toolchain():
     natives = linux_natives()
+    androids = android_natives()
     images = sorted({v.get("container", "none") for v in natives.values()})
     if not images or images == ["none"]:
         container = None
@@ -154,7 +192,6 @@ def toolchain():
         container = images[0]
     else:
         container = images
-    ndk = mk_vars(os.path.join(DEPENDS, "packages/android_ndk.mk"))
     wrapper = shell_vars("android/gradle/wrapper/gradle-wrapper.properties")
     gradle_kts = read("android/build.gradle.kts")
 
@@ -162,17 +199,33 @@ def toolchain():
         m = re.search(pattern, gradle_kts)
         return m.group(1) if m else None
 
-    clang = None
-    for triplet in ("aarch64-linux-android", "arm-linux-androideabi", "x86_64-linux-android"):
-        c = os.path.join(DEPENDS, triplet, "native/bin/clang")
-        if os.path.exists(c):
-            clang = first_line(c, "--version")
-            break
     m = re.search(r"^DEBIAN_SNAPSHOT=(\S+)$", read("bin/container-build-deps.sh"), re.M)
     debian_snapshot = m.group(1) if m else None
     java_home = os.environ.get("JAVA_HOME", "")
     javac = os.path.join(java_home, "bin/javac") if java_home else "javac"
+    packaging_container = os.environ.get("ZEPHYR_JAVA_CONTAINER") or None
+    compile_sdk = kts(r"compileSdk = (\d+)")
+    build_tools = kts(r'buildToolsVersion = "([^"]+)"')
+    android_home = os.environ.get("ANDROID_HOME")
+
+    def sdk_revision(rel):
+        try:
+            props = shell_vars(os.path.join(android_home, rel, "source.properties"))
+        except OSError:
+            return None
+        return props.get("Pkg.Revision")
+
+    sdk_packages = None
+    if android_home:
+        sdk_packages = {
+            "cmdline-tools": sdk_revision("cmdline-tools/latest"),
+            f"platforms;android-{compile_sdk}": sdk_revision(f"platforms/android-{compile_sdk}"),
+            f"build-tools;{build_tools}": sdk_revision(f"build-tools/{build_tools}"),
+        }
     return {
+        "packaging_env": "container" if packaging_container else "host",
+        "packaging_container": packaging_container,
+        "android_sdk_packages": sdk_packages,
         "gcc": first_line("gcc", "--version"),
         "aarch64-linux-gnu-g++": first_line("aarch64-linux-gnu-g++", "--version"),
         "binutils": first_line("objcopy", "--version"),
@@ -181,17 +234,20 @@ def toolchain():
         "debian_snapshot": debian_snapshot,
         "linux_natives": natives,
         "aarch64-linux-gnu-binutils": first_line("aarch64-linux-gnu-objcopy", "--version"),
-        "android_ndk": {"version": "r" + ndk.get("version", "?"), "sha256": ndk.get("sha256_hash")},
-        "ndk_clang": clang,
+        "android_ndk": ({"version": one_or_list(v["ndk"] for v in androids.values()),
+                         "sha256": one_or_list(v["ndk_sha256"] for v in androids.values())}
+                        if androids else None),
+        "ndk_clang": one_or_list(v["clang"] for v in androids.values()),
+        "android_natives": androids,
         "cmake": first_line("cmake", "--version"),
         "jdk": first_line(javac, "-version"),
         "maven": first_line("mvn", "-B", "--version"),
         "gradle": {"distribution": wrapper.get("distributionUrl", "").replace("\\:", ":"),
                    "sha256": wrapper.get("distributionSha256Sum")},
         "android_gradle_plugin": kts(r'id\("com\.android\.library"\) version "([^"]+)"'),
-        "android_compile_sdk": kts(r"compileSdk = (\d+)"),
+        "android_compile_sdk": compile_sdk,
         "android_min_sdk": kts(r"minSdk = (\d+)"),
-        "android_build_tools": kts(r'buildToolsVersion = "([^"]+)"'),
+        "android_build_tools": build_tools,
     }
 
 
