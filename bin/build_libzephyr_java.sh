@@ -39,10 +39,11 @@ ROOT="$(pwd)"
 . bin/pins.env
 
 # Verifies a tree's own pin tag (ZEPHYR_TAG or ZEPHYR_CPP_TAG) when it is present locally
-# (PLAN §2): the tag must point at the pinned commit and carry a good signature. Without gpg or without the release key in the keyring
-# this is a one-line warning, so a build without the keys still works; a bad signature is an error.
+# (PLAN §2): the tag must point at the pinned commit and carry a good signature. Without gpg or
+# without the release key in the keyring this is a one-line warning, so a build without the keys
+# still works; a bad signature is an error.
 verify_pin_tag() {
-  local TREE="$1" SHA="$2" TAG="$3" OUT
+  local TREE="$1" SHA="$2" TAG="$3" OUT NL=$'\n'
   git -C "$TREE" rev-parse -q --verify "refs/tags/$TAG" >/dev/null || return 0
   if [ "$(git -C "$TREE" rev-parse "$TAG^{commit}")" != "$SHA" ]; then
     echo "$TREE: tag $TAG does not point at the pin $SHA" >&2
@@ -52,12 +53,19 @@ verify_pin_tag() {
     echo "warning: $TREE: tag $TAG not verified, gpg is not installed" >&2
   elif OUT="$(git -C "$TREE" verify-tag --raw "$TAG" 2>&1)"; then
     echo "$TREE: tag $TAG verified"
-  elif printf '%s\n' "$OUT" | grep -q '^\[GNUPG:\] NO_PUBKEY '; then
-    echo "warning: $TREE: tag $TAG not verified, the release key is not in the keyring" >&2
   else
-    printf '%s\n' "$OUT" >&2
-    echo "$TREE: tag $TAG failed verification" >&2
-    exit 1
+    # a case on the output, not printf | grep -q (SIGPIPE under pipefail); the leading newline
+    # makes the pattern match the status line at the start of any line
+    case "$NL$OUT" in
+      *"$NL[GNUPG:] NO_PUBKEY "*)
+        echo "warning: $TREE: tag $TAG not verified, the release key is not in the keyring" >&2
+        ;;
+      *)
+        printf '%s\n' "$OUT" >&2
+        echo "$TREE: tag $TAG failed verification" >&2
+        exit 1
+        ;;
+    esac
   fi
 }
 

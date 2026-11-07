@@ -3,7 +3,9 @@
 # Builds dist/<version>/site/, the content of the project's GitHub Pages for one release:
 #   index.html   one plain HTML page (no scripts, no external resources): the name, the
 #                not-affiliated disclaimer, the Gradle and Maven lines, links to the user guide
-#                on GitHub, the Javadoc, the releases and the maintainer key's fingerprint
+#                on GitHub, the Javadoc, the releases, the maintainer key's fingerprint and, at
+#                the bottom, the donation address (the same sentence and address as the README's
+#                "Donations")
 #   javadoc/     the Javadoc of the JAR (mvn javadoc:javadoc, target/site/apidocs)
 #   maven/       a copy of dist/<version>/maven/ (bin/make_maven_repo.sh, which runs first)
 #   .nojekyll    GitHub Pages serves the files as they are instead of running Jekyll over them
@@ -66,6 +68,7 @@ cat > "$SITE/index.html" <<EOF
 <style>
 body { font-family: sans-serif; max-width: 46rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
 pre { background: #f4f4f4; padding: 0.75rem; overflow-x: auto; }
+code { overflow-wrap: anywhere; }
 </style>
 </head>
 <body>
@@ -115,6 +118,10 @@ dependencies {
 <pre>31DA 39AB 43E0 CA67 F1F3  A661 BA2A FF22 DF8A 4A13</pre>
 <p>whose public key is <a href="https://github.com/loki-notfound/zephyr-java/blob/main/KEYS.asc">KEYS.asc</a>
 in the repository.</p>
+
+<h2>Donations</h2>
+<p>If zephyr-java is useful to you, donations are welcome at this ZEPH address:</p>
+<p><code>ZEPHs8MmrN556ieVvv9YUZf3J5pW2uN1z5S88mb9DksG9bcEcqVGg9XbuQc6Q9e9Ka6bjMHYgaSidWfL1r1DGLyngj8NHT3Q6gp</code></p>
 </body>
 </html>
 EOF

@@ -2,12 +2,13 @@
 
 One section per release, newest first. Tags are `v<zephyr version>-sec.<N>-java.<M>`; the Maven
 version is the tag without the `v`. Changes to the Java API are listed under "Breaking changes".
-<!-- RELEASES §2 (versioning; "Breaking changes" section in the release notes) -->
+A release's date is the date of its signed tag and of its GitHub release.
+<!-- RELEASES §2 (versioning; "Breaking changes" section in the release notes); WORKORDER R13d addendum 1 (no date in the heading) -->
 
 **Not affiliated with ZephyrProtocol.** An independent project. Report Zephyr vulnerabilities to the
 ZephyrProtocol team, not here.
 
-## v2.3.0-sec.1-java.1 (unreleased)
+## v2.3.0-sec.2-java.1
 
 The first release of zephyr-java: Java bindings for the Zephyr wallet core (`zephyr-cpp` over
 Zephyr's `wallet2`), derived from monero-java at commit `53a54543` (2023-07-10), for Android (AAR)
@@ -19,16 +20,23 @@ platform, `libzephyr-java.so`, which exports only its JNI entry points.
 
 The core is built only from the tagged commits of the zephyr-backports forks:
 
-| | Tag | Commit |
-|---|---|---|
-| zephyr | `v2.3.0-sec.1` | `e9cf10f796a6053280110dbe453dcd4e4344c8e8` |
-| zephyr-cpp | `v2.3.0-sec.1` | `3a2ee602ee28e6b7941b617ad4706349ad992641` |
+| | Tag | Commit | Tag subject |
+|---|---|---|---|
+| zephyr | `v2.3.0-sec.2` | `8c6a120256b4bd887d6e7167d929d76e3507e0e5` | zephyr v2.3.0 + 30 security backports from Monero |
+| zephyr-cpp | `v2.3.0-sec.1` | `3a2ee602ee28e6b7941b617ad4706349ad992641` | zephyr-cpp master (4a99272f6d7a171cf6625016939094637459975a) + 4 security backports from monero-cpp |
 
-Both tags are signed with the zephyr-backports release key
+These two tags belong to the zephyr-backports **release set of 2026-11-07**, which also names
+zephyr-javascript `v2.3.0-sec.1` (`7b17a14280bd84ca783287f4640b3c744d25319f`) and zephyr-wallet
+`v2.3.0-sec.1` (`edef8c0ee281024de1a718aa6dce39bce75f3687`); zephyr-java does not build those two.
+The backports number each fork on its own: `sec.<N>` in this release's version is zephyr's tag
+number, and the zephyr-cpp tag is named here and in `manifest.json` (`core.zephyr-cpp.tag`, next
+to `core.release_set` and its members).
+
+All tags are signed with the zephyr-backports release key
 `FB39 94F0 997C A6F0 43D7  2491 9EFF 03F5 27D2 40A1`. A build against ZephyrProtocol's original
 of the same release (zephyr `v2.3.0` = `67c5f53b878fef41fb5e74c4382d5b7a2f37fd8a`, zephyr-cpp
 `4a99272f6d7a171cf6625016939094637459975a`) is expected to work as well.
-<!-- bin/pins.env (PIN_TAG, ZEPHYR_SHA, ZEPHYR_CPP_SHA, the key fingerprint and the original's commits in its comments); PLAN §2 "Source pins" and §7.9 -->
+<!-- bin/pins.env (ZEPHYR_TAG, ZEPHYR_CPP_TAG, ZEPHYR_SHA, ZEPHYR_CPP_SHA, RELEASE_SET, RELEASE_SET_MEMBERS, the key fingerprint and the original's commits in its comments); tag subjects: zephyr-cpp from the tag object in external/zephyr-cpp, zephyr from the reviewer's facts in WORKORDER R13d; RELEASES §2 refinement; PLAN §2 "Source pins" and §7.9 -->
 
 ### Platforms
 
@@ -60,7 +68,7 @@ android {
 }
 
 dependencies {
-    implementation("io.github.loki-notfound:zephyr-java-android:2.3.0-sec.1-java.1")
+    implementation("io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.1")
 }
 ```
 
@@ -69,7 +77,7 @@ The `packaging` line is required in every app: three of the Apache HTTP client's
 and the JAR bring the same three dependencies: `jackson-core` and `jackson-databind` 2.13.5 (the
 last Jackson line for Android below API 26) and `httpclient5` 5.2.1. `jeromq` (only for
 `ZephyrWalletRpc`'s ZMQ listener) is optional and must be added by an application that uses it.
-The JAR for Maven is `io.github.loki-notfound:zephyr-java:2.3.0-sec.1-java.1`; see the README's
+The JAR for Maven is `io.github.loki-notfound:zephyr-java:2.3.0-sec.2-java.1`; see the README's
 "Coordinates".
 <!-- README "Coordinates"; docs/guide/06-android.md "The dependency"; QUESTIONS R10-5 item 1 (META-INF/DEPENDENCIES); QUESTIONS R12-3 answer (artifactId zephyr-java-android, jeromq optional, slf4j-simple test scope); pom.xml and android/build.gradle.kts (the three dependencies); RELEASES §6 (Jackson 2.13.5) -->
 
@@ -139,7 +147,7 @@ repository.
 
 ```sh
 gpg --import KEYS.asc
-git verify-tag v2.3.0-sec.1-java.1
+git verify-tag v2.3.0-sec.2-java.1
 gpg --verify SHA256SUMS.asc && sha256sum -c SHA256SUMS
 ```
 

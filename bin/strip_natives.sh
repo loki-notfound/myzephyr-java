@@ -55,7 +55,9 @@ for PLATFORM in linux-x86_64 linux-arm64 android-arm64-v8a android-armeabi-v7a a
     echo "$PLATFORM: no $LIB, skipped"
     continue
   fi
-  if readelf -SW "$LIB" | grep -q '\.gnu_debuglink'; then
+  # the section list first: grep -q in a pipe can end readelf with SIGPIPE, a failure under pipefail
+  SECTIONS="$(readelf -SW "$LIB")"
+  if grep -q '\.gnu_debuglink' <<< "$SECTIONS"; then
     echo "$PLATFORM: $LIB is already stripped (has .gnu_debuglink), skipped"
     continue
   fi

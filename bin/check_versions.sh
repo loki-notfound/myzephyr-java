@@ -7,7 +7,7 @@
 # Prints the version and exits 0 when they agree; prints the differing values and exits 1
 # otherwise. bin/build_release.sh calls it first.
 #
-# Usage: bin/check_versions.sh            (or RELEASE_TAG=v2.3.0-sec.1-java.1 bin/check_versions.sh)
+# Usage: bin/check_versions.sh            (or RELEASE_TAG=v2.3.0-sec.2-java.1 bin/check_versions.sh)
 
 set -euo pipefail
 

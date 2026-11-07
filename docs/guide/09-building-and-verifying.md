@@ -6,20 +6,26 @@ the builds, the manifest, the signatures and how to reproduce a release.
 
 ## The pins
 
-`bin/pins.env` names the two source trees of the native core, by commit:
+`bin/pins.env` names the two source trees of the native core, by commit, from the zephyr-backports
+release set of 2026-11-07:
 
 | Tree | Repository | Tag | Commit |
 |---|---|---|---|
-| zephyr | `zephyr-backports/zephyr` | `v2.3.0-sec.1` | `e9cf10f796a6053280110dbe453dcd4e4344c8e8` |
+| zephyr | `zephyr-backports/zephyr` | `v2.3.0-sec.2` | `8c6a120256b4bd887d6e7167d929d76e3507e0e5` |
 | zephyr-cpp | `zephyr-backports/zephyr-cpp` | `v2.3.0-sec.1` | `3a2ee602ee28e6b7941b617ad4706349ad992641` |
+
+The backports number each fork on its own, so the two tags differ; a release set says which tags
+belong together (this one also names zephyr-javascript and zephyr-wallet `v2.3.0-sec.1`, which
+zephyr-java does not build). The release version's `sec.<N>` is zephyr's number.
 
 zephyr-cpp is the git submodule `external/zephyr-cpp`, at that commit. The zephyr tree is placed
 by `bin/place_zephyr_tree.sh` (which the build scripts call) at
 `external/zephyr-cpp/external/zephyr`, fetched by commit; zephyr-cpp's
 own `bin/update_submodules.sh` is never used, because it checks out a branch. Nothing is ever
-built from a branch. When the pin tag is present locally, the scripts check that it points at the
-pinned commit and run `git verify-tag` on it (see "Signatures" below).
-<!-- bin/pins.env; bin/place_zephyr_tree.sh (steps 1-2, verify_pin_tag); bin/build_libzephyr_java.sh header steps 1-2; .gitmodules -->
+built from a branch. When a tree's own tag (`ZEPHYR_TAG`, `ZEPHYR_CPP_TAG`) is present locally,
+the scripts check that it points at the pinned commit and run `git verify-tag` on it (see
+"Signatures" below).
+<!-- bin/pins.env (ZEPHYR_TAG, ZEPHYR_CPP_TAG, RELEASE_SET, RELEASE_SET_MEMBERS); bin/place_zephyr_tree.sh (steps 1-2, verify_pin_tag); bin/build_libzephyr_java.sh header steps 1-2; .gitmodules; RELEASES §2 refinement -->
 
 The backports are ZephyrProtocol's Zephyr 2.3.0 plus Monero security fixes, with no changes to the
 headers that zephyr-java compiles against. A build against ZephyrProtocol's original release must
@@ -114,7 +120,7 @@ Two builds from the same commit give the same files:
 
 | Key | Contents |
 |---|---|
-| `core` | zephyr and zephyr-cpp: repository URL, tag, commit |
+| `core` | zephyr and zephyr-cpp: repository URL, tag, commit; `release_set` (the zephyr-backports release set, `2026-11-07`) and `release_set_members` (name, tag, commit of each member) |
 | `depends` | every package of zephyr's depends: archive name, version, sha256 |
 | `patches` | the build-layer patches: name, sha256 |
 | `toolchain` | gcc, binutils, CMake, glibc, JDK and Maven of the packaging environment (`packaging_env`, `packaging_container`), NDK (version and sha256) and its clang, Android Gradle plugin, Gradle (distribution and sha256), compile and min SDK, build-tools, the Android SDK package revisions; per Linux native its compiler, glibc and container; per Android native its NDK, clang, API level, build path and container |
@@ -142,7 +148,7 @@ To check a release you downloaded:
 
 ```sh
 gpg --import KEYS.asc
-git verify-tag v2.3.0-sec.1-java.1                      # in a clone of this repository
+git verify-tag v2.3.0-sec.2-java.1                      # in a clone of this repository
 gpg --verify SHA256SUMS.asc && sha256sum -c SHA256SUMS  # in the directory of the release files
 ```
 

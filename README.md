@@ -6,16 +6,16 @@ built from the security-hardened forks of [zephyr-backports](https://github.com/
 linked statically into one native library per platform. The Java API mirrors
 [monero-java](https://github.com/woodser/monero-java), from which this project is derived, with
 Zephyr's assets, conversions and reserve information added.
-<!-- pins: bin/pins.env (zephyr and zephyr-cpp, zephyr-backports tag v2.3.0-sec.1); static linking: register D17 -->
+<!-- pins: bin/pins.env (zephyr v2.3.0-sec.2 and zephyr-cpp v2.3.0-sec.1, the zephyr-backports release set of 2026-11-07); static linking: register D17 -->
 
 **Not affiliated with ZephyrProtocol.** An independent project. Report Zephyr vulnerabilities to the
 ZephyrProtocol team, not here.
 
 ## Status
 
-Pre-release: there is no release yet. The first release, `v2.3.0-sec.1-java.1`, is built from the
-zephyr-backports release set of Zephyr 2.3.0 and follows it.
-<!-- RELEASES §2; PLAN §7.9 -->
+Pre-release: there is no release yet. The first release, `v2.3.0-sec.2-java.1`, is built from the
+zephyr-backports release set of 2026-11-07: zephyr `v2.3.0-sec.2` and zephyr-cpp `v2.3.0-sec.1`.
+<!-- RELEASES §2; PLAN §7.9; bin/pins.env (ZEPHYR_TAG, ZEPHYR_CPP_TAG, RELEASE_SET) -->
 
 What works today, on the development branches:
 
@@ -54,7 +54,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.github.loki-notfound:zephyr-java-android:2.3.0-sec.1-java.1")
+    implementation("io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.1")
 }
 ```
 <!-- artifactId: android/gradle.properties ARTIFACT_ID (QUESTIONS R12-3 answer); AAR POM dependencies: android/build.gradle.kts (jackson-core, jackson-databind, httpclient5); PLAN §5 R10 result -->
@@ -83,7 +83,7 @@ Desktop and server (Maven), the JAR with the Linux natives:
 <dependency>
   <groupId>io.github.loki-notfound</groupId>
   <artifactId>zephyr-java</artifactId>
-  <version>2.3.0-sec.1-java.1</version>
+  <version>2.3.0-sec.2-java.1</version>
 </dependency>
 ```
 <!-- pom.xml groupId and artifactId; RELEASES §2 (Maven version = tag without the v) -->
@@ -199,10 +199,11 @@ pairs, the fees and the locks.
 
 ## Building from source
 
-The native core is built only from pinned commits. `bin/pins.env` names them: zephyr and
-zephyr-cpp at the zephyr-backports tag `v2.3.0-sec.1`, by sha, never a branch. A build against
-ZephyrProtocol's original of the same release (zephyr `v2.3.0`, zephyr-cpp `4a99272`) must work
-as well; the backports are the same software plus Monero security fixes.
+The native core is built only from pinned commits. `bin/pins.env` names them: zephyr at the
+zephyr-backports tag `v2.3.0-sec.2` and zephyr-cpp at `v2.3.0-sec.1` (the release set of
+2026-11-07), by sha, never a branch. A build against ZephyrProtocol's original of the same
+release (zephyr `v2.3.0`, zephyr-cpp `4a99272`) must work as well; the backports are the same
+software plus Monero security fixes.
 <!-- bin/pins.env; PLAN §2 "Source pins" -->
 
 ```sh
@@ -240,7 +241,7 @@ keys.openpgp.org as well. To check a release:
 
 ```sh
 gpg --import KEYS.asc
-git verify-tag v2.3.0-sec.1-java.1
+git verify-tag v2.3.0-sec.2-java.1
 gpg --verify SHA256SUMS.asc && sha256sum -c SHA256SUMS
 ```
 
@@ -259,13 +260,13 @@ anyway, so that a build without the keys still works.
 
 ## Versioning
 
-A release is tagged `v<zephyr version>-sec.<N>-java.<M>`, for example `v2.3.0-sec.1-java.1`; the
+A release is tagged `v<zephyr version>-sec.<N>-java.<M>`, for example `v2.3.0-sec.2-java.1`; the
 Maven version is the same without the `v`.
 
 - `<zephyr version>-sec.<N>` names the zephyr-backports tag of the core the release is built
-  from, and with it the network rules and hard forks the release supports. When the backports
-  number each fork on its own, `sec.<N>` is the number of **zephyr's** tag (the network core);
-  the zephyr-cpp tag is then named in the tag message, in `manifest.json` and in this README.
+  from, and with it the network rules and hard forks the release supports. The backports number
+  each fork on its own, so `sec.<N>` is the number of **zephyr's** tag (the network core); the
+  zephyr-cpp tag is named in the tag message, in `manifest.json` and in this README.
 - `java.<M>` counts the zephyr-java releases on that core and starts again at 1 for each new
   core tag.
 - The version does not encode API compatibility. Changes to the Java API are listed under
@@ -283,3 +284,11 @@ zephyr-java is MIT licensed as well; see `LICENCE.txt`.
 Vulnerabilities in the Zephyr core (zephyr, zephyr-cpp, `wallet2`) go to the ZephyrProtocol team.
 Vulnerabilities in zephyr-java itself (the Java code, the JNI bridge, the build and the release
 artifacts) go to `loki@lateo.dev`.
+
+## Donations
+
+If zephyr-java is useful to you, donations are welcome at this ZEPH address:
+
+```
+ZEPHs8MmrN556ieVvv9YUZf3J5pW2uN1z5S88mb9DksG9bcEcqVGg9XbuQc6Q9e9Ka6bjMHYgaSidWfL1r1DGLyngj8NHT3Q6gp
+```
