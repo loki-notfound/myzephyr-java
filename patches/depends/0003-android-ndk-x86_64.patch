@@ -1,0 +1,18 @@
+Description: build the NDK r18b standalone toolchain for x86_64 when the host is x86_64-linux-android
+ The android_ndk package passes --arch only for arm and aarch64; without it,
+ make_standalone_toolchain.py builds an arm toolchain for the x86_64 host.
+Origin: zephyr-java
+Forwarded: not-needed
+Drop-when: the depends tree's android_ndk package sets the x86_64 arch itself (newer Monero depends
+ use a unified NDK toolchain and no longer run this script)
+
+--- a/contrib/depends/packages/android_ndk.mk
++++ b/contrib/depends/packages/android_ndk.mk
+@@ -8,6 +8,7 @@
+ define $(package)_set_vars
+ $(package)_config_opts_arm=--arch arm
+ $(package)_config_opts_aarch64=--arch arm64
++$(package)_config_opts_x86_64=--arch x86_64
+ endef
+ 
+ define $(package)_extract_cmds
