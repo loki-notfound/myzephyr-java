@@ -149,6 +149,10 @@
 						<configuration>
 							<source>${java-version}</source>
 							<target>${java-version}</target>
+							<!-- needs monero-java on the class path: only the coexistence profile compiles it -->
+							<testExcludes>
+								<testExclude>test/TestCoexistence.java</testExclude>
+							</testExcludes>
 						</configuration>
 					</plugin>
 					<plugin>
@@ -197,6 +201,19 @@
 							<argLine>-Djava.library.path=${project.basedir}/build</argLine>
 						</configuration>
 					</plugin>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-compiler-plugin</artifactId>
+						<version>3.8.0</version>
+						<configuration>
+							<source>${java-version}</source>
+							<target>${java-version}</target>
+							<!-- needs monero-java on the class path: only the coexistence profile compiles it -->
+							<testExcludes>
+								<testExclude>test/TestCoexistence.java</testExclude>
+							</testExcludes>
+						</configuration>
+					</plugin>
 				</plugins>
 			</build>
 		</profile>
@@ -230,6 +247,10 @@
 						<configuration>
 							<source>${java-version}</source>
 							<target>${java-version}</target>
+							<!-- needs monero-java on the class path: only the coexistence profile compiles it -->
+							<testExcludes>
+								<testExclude>test/TestCoexistence.java</testExclude>
+							</testExcludes>
 						</configuration>
 					</plugin>
 					<plugin>
@@ -264,6 +285,70 @@
 								</goals>
 							</execution>
 						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+		<profile>
+			<id>coexistence</id>
+			<!-- zephyr-java and monero-java in one JVM: mvn -Pcoexistence -Dtest=TestCoexistence test.
+			     Activating it switches the default profile off, so compiler and surefire are repeated. -->
+			<properties>
+				<!-- the project's own Jackson dependencies use this property, and dependencyManagement
+				     does not override versions the POM declares directly -->
+				<jackson-version>2.21.7</jackson-version>
+			</properties>
+			<dependencyManagement>
+				<dependencies>
+					<!-- monero-java 0.8.65 needs Jackson 2.21.7 (StreamReadConstraints, Jackson 2.15+);
+					     an app with both libraries resolves to the highest anyway, so this run also
+					     shows zephyr-java on Jackson 2.21.x -->
+					<dependency>
+						<groupId>com.fasterxml.jackson</groupId>
+						<artifactId>jackson-bom</artifactId>
+						<version>2.21.7</version>
+						<type>pom</type>
+						<scope>import</scope>
+					</dependency>
+				</dependencies>
+			</dependencyManagement>
+			<dependencies>
+				<dependency>
+					<!-- the newest release on Maven Central (2026-11-07); its jar bundles linux-x86_64/libmonero-java.so -->
+					<groupId>io.github.woodser</groupId>
+					<artifactId>monero-java</artifactId>
+					<version>0.8.65</version>
+					<scope>test</scope>
+				</dependency>
+			</dependencies>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-compiler-plugin</artifactId>
+						<version>3.8.0</version>
+						<configuration>
+							<source>${java-version}</source>
+							<target>${java-version}</target>
+						</configuration>
+					</plugin>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-surefire-plugin</artifactId>
+						<version>3.2.5</version>
+						<dependencies>
+							<dependency>
+								<groupId>org.apache.maven.surefire</groupId>
+								<artifactId>surefire-junit-platform</artifactId>
+								<version>3.2.5</version>
+							</dependency>
+						</dependencies>
+						<configuration>
+							<includes>
+								<include>test/TestCoexistence.java</include>
+							</includes>
+							<argLine>-Djava.library.path=${project.basedir}/build</argLine>
+						</configuration>
 					</plugin>
 				</plugins>
 			</build>

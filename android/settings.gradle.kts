@@ -17,3 +17,6 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "zephyr-java"
+
+// build-only Android test app; its instrumented test runs on a device (no emulator on the build VM)
+include(":testapp")

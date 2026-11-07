@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The platform's InstrumentationTestRunner is a shared library, not on the boot class path:
+     the test APK declares it (AGP does not add it). -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <uses-library android:name="android.test.runner" />
+    </application>
+
+</manifest>
