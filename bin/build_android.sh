@@ -10,7 +10,8 @@
 # 2. The same script applies the build-layer patches under patches/depends/ to the zephyr tree
 #    (build tooling under contrib/depends/ only, register D21), idempotently.
 # 3. Builds contrib/depends for the ABI's host triplet into contrib/depends/<triplet>/ (this
-#    downloads the NDK and the package sources; depends checks their sha256).
+#    downloads the NDK and the package sources; depends checks their sha256). A stalled download
+#    fails after 120 s below 1000 bytes/s, and depends retries it from downloads.getmonero.org.
 # 4. Builds zephyr's library targets with the depends toolchain in build/<triplet>/release of the
 #    zephyr tree (configured afresh every time; make rebuilds only what changed).
 # 5. Builds the JNI library in build-android/<abi>/ (CMakeLists.txt of this repo, Android branch)
@@ -96,8 +97,14 @@ for ABI in $ABIS; do
   TRIPLET="$(triplet_of "$ABI")"
   echo "=== $ABI ($TRIPLET)"
 
-  # 3. depends for this host
-  make -C "$Z/contrib/depends" HOST="$TRIPLET" -j"$(nproc)"
+  # 3. depends for this host. The download command is depends' own (builders/linux.mk, build_os
+  # is the build machine's, linux) plus a low-speed limit: a fetch that stays below 1000 bytes/s
+  # for 120 s fails instead of hanging, and depends then falls back to downloads.getmonero.org,
+  # whose archives it checks by sha256 like the primary ones (QUESTIONS R13d-5). $(...) is left
+  # to make, so depends' DOWNLOAD_CONNECT_TIMEOUT and DOWNLOAD_RETRIES still apply.
+  # shellcheck disable=SC2016
+  make -C "$Z/contrib/depends" HOST="$TRIPLET" -j"$(nproc)" \
+    build_linux_DOWNLOAD='curl --location --fail --connect-timeout $(DOWNLOAD_CONNECT_TIMEOUT) --retry $(DOWNLOAD_RETRIES) --speed-limit 1000 --speed-time 120 -o'
   PREFIX="$ROOT/$Z/contrib/depends/$TRIPLET"
   TOOLCHAIN="$PREFIX/share/toolchain.cmake"
   # clang 7.0.2: debug information only, see the header (__FILE__ stays absolute)

@@ -18,7 +18,8 @@
 #      0003-android-ndk-x86_64      no-op (android_ndk is not a Linux package)
 #      0004-openssl-openssldir      needed (OPENSSLDIR /etc/ssl instead of the depends prefix)
 # 3. Builds contrib/depends for the host triplet into contrib/depends/<triplet>/ (this downloads
-#    the package sources; depends checks their sha256).
+#    the package sources; depends checks their sha256). A stalled download fails after 120 s below
+#    1000 bytes/s, and depends retries it from downloads.getmonero.org.
 #      0005-neutral-engines-and-unbound-sysconfdir  needed (no depends-prefix paths in OpenSSL
 #                                                   and unbound)
 # 4. Builds zephyr's library targets with the depends toolchain in build/<triplet>/release of the
@@ -108,8 +109,14 @@ for ARCH in $ARCHES; do
   PREFIX="$ROOT/$Z/contrib/depends/$TRIPLET"
   echo "=== linux-$ARCH ($TRIPLET)"
 
-  # 3. depends for this host
-  make -C "$Z/contrib/depends" HOST="$TRIPLET" -j"$(nproc)"
+  # 3. depends for this host. The download command is depends' own (builders/linux.mk, build_os
+  # is the build machine's, linux) plus a low-speed limit: a fetch that stays below 1000 bytes/s
+  # for 120 s fails instead of hanging, and depends then falls back to downloads.getmonero.org,
+  # whose archives it checks by sha256 like the primary ones (QUESTIONS R13d-5). $(...) is left
+  # to make, so depends' DOWNLOAD_CONNECT_TIMEOUT and DOWNLOAD_RETRIES still apply.
+  # shellcheck disable=SC2016
+  make -C "$Z/contrib/depends" HOST="$TRIPLET" -j"$(nproc)" \
+    build_linux_DOWNLOAD='curl --location --fail --connect-timeout $(DOWNLOAD_CONNECT_TIMEOUT) --retry $(DOWNLOAD_RETRIES) --speed-limit 1000 --speed-time 120 -o'
   TOOLCHAIN="$PREFIX/share/toolchain.cmake"
   # gcc: -ffile-prefix-map covers __FILE__ and the debug information; the later map wins for
   # the depends prefix, which lies inside the checkout

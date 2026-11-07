@@ -89,7 +89,10 @@ There are four entry points:
 
 Every step is a plain shell command, so the same scripts serve a developer, CI and an F-Droid
 build. The first depends build takes a while: about 14 minutes per Android ABI and 10 minutes
-for Linux x86_64 on the machine this project is developed on.
+for Linux x86_64 on the machine this project is developed on. Depends downloads each source
+archive from the address in its recipe and, when that fails or stalls (below 1000 bytes/s for two
+minutes), from `downloads.getmonero.org`; either way it checks the archive's sha256 against the
+recipe before it uses it.
 
 ## Reproducibility
 

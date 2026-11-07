@@ -10,6 +10,11 @@
 #    sha, checkout, its own submodules), never from a branch, with the verification of each
 #    tree's own pin tag (ZEPHYR_TAG, ZEPHYR_CPP_TAG) when it is present locally; external/zephyr
 #    goes into the submodule's info/exclude, so the tree does not show as a change of zephyr-cpp.
+#    A tree placed earlier at another pin is moved: its applied build-layer patches are reversed
+#    first (highest number first, each one only when it reverses cleanly in a dry run), since they
+#    are local changes that would block the checkout. When the tree has any change that is not one
+#    of those patches, or a change is left after reversing them, the script stops and moves nothing
+#    (QUESTIONS R13d-4).
 # 2. Applies the build-layer patches under patches/depends/ to the zephyr tree, in name order,
 #    with patch -p1. They touch build tooling under contrib/depends/ only, never zephyr or
 #    zephyr-cpp sources (register D21; each patch has a DEP-3 header). Idempotent: a patch that
@@ -72,10 +77,46 @@ fi
 verify_pin_tag external/zephyr-cpp "$ZEPHYR_CPP_SHA" "$ZEPHYR_CPP_TAG"
 
 Z=external/zephyr-cpp/external/zephyr
+
+# Reverses the build-layer patches applied to a tree at another pin, so it can be checked out at
+# the new one. Stops when the tree has a change that no patch explains (a file the patches do not
+# touch) or when a change remains after the reversal (a patched file was edited beyond the patch).
+reverse_patches_before_move() {
+  local FROM="$1" CHANGED PATCHED F I P
+  CHANGED="$(git -C "$Z" status --porcelain --untracked-files=all | cut -c4-)"
+  [ -n "$CHANGED" ] || return 0
+  PATCHED="$(sed -n 's|^+++ b/||p' "$ROOT"/patches/depends/*.patch | cut -f1 | sort -u)"
+  while IFS= read -r F; do
+    if ! grep -qxF "$F" <<< "$PATCHED"; then
+      echo "$Z: '$F' is changed and is not a file of the build-layer patches;" >&2
+      echo "not moving the tree from $FROM to $ZEPHYR_SHA. Undo that change or remove the tree." >&2
+      exit 1
+    fi
+  done <<< "$CHANGED"
+  local PATCHES=("$ROOT"/patches/depends/*.patch)
+  for (( I=${#PATCHES[@]}-1; I>=0; I-- )); do
+    P="${PATCHES[$I]}"
+    if patch -d "$Z" -p1 -R --dry-run -s -f < "$P" >/dev/null 2>&1; then
+      patch -d "$Z" -p1 -R -s -f < "$P"
+      echo "patch $(basename "$P"): reversed (moving from $FROM)"
+    fi
+  done
+  CHANGED="$(git -C "$Z" status --porcelain --untracked-files=all)"
+  if [ -n "$CHANGED" ]; then
+    printf '%s\n' "$CHANGED" >&2
+    echo "$Z: changes left after reversing the build-layer patches (above);" >&2
+    echo "not moving the tree from $FROM to $ZEPHYR_SHA. Undo them or remove the tree." >&2
+    exit 1
+  fi
+}
+
 if [ ! -d "$Z/.git" ]; then
   git init -q "$Z" && git -C "$Z" remote add origin "$ZEPHYR_URL"
 fi
-if [ "$(git -C "$Z" rev-parse HEAD 2>/dev/null)" != "$ZEPHYR_SHA" ]; then
+Z_HEAD="$(git -C "$Z" rev-parse -q --verify HEAD 2>/dev/null || true)"
+if [ "$Z_HEAD" != "$ZEPHYR_SHA" ]; then
+  # a tree at another pin: its applied patches go first (a new tree has no HEAD yet)
+  [ -z "$Z_HEAD" ] || reverse_patches_before_move "$Z_HEAD"
   git -C "$Z" fetch -q --depth 1 origin "$ZEPHYR_SHA" && git -C "$Z" checkout -q FETCH_HEAD
 fi
 git -C "$Z" submodule update -q --init --recursive --depth 1
