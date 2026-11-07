@@ -13,11 +13,19 @@
 # 3. Builds contrib/depends for the ABI's host triplet into contrib/depends/<triplet>/ (this
 #    downloads the NDK and the package sources; depends checks their sha256).
 # 4. Builds zephyr's library targets with the depends toolchain in build/<triplet>/release of the
-#    zephyr tree. cmake is skipped when that directory has a CMakeCache.txt; make always runs.
+#    zephyr tree (configured afresh every time; make rebuilds only what changed).
 # 5. Builds the JNI library in build-android/<abi>/ (CMakeLists.txt of this repo, Android branch)
 #    and copies it to build/android/<abi>/libzephyr-java.so.
 #
+# Reproducibility: SOURCE_DATE_EPOCH is exported (the commit time of this checkout unless set),
+# and zephyr and the JNI library are compiled with -fdebug-prefix-map=<this checkout>=. and
+# -fdebug-prefix-map=<depends prefix>=/depends. NDK r18b's clang 7.0.2 has no -ffile-prefix-map
+# and no -fmacro-prefix-map, so __FILE__ strings (assertion and exception messages) stay
+# absolute paths of the build host: the Android libraries are reproducible for the same build
+# path only, until the core moves to a newer NDK (docs RELEASES §7, option 2).
+#
 # Usage: bin/build_android.sh <arm64-v8a|armeabi-v7a|x86_64|--all>
+#   --all  all three ABIs, or the ABIs in BUILD_ANDROID_ABIS (for example "arm64-v8a")
 #   JAVA_HOME must point at a JDK: its include/ and include/linux/ provide jni.h for every ABI.
 
 set -euo pipefail
@@ -29,12 +37,15 @@ usage() {
 
 [ $# -eq 1 ] || usage
 case "$1" in
-  --all) ABIS="arm64-v8a armeabi-v7a x86_64" ;;
+  --all) ABIS="${BUILD_ANDROID_ABIS:-arm64-v8a armeabi-v7a x86_64}" ;;
   arm64-v8a|armeabi-v7a|x86_64) ABIS="$1" ;;
   *) usage ;;
 esac
 
 : "${JAVA_HOME:?set JAVA_HOME to a JDK (its include/ provides jni.h)}"
+for ABI in $ABIS; do
+  case "$ABI" in arm64-v8a|armeabi-v7a|x86_64) ;; *) echo "unknown ABI in BUILD_ANDROID_ABIS: $ABI" >&2; exit 2 ;; esac
+done
 
 # ABI -> depends host triplet
 triplet_of() {
@@ -49,6 +60,13 @@ cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 # shellcheck source=pins.env
 . bin/pins.env
+
+# SOURCE_DATE_EPOCH (reproducible builds): the commit time of this checkout unless it is set
+if [ -z "${SOURCE_DATE_EPOCH:-}" ]; then
+  SOURCE_DATE_EPOCH="$(git -C "$ROOT" log -1 --format=%ct HEAD)"
+fi
+export SOURCE_DATE_EPOCH
+echo "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
 
 # Verifies the pin tag of a tree when it is present locally (PLAN §2): the tag must point at the
 # pinned commit and carry a good signature. Without gpg or without the release key in the keyring
@@ -113,16 +131,21 @@ for ABI in $ABIS; do
 
   # 3. depends for this host
   make -C "$Z/contrib/depends" HOST="$TRIPLET" -j"$(nproc)"
-  TOOLCHAIN="$ROOT/$Z/contrib/depends/$TRIPLET/share/toolchain.cmake"
+  PREFIX="$ROOT/$Z/contrib/depends/$TRIPLET"
+  TOOLCHAIN="$PREFIX/share/toolchain.cmake"
+  # clang 7.0.2: debug information only, see the header (__FILE__ stays absolute)
+  PREFIX_MAPS="-fdebug-prefix-map=$ROOT=. -fdebug-prefix-map=$PREFIX=/depends"
 
   # 4. zephyr's library targets, as in bin/build_libzephyr_java.sh (no blocks, no executables)
   ZB="$Z/build/$TRIPLET/release"
+  # A fresh configure every time, with the prefix maps in CFLAGS/CXXFLAGS: CMake adds them to the
+  # platform's initial flags (on Android -funwind-tables -no-canonical-prefixes, on armeabi-v7a
+  # also -march, -marm, -mfpu, -mfloat-abi), which -DCMAKE_C_FLAGS on a first configure would
+  # replace; zephyr's CMakeLists.txt only appends to CMAKE_C_FLAGS/CMAKE_CXX_FLAGS. Objects whose
+  # flags did not change are not rebuilt.
   mkdir -p "$ZB" && cd "$ZB"
-  if [ -f CMakeCache.txt ]; then
-    echo "zephyr: $ZB/CMakeCache.txt exists, skipping cmake"
-  else
-    cmake -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DBUILD_TESTS=OFF -DUSE_CCACHE=ON ../../..
-  fi
+  rm -f CMakeCache.txt
+  CFLAGS="$PREFIX_MAPS" CXXFLAGS="$PREFIX_MAPS" cmake -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DBUILD_TESTS=OFF -DUSE_CCACHE=ON ../../..
   make -j"$(nproc)" wallet cryptonote_protocol
   cd "$ROOT"
 
@@ -141,7 +164,8 @@ for ABI in $ABIS; do
 
   # 5. JNI library
   mkdir -p "build-android/$ABI" && cd "build-android/$ABI"
-  cmake -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DANDROID_HOST="$TRIPLET" ../..
+  cmake -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DANDROID_HOST="$TRIPLET" \
+    -DCMAKE_C_FLAGS="$PREFIX_MAPS" -DCMAKE_CXX_FLAGS="$PREFIX_MAPS" ../..
   cmake --build . -j"$(nproc)"
   cd "$ROOT"
   mkdir -p "build/android/$ABI"

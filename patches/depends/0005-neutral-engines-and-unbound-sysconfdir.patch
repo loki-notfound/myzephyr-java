@@ -1,0 +1,32 @@
+Description: build OpenSSL and unbound without directories of the depends prefix compiled in
+ OpenSSL compiles ENGINESDIR and MODULESDIR, unbound its configuration, pid and key file paths,
+ into the libraries as absolute paths of the build host's depends prefix. Neither is read here
+ (OpenSSL is built no-dso, so it never loads engines or provider modules; the wallet never loads
+ an unbound configuration file), but they tie the library to the build path. OpenSSL gets the
+ distributions' default directories on the make command line, unbound --sysconfdir=/etc (the
+ value the recipe already uses for mingw). Applies to every host.
+Origin: zephyr-java
+Forwarded: not-needed
+Drop-when: the depends tree builds OpenSSL and unbound without prefix paths compiled in
+
+--- a/contrib/depends/packages/openssl.mk
++++ b/contrib/depends/packages/openssl.mk
+@@ -56,7 +56,7 @@
+ endef
+ 
+ define $(package)_build_cmds
+-  $(MAKE) build_libs
++  $(MAKE) build_libs ENGINESDIR=/usr/lib/engines-3 MODULESDIR=/usr/lib/ossl-modules
+ endef
+ 
+ define $(package)_stage_cmds
+--- a/contrib/depends/packages/unbound.mk
++++ b/contrib/depends/packages/unbound.mk
+@@ -11,6 +11,7 @@
+   $(package)_config_opts=--disable-shared --enable-static --without-pyunbound --prefix=$(host_prefix)
+   $(package)_config_opts+=--with-libexpat=$(host_prefix) --with-ssl=$(host_prefix) --with-libevent=no
+   $(package)_config_opts+=--without-pythonmodule --disable-flto --with-pthreads --with-libunbound-only
++  $(package)_config_opts+=--sysconfdir=/etc
+   $(package)_config_opts_linux=--with-pic
+   $(package)_config_opts_w64=--enable-static-exe --sysconfdir=/etc --prefix=$(host_prefix) --target=$(host_prefix)
+   $(package)_config_opts_x86_64_darwin=ac_cv_func_SHA384_Init=yes

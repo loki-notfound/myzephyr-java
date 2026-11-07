@@ -19,14 +19,22 @@
 #      0004-openssl-openssldir      needed (OPENSSLDIR /etc/ssl instead of the depends prefix)
 # 3. Builds contrib/depends for the host triplet into contrib/depends/<triplet>/ (this downloads
 #    the package sources; depends checks their sha256).
+#      0005-neutral-engines-and-unbound-sysconfdir  needed (no depends-prefix paths in OpenSSL
+#                                                   and unbound)
 # 4. Builds zephyr's library targets with the depends toolchain in build/<triplet>/release of the
-#    zephyr tree. cmake is skipped when that directory has a CMakeCache.txt; make always runs.
+#    zephyr tree (configured afresh every time; make rebuilds only what changed).
 # 5. Builds the JNI library in build-linux/<arch>/ (CMakeLists.txt of this repo, with
 #    DEPENDS_PREFIX set) and copies it to build/natives/linux-<arch>/libzephyr-java.so.
+#
+# Reproducibility: SOURCE_DATE_EPOCH is exported (the commit time of this checkout unless set),
+# and zephyr and the JNI library are compiled with -ffile-prefix-map=<this checkout>=. and
+# -ffile-prefix-map=<depends prefix>=/depends (gcc: __FILE__ and debug information), so the
+# library does not depend on where the checkout is.
 #
 # Usage: bin/build_linux.sh <x86_64|arm64|--all>
 #   x86_64  depends host x86_64-linux-gnu (the host compiler)
 #   arm64   depends host aarch64-linux-gnu (aarch64-linux-gnu-gcc/g++ and binutils)
+#   --all   both, or the architectures in BUILD_LINUX_ARCHES (for example "x86_64")
 #   JAVA_HOME must point at a JDK: its include/ and include/linux/ provide jni.h.
 
 set -euo pipefail
@@ -38,12 +46,15 @@ usage() {
 
 [ $# -eq 1 ] || usage
 case "$1" in
-  --all) ARCHES="x86_64 arm64" ;;
+  --all) ARCHES="${BUILD_LINUX_ARCHES:-x86_64 arm64}" ;;
   x86_64|arm64) ARCHES="$1" ;;
   *) usage ;;
 esac
 
 : "${JAVA_HOME:?set JAVA_HOME to a JDK (its include/ provides jni.h)}"
+for ARCH in $ARCHES; do
+  case "$ARCH" in x86_64|arm64) ;; *) echo "unknown architecture in BUILD_LINUX_ARCHES: $ARCH" >&2; exit 2 ;; esac
+done
 
 # architecture -> depends host triplet
 triplet_of() {
@@ -57,6 +68,13 @@ cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 # shellcheck source=pins.env
 . bin/pins.env
+
+# SOURCE_DATE_EPOCH (reproducible builds): the commit time of this checkout unless it is set
+if [ -z "${SOURCE_DATE_EPOCH:-}" ]; then
+  SOURCE_DATE_EPOCH="$(git -C "$ROOT" log -1 --format=%ct HEAD)"
+fi
+export SOURCE_DATE_EPOCH
+echo "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
 
 # Verifies the pin tag of a tree when it is present locally (PLAN §2): the tag must point at the
 # pinned commit and carry a good signature. Without gpg or without the release key in the keyring
@@ -123,15 +141,20 @@ for ARCH in $ARCHES; do
   # 3. depends for this host
   make -C "$Z/contrib/depends" HOST="$TRIPLET" -j"$(nproc)"
   TOOLCHAIN="$PREFIX/share/toolchain.cmake"
+  # gcc: -ffile-prefix-map covers __FILE__ and the debug information; the later map wins for
+  # the depends prefix, which lies inside the checkout
+  PREFIX_MAPS="-ffile-prefix-map=$ROOT=. -ffile-prefix-map=$PREFIX=/depends"
 
   # 4. zephyr's library targets, as in bin/build_android.sh (no blocks, no executables)
   ZB="$Z/build/$TRIPLET/release"
+  # A fresh configure every time, with the prefix maps in CFLAGS/CXXFLAGS: CMake adds them to the
+  # platform's initial flags (on Android -funwind-tables -no-canonical-prefixes, on armeabi-v7a
+  # also -march, -marm, -mfpu, -mfloat-abi), which -DCMAKE_C_FLAGS on a first configure would
+  # replace; zephyr's CMakeLists.txt only appends to CMAKE_C_FLAGS/CMAKE_CXX_FLAGS. Objects whose
+  # flags did not change are not rebuilt.
   mkdir -p "$ZB" && cd "$ZB"
-  if [ -f CMakeCache.txt ]; then
-    echo "zephyr: $ZB/CMakeCache.txt exists, skipping cmake"
-  else
-    cmake -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DCMAKE_BUILD_TYPE=Release -DUSE_CCACHE=ON ../../..
-  fi
+  rm -f CMakeCache.txt
+  CFLAGS="$PREFIX_MAPS" CXXFLAGS="$PREFIX_MAPS" cmake -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DCMAKE_BUILD_TYPE=Release -DUSE_CCACHE=ON ../../..
   make -j"$(nproc)" wallet cryptonote_protocol
   cd "$ROOT"
 
@@ -150,7 +173,8 @@ for ARCH in $ARCHES; do
 
   # 5. JNI library
   mkdir -p "build-linux/$ARCH" && cd "build-linux/$ARCH"
-  cmake -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DDEPENDS_PREFIX="$PREFIX" ../..
+  cmake -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DDEPENDS_PREFIX="$PREFIX" \
+    -DCMAKE_C_FLAGS="$PREFIX_MAPS" -DCMAKE_CXX_FLAGS="$PREFIX_MAPS" ../..
   cmake --build . -j"$(nproc)"
   cd "$ROOT"
   mkdir -p "build/natives/linux-$ARCH"
