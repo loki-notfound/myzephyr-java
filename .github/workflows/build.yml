@@ -15,6 +15,13 @@ concurrency:
 permissions:
   contents: read
 
+# every run step under bash: in a container job GitHub's default shell is sh, which is dash in the
+# Debian image, and the steps use bash features (the SDK step's process substitution); with
+# shell: bash GitHub runs "bash --noprofile --norc -eo pipefail {0}", so pipefail holds too
+defaults:
+  run:
+    shell: bash
+
 jobs:
   java:
     # the developer build (bin/build_libzephyr_java.sh) against the distribution's libraries,
