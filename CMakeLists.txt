@@ -14,6 +14,17 @@ endif()
 
 project(zephyr-java-jni)
 
+# Android: the SET of CMAKE_CXX_FLAGS above runs before project(), so on a first configure it hides
+# the Android platform's initial flags (for armeabi-v7a -march=armv7-a -marm -mfpu=vfpv3-d16
+# -mfloat-abi=softfp, which also make the driver link the toolchain's armv7-a libc++ instead of the
+# sysroot's minimal libstdc++); add them back, once
+if (ANDROID)
+  string(FIND " ${CMAKE_CXX_FLAGS} " " ${CMAKE_CXX_FLAGS_INIT} " ANDROID_INIT_FLAGS_POS)
+  if (ANDROID_INIT_FLAGS_POS EQUAL -1)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS_INIT} ${CMAKE_CXX_FLAGS}")
+  endif()
+endif()
+
 #############
 # Paths
 #############
