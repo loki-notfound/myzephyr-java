@@ -147,7 +147,7 @@ public class TestZephyrIntegrationFunds {
   }
 
   private static void log(String msg) {
-    System.out.println("[R8b] " + msg);
+    System.out.println("[funds] " + msg);
   }
 
   private static void walletOpened() {
