@@ -17,11 +17,11 @@
 #   artifacts    every file in dist/<version>/ except manifest.json and SHA256SUMS: name, size,
 #                sha256
 #                The Maven repository and the site (dist/<version>/maven/, site/) are not listed:
-#                they hold copies of these artifacts plus metadata, and come after the manifest.
+#                they hold copies of these artifacts plus metadata (bin/package_release.sh builds
+#                them before the manifest).
 # SHA256SUMS is sha256sum over every file under dist/<version>/, the manifest and the files in
 # maven/ and site/ included, one line per file with its path relative to dist/<version>/.
-# With --sums-only, only SHA256SUMS is rewritten (bin/build_release.sh does that after
-# bin/make_maven_repo.sh and bin/make_site.sh).
+# With --sums-only, only SHA256SUMS is rewritten (bin/package_release.sh does that last).
 # A tool that is not installed is recorded as null.
 #
 # Usage: bin/make_manifest.sh [--sums-only] [dist/<version>]   (default: dist/<version of pom.xml>)

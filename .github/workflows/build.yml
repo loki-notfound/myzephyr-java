@@ -140,9 +140,11 @@ jobs:
           if-no-files-found: error
 
   package:
-    # the JAR (Linux natives, tests on the depends-built x86_64 library), sources and Javadoc
-    # jars, the AAR (Android natives) with its sources jar and POM, the debug symbols, under the
-    # release names of bin/build_release.sh (step 6), then the manifest and SHA256SUMS
+    # bin/package_release.sh, the same packaging script bin/build_release.sh calls, so the CI
+    # release and a local release cannot drift: the JAR (Linux natives, tests on the
+    # depends-built x86_64 library), sources and Javadoc jars, the AAR (Android natives) with its
+    # sources jar and POM, the debug symbols, the Maven repository, the site, the manifest and
+    # SHA256SUMS in dist/<version>/
     needs: natives
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -162,31 +164,10 @@ jobs:
           path: build
       - name: Android SDK platform and build-tools of the AAR build
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" > /dev/null
-      - name: Versions agree
-        run: bin/check_versions.sh
-      - name: JAR, sources and Javadoc jars
-        run: |
-          export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct HEAD)"
-          for ARCH in x86_64 arm64; do
-            mkdir -p "target/natives/linux-$ARCH"
-            cp "build/natives/linux-$ARCH/libzephyr-java.so" "target/natives/linux-$ARCH/"
-          done
-          mvn -q "-Dproject.build.outputTimestamp=$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)" "-Dnative.library.path=$PWD/build/natives/linux-x86_64" package
-      - name: AAR, its sources jar and POM
-        run: cd android && ./gradlew --no-daemon -q assembleRelease publishReleasePublicationToLocalRepository
-      - name: dist/<version>/ with the manifest and SHA256SUMS
-        run: |
-          export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct HEAD)"
-          VERSION="$(sed -n 's/^VERSION_NAME=//p' android/gradle.properties)"
-          DIST="dist/$VERSION"
-          REPO="android/build/repo/io/github/loki-notfound/zephyr-java"
-          mkdir -p "$DIST"
-          cp "target/zephyr-java-$VERSION.jar" "target/zephyr-java-$VERSION-sources.jar" "target/zephyr-java-$VERSION-javadoc.jar" "$DIST/"
-          cp "$(find "$REPO" -type f -name '*.aar')" "$DIST/zephyr-java-$VERSION.aar"
-          cp "$(find "$REPO" -type f -name '*-sources.jar')" "$DIST/zephyr-java-$VERSION-android-sources.jar"
-          cp "$(find "$REPO" -type f -name '*.pom')" "$DIST/zephyr-java-$VERSION-android.pom"
-          tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 --numeric-owner --format=gnu -C build/debug -cf - linux-x86_64 linux-arm64 android-arm64-v8a android-armeabi-v7a android-x86_64 | gzip -9n > "$DIST/debug-symbols-$VERSION.tar.gz"
-          bin/make_manifest.sh "$DIST"
+      - name: dist/<version>/ (bin/package_release.sh)
+        # the natives jobs' artifacts are in build/natives/, build/android/, build/debug/; the
+        # script checks the versions first (bin/check_versions.sh)
+        run: bin/package_release.sh "$(sed -n 's/^VERSION_NAME=//p' android/gradle.properties)"
       - uses: actions/upload-artifact@v4
         with:
           name: dist
