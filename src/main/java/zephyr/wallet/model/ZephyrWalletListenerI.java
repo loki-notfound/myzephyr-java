@@ -38,6 +38,10 @@ public interface ZephyrWalletListenerI {
    * Invoked 3 times per received output: once when unconfirmed, once when confirmed, and
    * once when unlocked.
    * 
+   * <p>The unconfirmed notification carries no asset type (the core does not pass it for pool
+   * outputs); the confirmed and unlocked notifications do. Use {@code onBalancesChanged} or
+   * {@code getTxs()} for the asset of an unconfirmed output.</p>
+   * 
    * @param output - the received output
    */
   public void onOutputReceived(ZephyrOutputWallet output);

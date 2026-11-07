@@ -20,6 +20,11 @@ public class ZephyrWalletListener implements ZephyrWalletListenerI {
   @Deprecated
   public final void onBalancesChanged(BigInteger newBalance, BigInteger newUnlockedBalance) { }
 
+  /**
+   * The unconfirmed notification carries no asset type (the core does not pass it for pool
+   * outputs); the confirmed and unlocked notifications do. Use {@code onBalancesChanged} or
+   * {@code getTxs()} for the asset of an unconfirmed output.
+   */
   @Override
   public void onOutputReceived(ZephyrOutputWallet output) { }
 

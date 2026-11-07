@@ -58,7 +58,8 @@ import zephyr.wallet.model.ZephyrWalletListener;
  * <p>Wallet A is the funding wallet of {@link TestZephyrIntegration}; wallet B is created in test 2.
  * Every destination is one of three addresses: A's primary address, B's primary address, or the
  * return address. After any failure no later test builds or relays a transaction; test 8 only
- * reads and records the state. The class is meant to run once.</p>
+ * reads and records the state. The class is resumable: tests 1 and 2 pick up wallet B and the
+ * transfer of test 2 from the wallets' history instead of sending again.</p>
  */
 @TestMethodOrder(OrderAnnotation.class)
 public class TestZephyrIntegrationFunds {
@@ -102,7 +103,8 @@ public class TestZephyrIntegrationFunds {
   // what the round sent: hash -> {test, source, destination}, per sending wallet
   private static final Map<String, String[]> roundTxsA = new LinkedHashMap<String, String[]>();
   private static final Map<String, String[]> roundTxsB = new LinkedHashMap<String, String[]>();
-  private static String transferHash;                                    // test 2
+  private static String transferHash;                                    // test 2 (or found by test 1)
+  private static BigInteger transferFee;
   private static final Map<String, BigInteger> sentToOwner = new LinkedHashMap<String, BigInteger>();
   private static final Map<String, BigInteger> feesPaid = new LinkedHashMap<String, BigInteger>();
 
@@ -309,14 +311,21 @@ public class TestZephyrIntegrationFunds {
 
   private static class FundsRecorder extends ZephyrWalletListener {
     final List<String> outputsReceived = new CopyOnWriteArrayList<String>();
+    final List<String> outputAssets = new CopyOnWriteArrayList<String>();
     final List<String> balanceAssets = new CopyOnWriteArrayList<String>();
+    final List<String> balanceAssetNames = new CopyOnWriteArrayList<String>();
     @Override
     public void onOutputReceived(ZephyrOutputWallet output) {
-      outputsReceived.add(output.getAssetType() + " " + output.getAmount());
+      String asset = output.getAssetType();
+      outputAssets.add(asset == null ? "null" : asset);
+      outputsReceived.add("asset " + (asset == null ? "null" : "'" + asset + "'") + " amount " + output.getAmount()
+          + " confirmed " + (output.getTx() == null ? null : output.getTx().isConfirmed())
+          + " locked " + (output.getTx() == null ? null : output.getTx().isLocked()));
     }
     @Override
     public void onBalancesChanged(BigInteger newBalance, BigInteger newUnlockedBalance, String assetType) {
-      balanceAssets.add(assetType + " " + newBalance + "/" + newUnlockedBalance);
+      balanceAssetNames.add(assetType == null ? "null" : assetType);
+      balanceAssets.add("asset " + (assetType == null ? "null" : "'" + assetType + "'") + " " + newBalance + "/" + newUnlockedBalance);
     }
   }
 
@@ -348,7 +357,26 @@ public class TestZephyrIntegrationFunds {
       log("A synced in " + (System.currentTimeMillis() - start) + " ms to height " + walletA.getHeight());
       printBalances("test 1, after sync");
 
-      assertEquals(FUNDED, bal(walletA, ZPH), "A ZPH balance");
+      // resumable: the transfer of test 2 may be in A's history already (an outgoing 10 ZPH to another address)
+      List<ZephyrTxWallet> earlier = new ArrayList<ZephyrTxWallet>();
+      for (ZephyrTxWallet tx : walletA.getTxs()) {
+        ZephyrOutgoingTransfer out = tx.getOutgoingTransfer();
+        if (out == null || out.getDestinations() == null) continue;
+        for (ZephyrDestination d : out.getDestinations()) {
+          if (!addressA.equals(d.getAddress()) && TRANSFER_AMOUNT.equals(d.getAmount())) { earlier.add(tx); break; }
+        }
+      }
+      assertTrue(earlier.size() <= 1, "more than one earlier 10 ZPH transfer in A's history: " + earlier.size());
+      if (earlier.isEmpty()) {
+        log("no earlier transfer in A's history: a fresh start");
+        assertEquals(FUNDED, bal(walletA, ZPH), "A ZPH balance");
+      } else {
+        ZephyrTxWallet t = earlier.get(0);
+        transferHash = t.getHash();
+        transferFee = t.getFee();
+        log("resumed: the test-2 transfer is in A's history: " + summary(t));
+        assertEquals(FUNDED.subtract(TRANSFER_AMOUNT).subtract(transferFee), bal(walletA, ZPH), "A ZPH balance after the earlier transfer");
+      }
       assertEquals(BigInteger.ZERO, bal(walletA, ZRS), "A ZRS balance");
       List<ZephyrTxWallet> txs = walletA.getTxs(FUNDING_TX_HASH);
       assertEquals(1, txs.size(), "funding tx in getTxs");
@@ -369,62 +397,87 @@ public class TestZephyrIntegrationFunds {
   public void testTransferToSecondWallet() throws Exception {
     assumeSending();
     guarded("testTransferToSecondWallet", () -> {
-      assertFalse(ZephyrWalletFull.walletExists(WALLET_B_PATH), "wallet B exists already; this class runs once");
-      new File(WALLET_B_PATH).getParentFile().mkdirs();
-      walletB = ZephyrWalletFull.createWallet(new ZephyrWalletConfig()
-          .setPath(WALLET_B_PATH)
-          .setPassword(TEST_PASSWORD)
-          .setNetworkType(ZephyrNetworkType.MAINNET)
-          .setServerUri(DAEMON_URI));
-      walletOpened();
-      addressB = walletB.getPrimaryAddress();
-      log("wallet B created: " + addressB + ", restore height " + walletB.getRestoreHeight());
+      if (ZephyrWalletFull.walletExists(WALLET_B_PATH)) {
+        walletB = ZephyrWalletFull.openWallet(WALLET_B_PATH, TEST_PASSWORD, ZephyrNetworkType.MAINNET, DAEMON_URI);
+        walletOpened();
+        addressB = walletB.getPrimaryAddress();
+        log("wallet B opened: " + addressB + ", restore height " + walletB.getRestoreHeight());
+      } else {
+        new File(WALLET_B_PATH).getParentFile().mkdirs();
+        walletB = ZephyrWalletFull.createWallet(new ZephyrWalletConfig()
+            .setPath(WALLET_B_PATH)
+            .setPassword(TEST_PASSWORD)
+            .setNetworkType(ZephyrNetworkType.MAINNET)
+            .setServerUri(DAEMON_URI));
+        walletOpened();
+        addressB = walletB.getPrimaryAddress();
+        log("wallet B created: " + addressB + ", restore height " + walletB.getRestoreHeight());
+      }
       ZephyrDecodedAddress decodedB = ZephyrUtils.decodeAddress(addressB);
       assertEquals(ZephyrNetworkType.MAINNET, decodedB.getNetworkType());
       assertEquals(ZephyrAddressType.PRIMARY_ADDRESS, decodedB.getAddressType());
       assertFalse(addressB.equals(addressA) || addressB.equals(RETURN_ADDRESS), "wallet B address collides");
       walletB.save();
-      FundsRecorder recorder = new FundsRecorder();
-      walletB.addListener(recorder);
       walletA.sync();
+      long start = System.currentTimeMillis();
       walletB.sync();
+      log("B synced in " + (System.currentTimeMillis() - start) + " ms to height " + walletB.getHeight());
       printBalances("test 2, before");
-      BigInteger aBefore = bal(walletA, ZPH);
 
-      ZephyrTxConfig config = new ZephyrTxConfig()
-          .addDestination(addressB, TRANSFER_AMOUNT)
-          .setSourceCurrency(ZPH).setDestinationCurrency(ZPH)
-          .setAccountIndex(0)
-          .setRelay(true);
-      assertDestination(config, addressB);
-      List<ZephyrTxWallet> txs = walletA.createTxs(config);
-      assertEquals(1, txs.size(), "one tx");
-      ZephyrTxWallet tx = txs.get(0);
-      transferHash = tx.getHash();
-      roundTxsA.put(tx.getHash(), new String[] { "test 2 transfer A -> B", ZPH, ZPH });
-      addTo(feesPaid, ZPH, tx.getFee());
-      log("TX test 2 (transfer A -> B, 10 ZPH): " + summary(tx));
-      assertTrue(tx.getFee().signum() > 0 && tx.getFee().compareTo(MAX_FEE) < 0, "fee " + tx.getFee());
-      ZephyrOutgoingTransfer out = tx.getOutgoingTransfer();
-      assertNotNull(out, "outgoing transfer");
-      assertEquals(ZPH, out.getAssetType(), "outgoing asset");
-      assertEquals(1, out.getDestinations().size(), "one destination");
-      assertEquals(addressB, out.getDestinations().get(0).getAddress(), "destination address");
-      assertEquals(TRANSFER_AMOUNT, out.getDestinations().get(0).getAmount(), "destination amount");
+      if (TRANSFER_AMOUNT.equals(bal(walletB, ZPH))) {
+        log("resumed: transfer already done");
+        assertNotNull(transferHash, "B holds 10 ZPH but test 1 found no transfer in A's history");
+        roundTxsA.put(transferHash, new String[] { "test 2 transfer A -> B", ZPH, ZPH });
+        addTo(feesPaid, ZPH, transferFee);
+        List<ZephyrTxWallet> inB = walletB.getTxs(transferHash);
+        assertEquals(1, inB.size(), "the transfer in B's getTxs");
+        log("the transfer in B: " + summary(inB.get(0)));
+        assertEquals(TRANSFER_AMOUNT, incomingAmount(inB.get(0), ZPH), "incoming ZPH of the transfer in B");
+        log("send and listener assertions skipped: covered by the first run (tx " + transferHash + ")");
+        waitFor("B unlocked ZPH equals 10", () -> TRANSFER_AMOUNT.equals(unl(walletB, ZPH)), walletB);
+      } else {
+        assertEquals(BigInteger.ZERO, bal(walletB, ZPH), "B ZPH before the transfer");
+        assertTrue(transferHash == null, "A's history has a transfer but B does not hold 10 ZPH: " + transferHash);
+        FundsRecorder recorder = new FundsRecorder();
+        walletB.addListener(recorder);
+        BigInteger aBefore = bal(walletA, ZPH);
+        assertEquals(FUNDED, aBefore, "A ZPH before the transfer");
+        ZephyrTxConfig config = new ZephyrTxConfig()
+            .addDestination(addressB, TRANSFER_AMOUNT)
+            .setSourceCurrency(ZPH).setDestinationCurrency(ZPH)
+            .setAccountIndex(0)
+            .setRelay(true);
+        assertDestination(config, addressB);
+        List<ZephyrTxWallet> txs = walletA.createTxs(config);
+        assertEquals(1, txs.size(), "one tx");
+        ZephyrTxWallet tx = txs.get(0);
+        transferHash = tx.getHash();
+        transferFee = tx.getFee();
+        roundTxsA.put(tx.getHash(), new String[] { "test 2 transfer A -> B", ZPH, ZPH });
+        addTo(feesPaid, ZPH, tx.getFee());
+        log("TX test 2 (transfer A -> B, 10 ZPH): " + summary(tx));
+        assertTrue(tx.getFee().signum() > 0 && tx.getFee().compareTo(MAX_FEE) < 0, "fee " + tx.getFee());
+        ZephyrOutgoingTransfer out = tx.getOutgoingTransfer();
+        assertNotNull(out, "outgoing transfer");
+        assertEquals(ZPH, out.getAssetType(), "outgoing asset");
+        assertEquals(1, out.getDestinations().size(), "one destination");
+        assertEquals(addressB, out.getDestinations().get(0).getAddress(), "destination address");
+        assertEquals(TRANSFER_AMOUNT, out.getDestinations().get(0).getAmount(), "destination amount");
 
-      waitFor("B balance shows 10 ZPH", () -> TRANSFER_AMOUNT.equals(bal(walletB, ZPH)), walletB);
-      log("B listener: onOutputReceived " + recorder.outputsReceived + "; onBalancesChanged " + recorder.balanceAssets);
-      boolean outputZph = false;
-      for (String s : recorder.outputsReceived) if (s.startsWith(ZPH + " ")) outputZph = true;
-      boolean balanceZph = false;
-      for (String s : recorder.balanceAssets) if (s.startsWith(ZPH + " ")) balanceZph = true;
-      assertTrue(outputZph, "no onOutputReceived with asset ZPH: " + recorder.outputsReceived);
-      assertTrue(balanceZph, "no onBalancesChanged with asset ZPH: " + recorder.balanceAssets);
-      waitFor("B unlocked ZPH equals 10", () -> TRANSFER_AMOUNT.equals(unl(walletB, ZPH)), walletB);
-      walletB.removeListener(recorder);
+        waitFor("B balance shows 10 ZPH", () -> TRANSFER_AMOUNT.equals(bal(walletB, ZPH)), walletB);
+        log("B listener after the pool payment: onOutputReceived " + recorder.outputsReceived + "; onBalancesChanged " + recorder.balanceAssets);
+        String hash = transferHash;
+        waitFor("the transfer is confirmed in B", () -> confirmed(walletB, Collections.singletonList(hash)), walletB);
+        log("B listener after confirmation: onOutputReceived " + recorder.outputsReceived + "; onBalancesChanged " + recorder.balanceAssets);
+        assertTrue(recorder.outputAssets.contains(ZPH), "no onOutputReceived with asset ZPH: " + recorder.outputsReceived);
+        assertTrue(recorder.balanceAssetNames.contains(ZPH), "no onBalancesChanged with asset ZPH: " + recorder.balanceAssets);
+        waitFor("B unlocked ZPH equals 10", () -> TRANSFER_AMOUNT.equals(unl(walletB, ZPH)), walletB);
+        log("B listener after unlock: onOutputReceived " + recorder.outputsReceived + "; onBalancesChanged " + recorder.balanceAssets);
+        walletB.removeListener(recorder);
+      }
       walletA.sync();
       printBalances("test 2, after");
-      assertEquals(aBefore.subtract(TRANSFER_AMOUNT).subtract(tx.getFee()), bal(walletA, ZPH), "A ZPH after the transfer");
+      assertEquals(FUNDED.subtract(TRANSFER_AMOUNT).subtract(transferFee), bal(walletA, ZPH), "A ZPH after the transfer");
       assertEquals(BigInteger.ZERO, bal(walletA, ZRS), "A ZRS after the transfer");
       assertEquals(TRANSFER_AMOUNT, bal(walletB, ZPH), "B ZPH after the transfer");
     });
@@ -460,6 +513,7 @@ public class TestZephyrIntegrationFunds {
     assumeSending();
     guarded("testMintReserve", () -> {
       walletA.sync();
+      waitFor("A unlocked ZPH equals the balance", () -> unl(walletA, ZPH).equals(bal(walletA, ZPH)), walletA);
       if (walletB != null) walletB.sync();
       printBalances("test 4, before");
       BigInteger zphBefore = bal(walletA, ZPH);
@@ -557,6 +611,7 @@ public class TestZephyrIntegrationFunds {
   public void testMintRemainder() throws Exception {
     assumeSending();
     guarded("testMintRemainder", () -> {
+      walletA.sync();
       waitFor("A unlocked ZPH equals the balance", () -> unl(walletA, ZPH).equals(bal(walletA, ZPH)), walletA);
       if (walletB != null) walletB.sync();
       printBalances("test 6, before");
@@ -644,6 +699,8 @@ public class TestZephyrIntegrationFunds {
   public void testReturnEverything() throws Exception {
     assumeSending();
     guarded("testReturnEverything", () -> {
+      walletA.sync();
+      waitFor("A unlocked ZPH equals the balance", () -> unl(walletA, ZPH).equals(bal(walletA, ZPH)), walletA);
       waitFor("A unlocked ZRS equals the balance", () -> unl(walletA, ZRS).equals(bal(walletA, ZRS)), walletA);
       if (walletB != null) walletB.sync();
       printBalances("test 7, before");
