@@ -1,0 +1,19 @@
+Description: run the NDK r18b standalone-toolchain script with python3 explicitly
+ The script's shebang is "python", which Debian 13 and other current hosts do not provide;
+ the build must not depend on a host alias.
+Origin: zephyr-java
+Forwarded: not-needed
+Drop-when: the depends tree runs the script with python3 itself (newer Monero depends use a
+ unified NDK toolchain and no longer run this script)
+
+--- a/contrib/depends/packages/android_ndk.mk
++++ b/contrib/depends/packages/android_ndk.mk
+@@ -21,7 +21,7 @@
+ endef
+ 
+ define $(package)_stage_cmds
+-  android-ndk-r$($(package)_version)/build/tools/make_standalone_toolchain.py --api 21 \
++  python3 android-ndk-r$($(package)_version)/build/tools/make_standalone_toolchain.py --api 21 \
+     --install-dir $(build_prefix) --stl=libc++ $($(package)_config_opts) &&\
+   mv $(build_prefix) $($(package)_staging_dir)/$(host_prefix)
+ endef

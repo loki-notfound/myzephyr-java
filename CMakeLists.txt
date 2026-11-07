@@ -20,7 +20,17 @@ project(zephyr-java-jni)
 
 set(ZEPHYR_CPP "${CMAKE_SOURCE_DIR}/external/zephyr-cpp" CACHE STRING "zephyr-cpp source directory")
 set(MONERO_PROJECT "${ZEPHYR_CPP}/external/zephyr" CACHE STRING "zephyr source directory")
-set(MONERO_PROJECT_BUILD "${MONERO_PROJECT}/build/release" CACHE STRING "zephyr build directory")
+if (ANDROID)
+  # Android: zephyr is built with its contrib/depends toolchain in build/<triplet>/release
+  # (bin/build_android.sh); ANDROID_HOST is that depends triplet
+  set(ANDROID_HOST "" CACHE STRING "depends host triplet of the Android build, e.g. aarch64-linux-android")
+  if (NOT ANDROID_HOST)
+    message(FATAL_ERROR "ANDROID_HOST (the depends triplet) must be set for an Android build")
+  endif()
+  set(MONERO_PROJECT_BUILD "${MONERO_PROJECT}/build/${ANDROID_HOST}/release" CACHE STRING "zephyr build directory")
+else()
+  set(MONERO_PROJECT_BUILD "${MONERO_PROJECT}/build/release" CACHE STRING "zephyr build directory")
+endif()
 set(ZEPHYR_CPP_SRC "${ZEPHYR_CPP}/src")
 set(MONERO_PROJECT_SRC "${MONERO_PROJECT}/src")
 message(STATUS "Using zephyr-cpp at ${ZEPHYR_CPP}")
@@ -82,7 +92,8 @@ message(STATUS EXTRA_LIBRARIES: ${EXTRA_LIBRARIES})
 # Protobuf
 ############
 
-if (NOT APPLE)
+# Android: zephyr builds without Trezor, hidapi and libusb there; no protobuf, libusb or HIDAPI
+if (NOT APPLE AND NOT ANDROID)
   include(FindProtobuf)
   find_package(Protobuf)
   message(STATUS "Protobuf lib: ${Protobuf_LIBRARY}, inc: ${Protobuf_INCLUDE_DIR}, protoc: ${Protobuf_PROTOC_EXECUTABLE}")
@@ -93,8 +104,10 @@ endif()
 # LibUSB
 ############
 
-find_library(usb_LIBRARY NAMES usb-1.0 libusb usb)
-set(LibUSB_LIBRARIES ${usb_LIBRARY})
+if (NOT ANDROID)
+  find_library(usb_LIBRARY NAMES usb-1.0 libusb usb)
+  set(LibUSB_LIBRARIES ${usb_LIBRARY})
+endif()
 
 ############
 # Boost
@@ -102,6 +115,11 @@ set(LibUSB_LIBRARIES ${usb_LIBRARY})
 
 set(Boost_NO_BOOST_CMAKE 1)
 set(Boost_USE_MULTITHREADED ON)
+if (ANDROID)
+  # the depends prefix holds static boost only (runtime-link=static)
+  set(Boost_USE_STATIC_LIBS ON)
+  set(Boost_USE_STATIC_RUNTIME ON)
+endif()
 find_package(Boost 1.58 QUIET REQUIRED COMPONENTS chrono date_time filesystem program_options regex serialization wserialization system thread)
 message(STATUS "Using Boost include dir at ${Boost_INCLUDE_DIR}")
 include_directories(${Boost_INCLUDE_DIR})
@@ -120,6 +138,9 @@ if (APPLE AND NOT IOS)
   endif()
 endif()
 
+if (ANDROID)
+  set(OPENSSL_USE_STATIC_LIBS ON)
+endif()
 find_package(OpenSSL REQUIRED)
 message(STATUS "Using OpenSSL include dir at ${OPENSSL_INCLUDE_DIR}")
 include_directories(${OPENSSL_INCLUDE_DIR})
@@ -152,10 +173,12 @@ if(APPLE)
   endif()
 endif()
 
-find_package(HIDAPI REQUIRED)
-message(STATUS "Using HIDAPI include dir at ${HIDAPI_INCLUDE_DIR}")
-add_definitions(-DHAVE_HIDAPI)
-include_directories(${HIDAPI_INCLUDE_DIR})
+if (NOT ANDROID)
+  find_package(HIDAPI REQUIRED)
+  message(STATUS "Using HIDAPI include dir at ${HIDAPI_INCLUDE_DIR}")
+  add_definitions(-DHAVE_HIDAPI)
+  include_directories(${HIDAPI_INCLUDE_DIR})
+endif()
 
 #############
 # zephyr static libraries (same list and paths as zephyr-cpp's CMakeLists.txt)
@@ -190,7 +213,7 @@ else()
   if(UNBOUND_LIBRARIES)
     message(STATUS "Found libunbound library")
     include_directories(${UNBOUND_INCLUDE_DIR})
-    if (WIN32)
+    if (WIN32 OR ANDROID)
       add_library(unbound STATIC IMPORTED)
     else()
       add_library(unbound SHARED IMPORTED)
@@ -267,9 +290,13 @@ add_library(device STATIC IMPORTED)
 set_target_properties(device PROPERTIES IMPORTED_LOCATION
     ${MONERO_PROJECT_BUILD}/src/device/libdevice.a)
 
-add_library(device_trezor STATIC IMPORTED)
-set_target_properties(device_trezor PROPERTIES IMPORTED_LOCATION
-    ${MONERO_PROJECT_BUILD}/src/device_trezor/libdevice_trezor.a)
+# Android: device_trezor (built without hardware support there) is linked only if its archive exists
+if (NOT ANDROID OR EXISTS ${MONERO_PROJECT_BUILD}/src/device_trezor/libdevice_trezor.a)
+  add_library(device_trezor STATIC IMPORTED)
+  set_target_properties(device_trezor PROPERTIES IMPORTED_LOCATION
+      ${MONERO_PROJECT_BUILD}/src/device_trezor/libdevice_trezor.a)
+  set(device_trezor_lib device_trezor)
+endif()
 
 add_library(multisig STATIC IMPORTED)
 set_target_properties(multisig PROPERTIES IMPORTED_LOCATION
@@ -315,9 +342,17 @@ target_compile_options(zephyr-java PRIVATE -include map)
 # carries visibility("default") itself, so the bridge's entry points and JNI_OnLoad stay exported.
 target_compile_options(zephyr-java PRIVATE -fvisibility=hidden -fvisibility-inlines-hidden)
 
+# Android: OpenSSL comes only from the depends prefix (OPENSSL_LIBRARIES); protobuf is the depends
+# libprotobuf.a that the toolchain file sets as Protobuf_LIBRARY (zephyr builds device_trezor with
+# protobuf there, without libusb and hidapi)
+if (ANDROID)
+  set(JNI_SSL_NAMES "")
+else()
+  set(JNI_SSL_NAMES ssl crypto)
+endif()
+
 target_link_libraries(zephyr-java
-    ssl
-    crypto
+    ${JNI_SSL_NAMES}
 
     wallet
     rpc_base
@@ -337,7 +372,7 @@ target_link_libraries(zephyr-java
     blockchain_db
     checkpoints
     device
-    device_trezor
+    ${device_trezor_lib}
     multisig
     version
     randomx
@@ -368,6 +403,23 @@ endif()
 
 if (WIN32)
   target_link_options(zephyr-java PUBLIC "-Wl,--enable-auto-import,--export-all-symbols")
+endif()
+
+# Android: one self-contained .so per ABI in the AAR, so libc++ is linked statically; 16 KB page
+# alignment (a Google Play requirement for arm64 and x86_64, harmless on armeabi-v7a); liblog
+if (ANDROID)
+  target_link_options(zephyr-java PRIVATE -static-libstdc++ -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384)
+  # Android's linker resolves every symbol at load time, so an unresolved symbol is a link error
+  # here, not a crash on the device
+  target_link_options(zephyr-java PRIVATE -Wl,--no-undefined)
+  # zephyr's liboracle.a (pricing records; not in zephyr-cpp's import list) and, after
+  # device_trezor, cncrypto again (hmac_keccak_hash); then what liboracle.a needs
+  add_library(oracle STATIC IMPORTED)
+  set_target_properties(oracle PROPERTIES IMPORTED_LOCATION
+      ${MONERO_PROJECT_BUILD}/src/oracle/liboracle.a)
+  target_link_libraries(zephyr-java oracle cncrypto easylogging epee ${OPENSSL_LIBRARIES})
+  target_link_libraries(zephyr-java log)
+  message(STATUS "Android ABI ${CMAKE_ANDROID_ARCH_ABI}, zephyr build ${MONERO_PROJECT_BUILD}")
 endif()
 
 INSTALL(TARGETS zephyr-java

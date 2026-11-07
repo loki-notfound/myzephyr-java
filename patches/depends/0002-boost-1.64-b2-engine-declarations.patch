@@ -1,0 +1,78 @@
+Description: boost 1.64 Boost.Build engine: add the includes and the two prototypes gcc 14 requires
+ The 2017 engine relies on implicit function declarations, which gcc 14 rejects; the host
+ compiles this engine, so the Android depends build fails before boost itself is built.
+Origin: zephyr-java
+Forwarded: not-needed
+Drop-when: depends moves to a boost whose engine builds with current compilers (Monero's
+ depends did so with boost 1.84 in 2024)
+
+--- a/contrib/depends/packages/boost.mk
++++ b/contrib/depends/packages/boost.mk
+@@ -3,7 +3,7 @@
+ $(package)_download_path=https://downloads.sourceforge.net/project/boost/boost/1.64.0/
+ $(package)_file_name=$(package)_$($(package)_version).tar.bz2
+ $(package)_sha256_hash=7bcc5caace97baa948931d712ea5f37038dbb1c5d89b43ad4def4ed7cb683332
+-$(package)_patches=fix_aroptions.patch fix_arm_arch.patch
++$(package)_patches=fix_aroptions.patch fix_arm_arch.patch b2-engine-implicit-declarations.patch
+ 
+ define $(package)_set_vars
+ $(package)_config_opts_release=variant=release
+@@ -31,6 +31,7 @@
+ define $(package)_preprocess_cmds
+   patch -p1 < $($(package)_patch_dir)/fix_aroptions.patch &&\
+   patch -p1 < $($(package)_patch_dir)/fix_arm_arch.patch &&\
++  patch -p1 < $($(package)_patch_dir)/b2-engine-implicit-declarations.patch &&\
+   echo "using $(boost_toolset_$(host_os)) : : $($(package)_cxx) : <cxxflags>\"$($(package)_cxxflags) $($(package)_cppflags)\" <linkflags>\"$($(package)_ldflags)\" <archiver>\"$(boost_archiver_$(host_os))\" <arflags>\"$($(package)_arflags)\" <striper>\"$(host_STRIP)\"  <ranlib>\"$(host_RANLIB)\" <rc>\"$(host_WINDRES)\" : ;" > user-config.jam
+ endef
+ 
+--- /dev/null
++++ b/contrib/depends/patches/boost/b2-engine-implicit-declarations.patch
+@@ -0,0 +1,48 @@
++--- boost_1_64_0/tools/build/src/engine/execcmd.c
+++++ boost_1_64_0/tools/build/src/engine/execcmd.c
++@@ -10,6 +10,7 @@
++ 
++ #include "jam.h"
++ #include "execcmd.h"
+++#include "output.h"
++ 
++ #include <assert.h>
++ #include <stdio.h>
++--- boost_1_64_0/tools/build/src/engine/filesys.h
+++++ boost_1_64_0/tools/build/src/engine/filesys.h
++@@ -87,6 +87,7 @@
++ FILELIST * filelist_push_front( FILELIST * list, OBJECT * path );
++ FILELIST * filelist_pop_front( FILELIST * list );
++ int filelist_length( FILELIST * list );
+++int filelist_empty( FILELIST * list );
++ void filelist_free( FILELIST * list );
++ 
++ FILELISTITER filelist_begin( FILELIST * list );
++@@ -101,6 +102,7 @@
++ 
++ /* Internal utility worker functions. */
++ void file_query_posix_( file_info_t * const );
+++int file_collect_archive_content_( file_archive_info_t * const archive );
++ 
++ void file_done();
++ 
++--- boost_1_64_0/tools/build/src/engine/make.c
+++++ boost_1_64_0/tools/build/src/engine/make.c
++@@ -31,6 +31,7 @@
++ 
++ #include "jam.h"
++ #include "make.h"
+++#include "output.h"
++ 
++ #include "command.h"
++ #ifdef OPT_HEADER_CACHE_EXT
++--- boost_1_64_0/tools/build/src/engine/modules/path.c
+++++ boost_1_64_0/tools/build/src/engine/modules/path.c
++@@ -5,6 +5,7 @@
++  */
++ 
++ #include "../constants.h"
+++#include "../filesys.h"
++ #include "../frames.h"
++ #include "../lists.h"
++ #include "../native.h"
