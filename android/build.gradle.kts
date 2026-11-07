@@ -59,7 +59,9 @@ publishing {
     repositories {
         maven {
             name = "local"
-            url = uri(layout.buildDirectory.dir("repo"))
+            // build/repo; bin/make_maven_repo.sh publishes into dist/<version>/maven with -PrepoDir=
+            val repoDir = providers.gradleProperty("repoDir")
+            url = if (repoDir.isPresent) uri(repoDir.get()) else uri(layout.buildDirectory.dir("repo"))
         }
     }
 }

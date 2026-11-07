@@ -16,10 +16,15 @@
 #                and sha256 as declared there
 #   artifacts    every file in dist/<version>/ except manifest.json and SHA256SUMS: name, size,
 #                sha256
-# SHA256SUMS is sha256sum over every file of dist/<version>/, the manifest included.
+#                The Maven repository and the site (dist/<version>/maven/, site/) are not listed:
+#                they hold copies of these artifacts plus metadata, and come after the manifest.
+# SHA256SUMS is sha256sum over every file under dist/<version>/, the manifest and the files in
+# maven/ and site/ included, one line per file with its path relative to dist/<version>/.
+# With --sums-only, only SHA256SUMS is rewritten (bin/build_release.sh does that after
+# bin/make_maven_repo.sh and bin/make_site.sh).
 # A tool that is not installed is recorded as null.
 #
-# Usage: bin/make_manifest.sh [dist/<version>]   (default: dist/<version of pom.xml>)
+# Usage: bin/make_manifest.sh [--sums-only] [dist/<version>]   (default: dist/<version of pom.xml>)
 
 set -euo pipefail
 
@@ -30,7 +35,13 @@ if [ -z "${SOURCE_DATE_EPOCH:-}" ]; then
 fi
 export SOURCE_DATE_EPOCH
 
-python3 -I - "${1:-}" <<'PY'
+SUMS_ONLY=0
+if [ "${1:-}" = --sums-only ]; then
+  SUMS_ONLY=1
+  shift
+fi
+
+[ "$SUMS_ONLY" = 1 ] || python3 -I - "${1:-}" <<'PY'
 import hashlib
 import json
 import os
@@ -220,5 +231,5 @@ main()
 PY
 
 DIST="${1:-dist/$(python3 -I -c 'import sys,xml.etree.ElementTree as E; print(E.parse(sys.argv[1]).getroot().find("{http://maven.apache.org/POM/4.0.0}version").text.strip())' pom.xml)}"
-(cd "$DIST" && find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%f\n' | LC_ALL=C sort | xargs sha256sum > SHA256SUMS)
+(cd "$DIST" && find . -type f ! -path ./SHA256SUMS -printf '%P\n' | LC_ALL=C sort | xargs -d '\n' sha256sum > SHA256SUMS)
 echo "wrote $DIST/SHA256SUMS: $(wc -l < "$DIST/SHA256SUMS") files"

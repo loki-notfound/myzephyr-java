@@ -40,8 +40,10 @@ What works today, on the development branches:
 
 Releases are published as GitHub releases and in a static Maven repository on this project's
 GitHub Pages, `https://loki-notfound.github.io/zephyr-java/maven` (available with the first
-release). Maven Central may follow once the API has settled.
-<!-- RELEASES §5; PLAN §2 "Distribution" -->
+release). Maven Central may follow once the API has settled. The repository and the Javadoc live on
+the project's GitHub Pages, built by `bin/make_site.sh` from each release (`dist/<version>/site/`)
+and published with the first release.
+<!-- RELEASES §5; PLAN §2 "Distribution"; bin/make_maven_repo.sh, bin/make_site.sh -->
 
 Android (Gradle, Kotlin DSL). The AAR has its own artifactId, `zephyr-java-android`, and brings
 its POM's dependencies (Jackson and the Apache HTTP client) along:
