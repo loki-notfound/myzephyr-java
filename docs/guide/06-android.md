@@ -31,7 +31,7 @@ commons-codec.
 file `META-INF/DEPENDENCIES`, and without the exclude the app's build stops in
 `mergeDebugJavaResource` with "3 files found with path 'META-INF/DEPENDENCIES'". The file is Maven
 metadata; nothing reads it at run time.
-<!-- QUESTIONS R10-5 item 1 (verbatim error) and answer (a); android/testapp/build.gradle.kts packaging block -->
+<!-- QUESTIONS R10-5 item 1 (verbatim error) and answer (a); evidence/r13/consumer-android.app.build.gradle.kts packaging block -->
 
 **Jackson.** The library pins Jackson 2.13.5 because 2.13 is the last Jackson line that runs on
 Android below API 26 (earlier 2.13 releases call `Method.getParameterCount()`, which API 24 and
@@ -54,16 +54,14 @@ it, so an app without jeromq builds cleanly.
   (Cortex-A8 and A9 cores lack it); every Android 7 device supports it.
 - **16 KB pages:** the libraries are linked for 16 KB page alignment, which Google Play requires for
   apps that target Android 15 and later. Keep them uncompressed in the APK
-  (`packaging { jniLibs.useLegacyPackaging = false }`, as the test app sets); the test app's APK
-  passes `zipalign -c -P 16`.
-- **Size:** each ABI's library is about 28 to 35 MB before stripping. Every ABI you ship adds one;
-  the test app's debug APK with all three is 95.6 MB.
-<!-- RELEASES §6 (minSdk 24, final); RELEASES §7 R9 outcome (-mfpu=vfpv4, "every Android 7 device supports"); evidence/r9/android-r9.md:163-165 (VFPv4 from zephyr's CMakeLists; Cortex-A8/A9 without VFPv4); RELEASES §3 (16 KB page size, Google Play requirement for apps targeting Android 15+); PLAN §5 R9 result (sizes 31.7, 27.6, 34.5 MB before stripping) and R10 result (APK passes zipalign -c -P 16, .so stored and 16 KB aligned); QUESTIONS R10-6 (testapp-debug.apk 95,587,430 bytes) -->
+  (`packaging { jniLibs.useLegacyPackaging = false }`); an app built against the AAR with AGP
+  9.5.0 passes `zipalign -c -P 16`, with the three libraries stored.
+- **Size:** each ABI's library is about 28 to 35 MB before stripping. Every ABI you ship adds one.
+<!-- RELEASES §6 (minSdk 24, final); RELEASES §7 R9 outcome (-mfpu=vfpv4, "every Android 7 device supports"); evidence/r9/android-r9.md:163-165 (VFPv4 from zephyr's CMakeLists; Cortex-A8/A9 without VFPv4); RELEASES §3 (16 KB page size, Google Play requirement for apps targeting Android 15+); PLAN §5 R9 result (sizes 31.7, 27.6, 34.5 MB before stripping) and R10 result (APK passes zipalign -c -P 16, .so stored and 16 KB aligned); evidence/r13/release-candidate-r13.md (the consumer app check: AGP 9.5.0, zipalign -c -P 16, the three libraries stored) -->
 
 The libraries have been built and checked on this project's build host, but **not yet run on a
-device or an emulator**: the build host has no hardware virtualisation. The test app in
-`android/testapp` is for that check (below).
-<!-- PLAN §5 R10 ("The VM has no KVM, so the Android test app is built and checked ... but not run") -->
+device or an emulator**: the build host has no hardware virtualisation.
+<!-- PLAN §5 R10 ("The VM has no KVM") -->
 
 ## The shipped R8 rules
 
@@ -159,21 +157,3 @@ android.system.Os.setenv("SSL_CERT_FILE", bundle.getAbsolutePath(), true);
 On the JVM the same applies: the Linux release library looks in `/etc/ssl`, and `SSL_CERT_FILE` or
 `SSL_CERT_DIR` override it. The Java RPC classes are different: they use the JVM's trust store.
 <!-- patches/depends/0004 (OPENSSLDIR /etc/ssl for every depends host); evidence/r10/packaging-r10.md (SSLContexts.createSystemDefault() in ZephyrRpcConnection.java:616) -->
-
-## Checking on a device: the test app
-
-`android/testapp` is a small app built against the library module. It loads the native library,
-validates address vectors natively, and carries one instrumented test that creates an offline
-in-memory wallet. Build and run it with:
-
-```sh
-cd android
-./gradlew :testapp:assembleDebug :testapp:assembleDebugAndroidTest
-adb install -r testapp/build/outputs/apk/debug/testapp-debug.apk
-adb install -r testapp/build/outputs/apk/androidTest/debug/testapp-debug-androidTest.apk
-adb shell am instrument -w io.github.lokinotfound.zephyrjava.testapp.test/android.test.InstrumentationTestRunner
-```
-
-It needs no node and no funds. It uses the platform's JUnit 3 runner, so the project has no
-AndroidX dependency.
-<!-- evidence/r10/apk-checks.txt (APK paths; packages io.github.lokinotfound.zephyrjava.testapp and .test); android/testapp/build.gradle.kts (header comment: build and run commands; namespace; testInstrumentationRunner android.test.InstrumentationTestRunner); PLAN §5 R10 result (build-only test app, instrumented offline-wallet test for the owner's device); QUESTIONS R10-5 item 2 (uses-library android.test.runner) -->

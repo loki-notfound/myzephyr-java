@@ -87,10 +87,9 @@ differs), but they have not been seen working.
 
 ## In the build and the packaging
 
-**Android: not yet run on a device or an emulator.** The Android libraries, the AAR and a test app
-are built and checked (exports, page alignment, packaging), but the build host has no hardware
-virtualisation, so nothing has run on Android yet. The test app is ready for that check
-([chapter 6](06-android.md#checking-on-a-device-the-test-app)). *Status:* pending a device test.
+**Android: not yet run on a device or an emulator.** The Android libraries and the AAR are built
+and checked (exports, page alignment, packaging), but the build host has no hardware
+virtualisation, so nothing has run on Android yet. *Status:* pending a device test.
 <!-- PLAN §5 R9 result ("Not yet proven: running on a device or emulator") and R10 ("The VM has no KVM") -->
 
 **Android: TLS needs the app's help.** The native wallet does not use Android's certificate store;

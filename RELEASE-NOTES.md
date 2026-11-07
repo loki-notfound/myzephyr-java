@@ -35,9 +35,9 @@ of the same release (zephyr `v2.3.0` = `67c5f53b878fef41fb5e74c4382d5b7a2f37fd8a
 - **Android** (`io.github.loki-notfound:zephyr-java-android`, AAR): minSdk 24; native libraries
   for `arm64-v8a`, `armeabi-v7a` and `x86_64`, 16 KB page aligned, stored uncompressed; consumer
   R8 rules included. `armeabi-v7a` needs a CPU with VFPv4. Built with NDK r18b through Zephyr's
-  own `contrib/depends`. The AAR and a test app are built and checked, not yet run on a device or
-  an emulator.
-  <!-- PLAN §5 R9 and R10 results; RELEASES §6 (minSdk 24, final) and §7 (option 1, NDK r18b; armeabi-v7a with -mfpu=vfpv4); README "Status"; android/gradle.properties ARTIFACT_ID -->
+  own `contrib/depends`. The AAR is built and checked (16 KB page alignment, uncompressed native
+  libraries) in a throwaway consumer app; it has not yet run on a device or an emulator.
+  <!-- evidence/r13/release-candidate-r13.md (the consumer app check: AGP 9.5.0, zipalign -c -P 16, the three libraries stored); PLAN §5 R9 and R10 results; RELEASES §6 (minSdk 24, final) and §7 (option 1, NDK r18b; armeabi-v7a with -mfpu=vfpv4); README "Status"; android/gradle.properties ARTIFACT_ID -->
 - **Linux** (`io.github.loki-notfound:zephyr-java`, JAR): the native libraries for `x86_64` and
   `arm64` inside the JAR, loaded from it. Built in a Debian 12 container (glibc 2.36 or newer:
   Debian 12, Ubuntu 23.04 and later, RHEL 10); everything else is linked statically. The `arm64`

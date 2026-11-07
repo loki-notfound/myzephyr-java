@@ -1,4 +1,4 @@
-// Android packaging of zephyr-java: the AAR (this project) and a build-only test app (:testapp).
+// Android packaging of zephyr-java: the AAR (this project).
 // Maven stays the primary build of the Java library; this build compiles the same sources
 // (../src/main/java) and packages the native libraries of bin/build_android.sh (../build/android).
 pluginManagement {
@@ -17,6 +17,3 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "zephyr-java"
-
-// build-only Android test app; its instrumented test runs on a device (no emulator on the build VM)
-include(":testapp")

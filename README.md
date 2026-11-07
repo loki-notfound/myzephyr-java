@@ -24,9 +24,9 @@ What works today, on the development branches:
   <!-- PLAN §5, R8 results (both parts): TestZephyrIntegration and TestZephyrIntegrationFunds -->
 - **The AAR** for Android, minSdk 24, with the native library for `arm64-v8a`, `armeabi-v7a` and
   `x86_64`. The `armeabi-v7a` library needs a CPU with VFPv4, which every device that runs
-  Android 7 has. The AAR and a test app are built and checked (16 KB page alignment, uncompressed
-  native libraries); they have not yet run on a device or an emulator.
-  <!-- PLAN §5 R9 and R10 results; RELEASES §6 (minSdk 24) and §7 (VFPv4); evidence/r9/armv7-checks.txt -->
+  Android 7 has. The AAR is built and checked (16 KB page alignment, uncompressed native libraries)
+  in a throwaway consumer app; it has not yet run on a device or an emulator.
+  <!-- PLAN §5 R9 and R10 results; RELEASES §6 (minSdk 24) and §7 (VFPv4); evidence/r9/armv7-checks.txt; evidence/r13/release-candidate-r13.md (the consumer app check: AGP 9.5.0, zipalign -c -P 16, the three libraries stored) -->
 - **The JAR** with the native libraries for Linux `x86_64` and `arm64` inside, loaded from the JAR.
   Release natives are built in a Debian 12 container and need glibc 2.36 or newer (Debian 12,
   Ubuntu 23.04 and later, RHEL 10); everything else is linked statically. The `arm64` library is
