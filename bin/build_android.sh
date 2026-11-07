@@ -100,11 +100,12 @@ for ABI in $ABIS; do
   # 3. depends for this host. The download command is depends' own (builders/linux.mk, build_os
   # is the build machine's, linux) plus a low-speed limit: a fetch that stays below 1000 bytes/s
   # for 120 s fails instead of hanging, and depends then falls back to downloads.getmonero.org,
-  # whose archives it checks by sha256 like the primary ones. $(...) is left
-  # to make, so depends' DOWNLOAD_CONNECT_TIMEOUT and DOWNLOAD_RETRIES still apply.
-  # shellcheck disable=SC2016
+  # whose archives it checks by sha256 like the primary ones. The connect timeout and the retries
+  # are depends' own defaults (DOWNLOAD_CONNECT_TIMEOUT:=30, DOWNLOAD_RETRIES:=5), written out:
+  # no $(...) in a command-line variable, because make passes it on to every sub-make unexpanded,
+  # and ncurses' Android build starts its sub-makes from a shell line, which /bin/sh then rejects.
   make -C "$Z/contrib/depends" HOST="$TRIPLET" -j"$(nproc)" \
-    build_linux_DOWNLOAD='curl --location --fail --connect-timeout $(DOWNLOAD_CONNECT_TIMEOUT) --retry $(DOWNLOAD_RETRIES) --speed-limit 1000 --speed-time 120 -o'
+    build_linux_DOWNLOAD='curl --location --fail --connect-timeout 30 --retry 5 --speed-limit 1000 --speed-time 120 -o'
   PREFIX="$ROOT/$Z/contrib/depends/$TRIPLET"
   TOOLCHAIN="$PREFIX/share/toolchain.cmake"
   # clang 7.0.2: debug information only, see the header (__FILE__ stays absolute)
