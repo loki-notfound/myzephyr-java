@@ -47,6 +47,7 @@ import zephyr.wallet.model.ZephyrAssets;
 import zephyr.wallet.model.ZephyrBalance;
 import zephyr.wallet.model.ZephyrDecodedAddress;
 import zephyr.wallet.model.ZephyrReserveInfo;
+import zephyr.wallet.model.ZephyrSubaddress;
 import zephyr.wallet.model.ZephyrTransfer;
 import zephyr.wallet.model.ZephyrTxWallet;
 import zephyr.wallet.model.ZephyrWalletConfig;
@@ -257,27 +258,69 @@ public class TestZephyrIntegration {
 
   @Test
   @Order(5)
-  public void testFreshWalletBalances() {
+  public void testWalletBalanceConsistency() {
     assumeWallet();
     ZephyrBalance balance = wallet.getBalance();
     ZephyrBalance unlocked = wallet.getUnlockedBalance();
-    for (String asset : ZephyrAssets.V2) {
-      assertEquals(BigInteger.ZERO, balance.get(asset), asset);
-      assertEquals(BigInteger.ZERO, unlocked.get(asset), asset);
-    }
     Map<Integer, ZephyrBalance> perSubaddress = wallet.getBalance(0);
     Map<Integer, ZephyrBalance> perSubaddressUnlocked = wallet.getUnlockedBalance(0);
+    List<ZephyrAccount> accounts = wallet.getAccounts(true);
+    log("balance " + balance.toMap() + ", unlocked " + unlocked.toMap());
+    log("account 0 per subaddress " + perSubaddress + ", unlocked " + perSubaddressUnlocked);
+    for (ZephyrAccount account : accounts) {
+      log("account " + account.getIndex() + ": balance " + (account.getBalance() == null ? null : account.getBalance().toMap())
+          + ", unlocked " + (account.getUnlockedBalance() == null ? null : account.getUnlockedBalance().toMap())
+          + ", subaddresses " + (account.getSubaddresses() == null ? null : account.getSubaddresses().size()));
+    }
+    assertNotNull(balance);
+    assertNotNull(unlocked);
     assertNotNull(perSubaddress);
     assertNotNull(perSubaddressUnlocked);
-    assertEquals(BigInteger.ZERO, wallet.getBalance(ZephyrAssets.ZPH, 0));
-    assertEquals(BigInteger.ZERO, wallet.getBalance(ZephyrAssets.ZPH, 0, 0));
-    assertEquals(BigInteger.ZERO, wallet.getUnlockedBalance(ZephyrAssets.ZPH, 0));
-    assertEquals(BigInteger.ZERO, wallet.getUnlockedBalance(ZephyrAssets.ZPH, 0, 0));
-    List<ZephyrAccount> accounts = wallet.getAccounts(true);
+
+    // wallet, account, subaddress and asset-specific calls agree per asset
+    for (String asset : ZephyrAssets.V2) {
+      checkConsistency(asset, balance.get(asset), wallet.getBalance(asset, 0), wallet.getBalance(asset, 0, 0), perSubaddress, "balance");
+      checkConsistency(asset, unlocked.get(asset), wallet.getUnlockedBalance(asset, 0), wallet.getUnlockedBalance(asset, 0, 0), perSubaddressUnlocked, "unlocked");
+      assertTrue(unlocked.get(asset).compareTo(balance.get(asset)) <= 0, asset + ": unlocked " + unlocked.get(asset) + " above balance " + balance.get(asset));
+    }
+
+    // the account from getAccounts(true): its balance is the wallet's, its subaddresses sum to it
     assertEquals(1, accounts.size());
-    assertTrue(accounts.get(0).getBalance() instanceof ZephyrBalance, "account balance " + accounts.get(0).getBalance());
-    log("balance " + balance.toMap() + ", unlocked " + unlocked.toMap() + ", account 0 per subaddress " + perSubaddress
-        + ", unlocked " + perSubaddressUnlocked + ", account balance " + accounts.get(0).getBalance().toMap());
+    ZephyrAccount account = accounts.get(0);
+    assertNotNull(account.getBalance(), "account balance");
+    assertNotNull(account.getUnlockedBalance(), "account unlocked balance");
+    assertNotNull(account.getSubaddresses(), "account subaddresses");
+    log("account balance equals the wallet balance as objects (ZephyrBalance.equals): " + balance.equals(account.getBalance())
+        + "; unlocked: " + unlocked.equals(account.getUnlockedBalance()));
+    TreeSet<String> assets = new TreeSet<String>(ZephyrAssets.V2);  // compared per asset: an absent asset is zero
+    assets.addAll(balance.getAssetTypes());
+    assets.addAll(account.getBalance().getAssetTypes());
+    assets.addAll(unlocked.getAssetTypes());
+    assets.addAll(account.getUnlockedBalance().getAssetTypes());
+    for (String asset : assets) {
+      assertEquals(balance.get(asset), account.getBalance().get(asset), asset + ": account balance");
+      assertEquals(unlocked.get(asset), account.getUnlockedBalance().get(asset), asset + ": account unlocked balance");
+      BigInteger sum = BigInteger.ZERO;
+      BigInteger sumUnlocked = BigInteger.ZERO;
+      for (ZephyrSubaddress subaddress : account.getSubaddresses()) {
+        if (subaddress.getBalance() != null) sum = sum.add(subaddress.getBalance().get(asset));
+        if (subaddress.getUnlockedBalance() != null) sumUnlocked = sumUnlocked.add(subaddress.getUnlockedBalance().get(asset));
+      }
+      assertEquals(account.getBalance().get(asset), sum, asset + ": sum over the account's subaddresses");
+      assertEquals(account.getUnlockedBalance().get(asset), sumUnlocked, asset + ": unlocked sum over the account's subaddresses");
+    }
+  }
+
+  /** One asset: the wallet amount, the account amount, subaddress 0/0 and the per-subaddress map agree. */
+  private static void checkConsistency(String asset, BigInteger walletAmount, BigInteger accountAmount, BigInteger subaddressAmount,
+      Map<Integer, ZephyrBalance> perSubaddress, String kind) {
+    assertNotNull(walletAmount, asset + " " + kind);
+    assertTrue(walletAmount.signum() >= 0, asset + " " + kind + " " + walletAmount);
+    assertEquals(walletAmount, accountAmount, asset + " " + kind + ": account 0");
+    BigInteger sum = BigInteger.ZERO;
+    for (ZephyrBalance b : perSubaddress.values()) sum = sum.add(b.get(asset));
+    assertEquals(walletAmount, sum, asset + " " + kind + ": sum over the per-subaddress map");
+    assertTrue(subaddressAmount.compareTo(accountAmount) <= 0, asset + " " + kind + ": subaddress 0/0 " + subaddressAmount + " above account " + accountAmount);
   }
 
   @Test
