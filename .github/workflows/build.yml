@@ -1,6 +1,5 @@
 # zephyr-java CI: the Java build with its pure tests, the native matrix through zephyr's depends,
 # and the release package with the build manifest.
-# NOT RUN YET: written on 2026-11-07; the first run is after the first push.
 # Every job calls the repository's own scripts, the same ones F-Droid and a local release run.
 name: build
 
@@ -163,7 +162,7 @@ jobs:
     env:
       ZEPHYR_JAVA_CONTAINER: docker.io/library/debian:12@sha256:366a6da5efcceffbaa19c560a101b97b87a1a9664eeeac8bc3d24395ddbf14f3
       TAR_OPTIONS: --no-same-owner
-      # the image sets no locale; JDK 17 would write Javadoc's options file in ASCII (R13c-3)
+      # the image sets no locale; JDK 17 would write Javadoc's options file in ASCII
       LANG: C.UTF-8
       ANDROID_HOME: /opt/android-sdk
       GRADLE_USER_HOME: /work/.gradle-home
@@ -201,7 +200,7 @@ jobs:
         # the checkout with the natives jobs' artifacts (build/natives/, build/android/,
         # build/debug/) is copied to /work, the path of the local build; download-artifact drops
         # the natives' exec bit, so they get 0755 back; the pinned zephyr tree with the patches
-        # is placed for bin/make_manifest.sh (the depends recipes; R13c-5); the script checks the
+        # is placed for bin/make_manifest.sh (the depends recipes); the script checks the
         # versions first (bin/check_versions.sh); dist/ is copied back for the upload
         run: |
           mkdir -p /work
