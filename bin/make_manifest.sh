@@ -3,7 +3,10 @@
 # Writes dist/<version>/manifest.json and dist/<version>/SHA256SUMS for a release built by
 # bin/build_release.sh. The manifest (JSON, sorted keys, python3 standard library only) records:
 #   zephyr_java  version, commit sha of this checkout, SOURCE_DATE_EPOCH
-#   core         both pins of bin/pins.env: tag, sha, URL
+#   core         both pins of bin/pins.env: tag (ZEPHYR_TAG, ZEPHYR_CPP_TAG), sha, URL; release_set
+#                (RELEASE_SET, the zephyr-backports release set the pins belong to) and
+#                release_set_members (RELEASE_SET_MEMBERS: name, tag, sha of every member; the
+#                zephyr and zephyr-cpp members must equal the pins)
 #   patches      every build-layer patch under patches/depends/: file name and sha256
 #   toolchain    gcc, aarch64-linux-gnu-g++, binutils, glibc, cmake, JDK ($JAVA_HOME) and Maven
 #                of the environment this script runs in, the packaging environment: the pinned
@@ -109,8 +112,28 @@ def shell_vars(path):
     for line in read(path).splitlines():
         m = re.match(r"^([A-Za-z_][A-Za-z0-9_.]*)=(.*)$", line.strip())
         if m:
-            out[m.group(1)] = m.group(2)
+            value = m.group(2)
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+                value = value[1:-1]
+            out[m.group(1)] = value
     return out
+
+
+def release_set_members(pins):
+    """RELEASE_SET_MEMBERS of bin/pins.env as a list; its zephyr and zephyr-cpp entries must be
+    the pins themselves."""
+    members = []
+    for item in pins["RELEASE_SET_MEMBERS"].split():
+        name, tag, sha = item.split(":")
+        members.append({"name": name, "tag": tag, "sha": sha})
+    by_name = {m["name"]: m for m in members}
+    for name, tag_key, sha_key in (("zephyr", "ZEPHYR_TAG", "ZEPHYR_SHA"),
+                                   ("zephyr-cpp", "ZEPHYR_CPP_TAG", "ZEPHYR_CPP_SHA")):
+        m = by_name.get(name)
+        if m is None or m["tag"] != pins[tag_key] or m["sha"] != pins[sha_key]:
+            sys.exit(f"bin/pins.env: RELEASE_SET_MEMBERS {name} {m} differs from "
+                     f"{tag_key}={pins[tag_key]} {sha_key}={pins[sha_key]}")
+    return members
 
 
 def mk_vars(path):
@@ -277,9 +300,12 @@ def main():
             "source_date_epoch": int(os.environ["SOURCE_DATE_EPOCH"]),
         },
         "core": {
-            "zephyr": {"tag": pins["PIN_TAG"], "sha": pins["ZEPHYR_SHA"], "url": pins["ZEPHYR_URL"]},
-            "zephyr-cpp": {"tag": pins["PIN_TAG"], "sha": pins["ZEPHYR_CPP_SHA"],
+            "zephyr": {"tag": pins["ZEPHYR_TAG"], "sha": pins["ZEPHYR_SHA"],
+                       "url": pins["ZEPHYR_URL"]},
+            "zephyr-cpp": {"tag": pins["ZEPHYR_CPP_TAG"], "sha": pins["ZEPHYR_CPP_SHA"],
                            "url": pins["ZEPHYR_CPP_URL"]},
+            "release_set": pins["RELEASE_SET"],
+            "release_set_members": release_set_members(pins),
         },
         "patches": [{"name": n, "sha256": sha256(os.path.join(patches_dir, n))}
                     for n in sorted(os.listdir(patches_dir)) if n.endswith(".patch")],

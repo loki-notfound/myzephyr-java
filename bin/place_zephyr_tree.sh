@@ -7,9 +7,9 @@
 #
 # 1. Checks that the zephyr-cpp submodule is at the pinned sha (bin/pins.env) and places the
 #    zephyr tree at external/zephyr-cpp/external/zephyr by sha (git init, fetch --depth 1 of the
-#    sha, checkout, its own submodules), never from a branch, with the verification of the pin
-#    tag when it is present locally; external/zephyr goes into the submodule's info/exclude, so
-#    the tree does not show as a change of zephyr-cpp.
+#    sha, checkout, its own submodules), never from a branch, with the verification of each
+#    tree's own pin tag (ZEPHYR_TAG, ZEPHYR_CPP_TAG) when it is present locally; external/zephyr
+#    goes into the submodule's info/exclude, so the tree does not show as a change of zephyr-cpp.
 # 2. Applies the build-layer patches under patches/depends/ to the zephyr tree, in name order,
 #    with patch -p1. They touch build tooling under contrib/depends/ only, never zephyr or
 #    zephyr-cpp sources (register D21; each patch has a DEP-3 header). Idempotent: a patch that
@@ -31,25 +31,25 @@ ROOT="$(pwd)"
 # shellcheck source=pins.env
 . bin/pins.env
 
-# Verifies the pin tag of a tree when it is present locally (PLAN §2): the tag must point at the
-# pinned commit and carry a good signature. Without gpg or without the release key in the keyring
+# Verifies a tree's own pin tag (ZEPHYR_TAG or ZEPHYR_CPP_TAG) when it is present locally
+# (PLAN §2): the tag must point at the pinned commit and carry a good signature. Without gpg or without the release key in the keyring
 # this is a one-line warning, so a build without the keys still works; a bad signature is an error.
 verify_pin_tag() {
-  local TREE="$1" SHA="$2" OUT
-  git -C "$TREE" rev-parse -q --verify "refs/tags/$PIN_TAG" >/dev/null || return 0
-  if [ "$(git -C "$TREE" rev-parse "$PIN_TAG^{commit}")" != "$SHA" ]; then
-    echo "$TREE: tag $PIN_TAG does not point at the pin $SHA" >&2
+  local TREE="$1" SHA="$2" TAG="$3" OUT
+  git -C "$TREE" rev-parse -q --verify "refs/tags/$TAG" >/dev/null || return 0
+  if [ "$(git -C "$TREE" rev-parse "$TAG^{commit}")" != "$SHA" ]; then
+    echo "$TREE: tag $TAG does not point at the pin $SHA" >&2
     exit 1
   fi
   if ! command -v gpg >/dev/null; then
-    echo "warning: $TREE: tag $PIN_TAG not verified, gpg is not installed" >&2
-  elif OUT="$(git -C "$TREE" verify-tag --raw "$PIN_TAG" 2>&1)"; then
-    echo "$TREE: tag $PIN_TAG verified"
+    echo "warning: $TREE: tag $TAG not verified, gpg is not installed" >&2
+  elif OUT="$(git -C "$TREE" verify-tag --raw "$TAG" 2>&1)"; then
+    echo "$TREE: tag $TAG verified"
   elif printf '%s\n' "$OUT" | grep -q '^\[GNUPG:\] NO_PUBKEY '; then
-    echo "warning: $TREE: tag $PIN_TAG not verified, the release key is not in the keyring" >&2
+    echo "warning: $TREE: tag $TAG not verified, the release key is not in the keyring" >&2
   else
     printf '%s\n' "$OUT" >&2
-    echo "$TREE: tag $PIN_TAG failed verification" >&2
+    echo "$TREE: tag $TAG failed verification" >&2
     exit 1
   fi
 }
@@ -61,7 +61,7 @@ if [ "$CPP_HEAD" != "$ZEPHYR_CPP_SHA" ]; then
   echo "Initialise the submodule first: git submodule update --init" >&2
   exit 1
 fi
-verify_pin_tag external/zephyr-cpp "$ZEPHYR_CPP_SHA"
+verify_pin_tag external/zephyr-cpp "$ZEPHYR_CPP_SHA" "$ZEPHYR_CPP_TAG"
 
 Z=external/zephyr-cpp/external/zephyr
 if [ ! -d "$Z/.git" ]; then
@@ -72,7 +72,7 @@ if [ "$(git -C "$Z" rev-parse HEAD 2>/dev/null)" != "$ZEPHYR_SHA" ]; then
 fi
 git -C "$Z" submodule update -q --init --recursive --depth 1
 [ "$(git -C "$Z" rev-parse HEAD)" = "$ZEPHYR_SHA" ] || { echo "zephyr tree is not at $ZEPHYR_SHA"; exit 1; }
-verify_pin_tag "$Z" "$ZEPHYR_SHA"
+verify_pin_tag "$Z" "$ZEPHYR_SHA" "$ZEPHYR_TAG"
 
 EXCLUDE="$(git -C external/zephyr-cpp rev-parse --path-format=absolute --git-path info/exclude)"
 mkdir -p "$(dirname "$EXCLUDE")"
