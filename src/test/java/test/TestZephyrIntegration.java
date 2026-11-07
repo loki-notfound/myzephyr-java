@@ -231,15 +231,23 @@ public class TestZephyrIntegration {
       }
       log("FUNDING ADDRESS: " + wallet.getPrimaryAddress());
 
+      // the core reports onSyncProgress per fetched block, so a wallet at the daemon height gets none
       SyncRecorder recorder = new SyncRecorder();
+      long heightBefore = wallet.getHeight();
+      long daemonHeightBefore = getDaemon().getHeight();
+      boolean blocksToFetch = heightBefore < daemonHeightBefore;
+      log("before sync: wallet height " + heightBefore + ", daemon height " + daemonHeightBefore + "; case: "
+          + (blocksToFetch ? "blocks to fetch, at least one onSyncProgress call expected" : "at the daemon height, no onSyncProgress call expected"));
       long start = System.currentTimeMillis();
       wallet.sync(recorder);
       long elapsed = System.currentTimeMillis() - start;
       long walletHeight = wallet.getHeight();
       long daemonHeightAfter = getDaemon().getHeight();
-      log("sync: " + elapsed + " ms, " + recorder.progress.size() + " onSyncProgress calls, wallet height " + walletHeight + ", daemon height " + daemonHeightAfter);
+      int progressCalls = recorder.progress.size();
+      log("sync: " + elapsed + " ms, " + progressCalls + " onSyncProgress calls, wallet height " + walletHeight + ", daemon height " + daemonHeightAfter);
       assertTrue(walletHeight == daemonHeightAfter || walletHeight == daemonHeightAfter - 1, "wallet height " + walletHeight + ", daemon height " + daemonHeightAfter);
-      assertFalse(recorder.progress.isEmpty(), "no onSyncProgress call");
+      if (blocksToFetch) assertTrue(progressCalls > 0, "no onSyncProgress call although the wallet was at " + heightBefore + " and the daemon at " + daemonHeightBefore);
+      else assertEquals(0, progressCalls, "onSyncProgress calls although the wallet was at the daemon height " + daemonHeightBefore);
       assertEquals(25, wallet.getMnemonic().trim().split("\\s+").length);  // never printed
       ZephyrDecodedAddress decoded = ZephyrUtils.decodeAddress(wallet.getPrimaryAddress());
       assertEquals(ZephyrNetworkType.MAINNET, decoded.getNetworkType());
