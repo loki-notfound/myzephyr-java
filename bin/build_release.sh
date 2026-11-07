@@ -9,7 +9,13 @@
 #                                    that image, the same as CI's, glibc floor 2.36);
 #                                    LINUX_BUILD=host builds them on the host with
 #                                    bin/build_linux.sh instead, for development only
-#  2. bin/build_android.sh --all     Android natives through depends (arm64-v8a, armeabi-v7a, x86_64)
+#  2. bin/build_android_container.sh --all
+#                                    Android natives through depends (arm64-v8a, armeabi-v7a,
+#                                    x86_64) in the same image with the checkout at /work, the
+#                                    path CI builds at too (NDK r18b keeps __FILE__ paths, so the
+#                                    Android libraries are reproducible at the same path only);
+#                                    ANDROID_BUILD=host builds them on the host with
+#                                    bin/build_android.sh instead, for development only
 #  3. bin/strip_natives.sh           stripped natives in place, debug files in build/debug/
 #  4. bin/package_release.sh        everything after the natives, shared with the CI package job:
 #                                    the JAR (with the Linux natives, the pure tests on the
@@ -34,6 +40,7 @@
 #                       and then no AAR)
 #   SOURCE_DATE_EPOCH   optional, see above
 #   LINUX_BUILD         container (default; podman or docker) or host
+#   ANDROID_BUILD       container (default; podman or docker) or host
 #
 # Usage: bin/build_release.sh
 
@@ -85,10 +92,19 @@ if [ -n "$LINUX_ARCHES" ]; then
     BUILD_LINUX_ARCHES="$LINUX_ARCHES" bin/build_linux.sh --all
   fi
 fi
+case "${ANDROID_BUILD:=container}" in
+  container|host) ;;
+  *) echo "ANDROID_BUILD must be container or host, not $ANDROID_BUILD" >&2; exit 2 ;;
+esac
 if [ -n "$ANDROID_ABIS" ]; then
   : "${ANDROID_HOME:?set ANDROID_HOME to the Android SDK}"
-  phase "build_android.sh ($ANDROID_ABIS)"
-  BUILD_ANDROID_ABIS="$ANDROID_ABIS" bin/build_android.sh --all
+  if [ "$ANDROID_BUILD" = container ]; then
+    phase "build_android_container.sh ($ANDROID_ABIS)"
+    BUILD_ANDROID_ABIS="$ANDROID_ABIS" bin/build_android_container.sh --all
+  else
+    phase "build_android.sh ($ANDROID_ABIS, on the host: not a release build)"
+    BUILD_ANDROID_ABIS="$ANDROID_ABIS" bin/build_android.sh --all
+  fi
 fi
 
 # 3: strip, debug symbols

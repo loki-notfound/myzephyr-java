@@ -5,7 +5,8 @@
 # Ubuntu 23.04 and later, RHEL 10).
 #
 # Runs, inside the image with this checkout mounted at /work:
-#   bin/linux-build-deps.sh                      the Debian 12 build packages (as root)
+#   bin/container-build-deps.sh                  the Debian 12 build packages from the pinned
+#                                                Debian snapshot (as root)
 #   bin/build_linux.sh <x86_64|arm64|--all>      depends, zephyr, the JNI library
 #   bin/strip_natives.sh                         stripped natives and debug files, as in CI
 # with JAVA_HOME at the image's OpenJDK 17 (jni.h only), SOURCE_DATE_EPOCH passed through (the
@@ -18,7 +19,7 @@
 # package and host, so a switch between host and container rebuilds the depends packages, and
 # bin/build_linux.sh wipes build directories configured for the other path. A host build and a
 # container build write the same build/natives/linux-<arch>/, so the last one wins; releases build
-# Linux in the container only.
+# Linux in the container only. bin/build_android_container.sh is the same for the Android natives.
 # podman (rootless: files written in the container belong to the calling user) or, when podman
 # is absent, docker.
 #
@@ -59,7 +60,7 @@ ENV_ARGS=(-e "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" -e "ZEPHYR_JAVA_CONTAINER=$I
 
 "$ENGINE" run --rm -v "$ROOT":/work -w /work "${ENV_ARGS[@]}" "$IMAGE" bash -c '
   set -euo pipefail
-  bin/linux-build-deps.sh
+  bin/container-build-deps.sh
   # the mounted checkout belongs to another uid when docker runs as root
   git config --global --add safe.directory "*"
   export JAVA_HOME="/usr/lib/jvm/java-17-openjdk-$(dpkg --print-architecture)"

@@ -52,83 +52,84 @@ jobs:
 
   natives:
     # one release native per platform through zephyr's contrib/depends, stripped, with debug
-    # symbols. The Linux natives are built in the pinned debian:12 image, the same image as the
-    # local verification build (bin/build_linux_container.sh): an identical environment for CI and
-    # the second build that must match, and a glibc floor of 2.36 (Debian 12, Ubuntu 23.04 and
-    # later, RHEL 10). The Android natives are built on the runner (depends builds them against
-    # the NDK, so the host's libraries do not reach them).
+    # symbols. Every native is built in the pinned debian:12 image with the checkout copied to
+    # /work, the same image, path and Debian snapshot as the local verification build
+    # (bin/build_linux_container.sh, bin/build_android_container.sh): NDK r18b's clang 7 keeps
+    # __FILE__ paths in the Android libraries, so they match only when built at the same path;
+    # bin/container-build-deps.sh installs the toolchain packages from one snapshot.debian.org
+    # timestamp, so both sides compile with the same packages; the Linux natives get a glibc floor
+    # of 2.36 (Debian 12, Ubuntu 23.04 and later, RHEL 10).
     runs-on: ubuntu-24.04
     timeout-minutes: 180
-    container: ${{ matrix.container }}
+    container: docker.io/library/debian:12@sha256:366a6da5efcceffbaa19c560a101b97b87a1a9664eeeac8bc3d24395ddbf14f3
+    env:
+      ZEPHYR_JAVA_CONTAINER: docker.io/library/debian:12@sha256:366a6da5efcceffbaa19c560a101b97b87a1a9664eeeac8bc3d24395ddbf14f3
     strategy:
       fail-fast: false
       matrix:
         include:
           - platform: linux-x86_64
             build: bin/build_linux.sh x86_64
-            container: docker.io/library/debian:12@sha256:366a6da5efcceffbaa19c560a101b97b87a1a9664eeeac8bc3d24395ddbf14f3
           - platform: linux-arm64
             build: bin/build_linux.sh arm64
-            container: docker.io/library/debian:12@sha256:366a6da5efcceffbaa19c560a101b97b87a1a9664eeeac8bc3d24395ddbf14f3
           - platform: android-arm64-v8a
             build: bin/build_android.sh arm64-v8a
-            container: ""
           - platform: android-armeabi-v7a
             build: bin/build_android.sh armeabi-v7a
-            container: ""
           - platform: android-x86_64
             build: bin/build_android.sh x86_64
-            container: ""
     steps:
-      - name: git for the checkout (container)
-        # actions/checkout needs git in the image to fetch the submodules
-        if: matrix.container != ''
-        run: apt-get update -q && apt-get install -y -q --no-install-recommends git ca-certificates
       - uses: actions/checkout@v4
+        # the image has no git yet, so this first checkout downloads the files only (REST API),
+        # enough to run bin/container-build-deps.sh: nothing is installed from the live mirror
+      - name: Debian 12 build packages from the pinned snapshot
+        run: bash bin/container-build-deps.sh
+      - uses: actions/checkout@v4
+        # now with git: the repository and the zephyr-cpp submodule
         with:
           submodules: true
-      - name: Debian 12 build packages and JAVA_HOME (container)
+      - name: git and the environment
         # the workspace belongs to the runner's user, the container runs as root
-        if: matrix.container != ''
         run: |
           git config --global --add safe.directory "*"
-          bin/linux-build-deps.sh
           echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-$(dpkg --print-architecture)" >> "$GITHUB_ENV"
-          echo "ZEPHYR_JAVA_CONTAINER=${{ matrix.container }}" >> "$GITHUB_ENV"
-      - uses: actions/setup-java@v4
-        # JAVA_HOME (jni.h) for the Android builds on the runner
-        if: matrix.container == ''
-        with:
-          distribution: temurin
-          java-version: "21"
-      - name: Host tools of zephyr's depends (runner)
-        # depends builds its Android packages with these host tools; no Android SDK, no Java packages
-        if: matrix.container == ''
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -y -q --no-install-recommends gperf bison flex libtool-bin autoconf automake unzip ccache python3 patch
-      - name: ccache directory
-        # github.workspace is the runner's path, not the container's: take the working directory
-        run: echo "CCACHE_DIR=$PWD/.ccache" >> "$GITHUB_ENV"
+          echo "CCACHE_DIR=$GITHUB_WORKSPACE/.ccache" >> "$GITHUB_ENV"
       - uses: actions/cache@v4
         # depends' package cache and downloaded sources; bin/pins.env fixes the zephyr tree and with
-        # it every recipe in contrib/depends/packages/, and patches/depends/ changes the recipes
-        # on top: together they decide the depends packages' hashes
+        # it every recipe in contrib/depends/packages/, patches/depends/ changes the recipes on
+        # top, and bin/container-build-deps.sh fixes the compilers: together they decide the
+        # depends packages' hashes
         with:
           path: |
             external/zephyr-cpp/external/zephyr/contrib/depends/built
             external/zephyr-cpp/external/zephyr/contrib/depends/sources
-          key: depends-${{ matrix.platform }}-${{ hashFiles('bin/pins.env', 'patches/depends/**') }}
+          key: depends-${{ matrix.platform }}-${{ hashFiles('bin/pins.env', 'patches/depends/**', 'bin/container-build-deps.sh') }}
       - uses: actions/cache@v4
         with:
           path: .ccache
           key: ccache-${{ matrix.platform }}-${{ github.sha }}
           restore-keys: |
             ccache-${{ matrix.platform }}-
-      - name: Build ${{ matrix.platform }}
-        run: ${{ matrix.build }}
-      - name: Strip, keep the debug symbols
-        run: bin/strip_natives.sh
+      - name: Build ${{ matrix.platform }} at /work
+        # the checkout (with the restored depends cache) is copied to /work and built there; the
+        # outputs and the depends cache are copied back for the upload and the cache save
+        run: |
+          mkdir -p /work
+          cp -a "$GITHUB_WORKSPACE"/. /work/
+          cd /work
+          ${{ matrix.build }}
+          bin/strip_natives.sh
+          mkdir -p "$GITHUB_WORKSPACE/build"
+          for D in natives android debug; do
+            if [ -d "build/$D" ]; then
+              rm -rf "$GITHUB_WORKSPACE/build/$D"
+              cp -a "build/$D" "$GITHUB_WORKSPACE/build/"
+            fi
+          done
+          DEPENDS=external/zephyr-cpp/external/zephyr/contrib/depends
+          mkdir -p "$GITHUB_WORKSPACE/$DEPENDS"
+          rm -rf "$GITHUB_WORKSPACE/$DEPENDS/built" "$GITHUB_WORKSPACE/$DEPENDS/sources"
+          cp -a "$DEPENDS/built" "$DEPENDS/sources" "$GITHUB_WORKSPACE/$DEPENDS/"
       - uses: actions/upload-artifact@v4
         # paths relative to build/: natives/ (with build-env for the manifest), android/, debug/
         with:

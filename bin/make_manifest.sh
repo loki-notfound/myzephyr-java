@@ -11,7 +11,9 @@
 #                build-tools; linux_natives: per Linux native the build environment that
 #                bin/build_linux.sh recorded (build/natives/linux-<arch>/build-env: container image
 #                or none, glibc, compiler); linux_container: that image when every Linux native
-#                was built in the same one, null when all were built on the host, else the list
+#                was built in the same one, null when all were built on the host, else the list;
+#                debian_snapshot: the Debian snapshot the container builds install their packages
+#                from (DEBIAN_SNAPSHOT in bin/container-build-deps.sh)
 #   depends      every package of zephyr's contrib/depends/packages/*.mk: version, file name
 #                and sha256 as declared there
 #   artifacts    every file in dist/<version>/ except manifest.json and SHA256SUMS: name, size,
@@ -166,6 +168,8 @@ def toolchain():
         if os.path.exists(c):
             clang = first_line(c, "--version")
             break
+    m = re.search(r"^DEBIAN_SNAPSHOT=(\S+)$", read("bin/container-build-deps.sh"), re.M)
+    debian_snapshot = m.group(1) if m else None
     java_home = os.environ.get("JAVA_HOME", "")
     javac = os.path.join(java_home, "bin/javac") if java_home else "javac"
     return {
@@ -174,6 +178,7 @@ def toolchain():
         "binutils": first_line("objcopy", "--version"),
         "glibc": first_line("ldd", "--version"),
         "linux_container": container,
+        "debian_snapshot": debian_snapshot,
         "linux_natives": natives,
         "aarch64-linux-gnu-binutils": first_line("aarch64-linux-gnu-objcopy", "--version"),
         "android_ndk": {"version": "r" + ndk.get("version", "?"), "sha256": ndk.get("sha256_hash")},

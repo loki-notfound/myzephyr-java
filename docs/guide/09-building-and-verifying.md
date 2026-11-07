@@ -73,13 +73,14 @@ There are four entry points:
   CI job), so everything but glibc comes from zephyr's depends and is linked statically. The
   results are `build/natives/linux-<arch>/libzephyr-java.so`.
 - **`bin/build_android.sh <abi|--all>`**, the Android natives with zephyr's depends and NDK r18b
-  (downloaded and checked by depends), into `build/android/<abi>/`.
+  (downloaded and checked by depends), into `build/android/<abi>/`. For releases,
+  **`bin/build_android_container.sh <abi|--all>`** runs it in the same pinned image.
 - **`bin/build_release.sh`**, everything: the natives, stripping with separate debug files, the JAR
   with sources and Javadoc jars (the pure tests run on the depends-built library), the AAR through
   Gradle in `android/`, and `dist/<version>/` with `manifest.json` and `SHA256SUMS`. It needs a JDK
   21 in `JAVA_HOME` and an Android SDK with platform 36 and build-tools 36.0.0 in `ANDROID_HOME`.
   `BUILD_LINUX_ARCHES` and `BUILD_ANDROID_ABIS` choose the platforms; an empty value builds none.
-<!-- bin/build_libzephyr_java.sh, bin/build_linux.sh, bin/build_linux_container.sh, bin/build_android.sh, bin/build_release.sh header comments; .github/workflows/build.yml (java job "System libraries of the developer build"; natives job container debian:12@sha256:366a6da5...) -->
+<!-- bin/build_libzephyr_java.sh, bin/build_linux.sh, bin/build_linux_container.sh, bin/build_android.sh, bin/build_android_container.sh, bin/build_release.sh header comments; .github/workflows/build.yml (java job "System libraries of the developer build"; natives job container debian:12@sha256:366a6da5...) -->
 
 Every step is a plain shell command, so the same scripts serve a developer, CI and an F-Droid
 build. The first depends build takes a while: about 14 minutes per Android ABI and 10 minutes
@@ -153,13 +154,18 @@ second build:
 2. Build the Linux natives with `bin/build_linux_container.sh --all` and compare each
    `build/natives/linux-<arch>/libzephyr-java.so` with the copy inside the release JAR
    (`unzip -p zephyr-java-<version>.jar linux-x86_64/libzephyr-java.so | sha256sum`).
-3. Build the Android natives with `bin/build_android.sh --all` in a checkout at the same path as
-   the release build (the path shows up in the release libraries' `strings`), and compare with the
+3. Build the Android natives with `bin/build_android_container.sh --all`, and compare with the
    libraries in the AAR (`jni/<abi>/libzephyr-java.so`).
 4. Compare the jars and the AAR the same way, file by file. `manifest.json` itself records the
    build environment (compilers, glibc, container), so its hash matches only a build in the same
    environment.
-<!-- RELEASES §4 "Release flow" and "Linux build environment"; bin/build_release.sh steps; PLAN §5 R10 result (JAR carries linux-x86_64/libzephyr-java.so) and R11 result; QUESTIONS R11-11 answer (R13 builds Linux in the container only) -->
+
+Every native of a release is built in the pinned `debian:12` image with the checkout at `/work`,
+in CI and locally alike, so the source paths that NDK r18b leaves in the Android libraries read
+`/work/...` on both sides and the libraries match. The image installs its packages from the Debian
+snapshot `20261107T000000Z` (`snapshot.debian.org`, recorded in the manifest as
+`toolchain.debian_snapshot`), so both builds use the same compilers and binutils.
+<!-- RELEASES §4 "Release flow" and "Linux build environment"; bin/build_release.sh steps; PLAN §5 R10 result (JAR carries linux-x86_64/libzephyr-java.so) and R11 result; QUESTIONS R11-11 answer (R13 builds Linux in the container only); QUESTIONS R13-6 answer and bin/build_android_container.sh, bin/container-build-deps.sh (DEBIAN_SNAPSHOT), .github/workflows/build.yml natives job (/work) -->
 
 The stripped libraries carry a `gnu_debuglink` to their debug files, which ship in
 `debug-symbols-<version>.tar.gz`, so a crash report from a release can be symbolised without

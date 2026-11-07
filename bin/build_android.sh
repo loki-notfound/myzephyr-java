@@ -16,6 +16,12 @@
 #    zephyr tree (configured afresh every time; make rebuilds only what changed).
 # 5. Builds the JNI library in build-android/<abi>/ (CMakeLists.txt of this repo, Android branch)
 #    and copies it to build/android/<abi>/libzephyr-java.so.
+# The release natives are built in the debian:12 image at /work: bin/build_android_container.sh
+# runs this script there; run directly, it builds on the host.
+# Host and container builds share the checkout under different paths (/work in the container).
+# A zephyr build directory or build-android/<abi>/ whose CMake cache records another source path
+# is wiped before configuring, as in bin/build_linux.sh. A switch between host and container also
+# rebuilds the depends packages (their build ids contain the prefix path and the compilers).
 #
 # Reproducibility: SOURCE_DATE_EPOCH is exported (the commit time of this checkout unless set),
 # and zephyr and the JNI library are compiled with -fdebug-prefix-map=<this checkout>=. and
@@ -125,6 +131,20 @@ for P in "$ROOT"/patches/depends/*.patch; do
   fi
 done
 
+# Wipes a CMake build directory whose top-level CMakeCache.txt records a source directory other
+# than the given one: host and container builds share the checkout under different paths, and
+# nested ExternalProject caches (zephyr's translations) record the path too, so a stale tree from
+# another path cannot be reconfigured in place (the same function as in bin/build_linux.sh).
+wipe_if_other_source() {
+  local DIR="$1" SRC="$2" HOME_DIR
+  [ -f "$DIR/CMakeCache.txt" ] || return 0
+  HOME_DIR="$(sed -n 's/^CMAKE_HOME_DIRECTORY:INTERNAL=//p' "$DIR/CMakeCache.txt")"
+  if [ "$HOME_DIR" != "$SRC" ]; then
+    echo "$DIR: configured for $HOME_DIR, not $SRC: wiped"
+    rm -rf "$DIR"
+  fi
+}
+
 for ABI in $ABIS; do
   TRIPLET="$(triplet_of "$ABI")"
   echo "=== $ABI ($TRIPLET)"
@@ -143,6 +163,7 @@ for ABI in $ABIS; do
   # also -march, -marm, -mfpu, -mfloat-abi), which -DCMAKE_C_FLAGS on a first configure would
   # replace; zephyr's CMakeLists.txt only appends to CMAKE_C_FLAGS/CMAKE_CXX_FLAGS. Objects whose
   # flags did not change are not rebuilt.
+  wipe_if_other_source "$ZB" "$ROOT/$Z"
   mkdir -p "$ZB" && cd "$ZB"
   rm -f CMakeCache.txt
   CFLAGS="$PREFIX_MAPS" CXXFLAGS="$PREFIX_MAPS" cmake -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DBUILD_TESTS=OFF -DUSE_CCACHE=ON ../../..
@@ -162,7 +183,8 @@ for ABI in $ABIS; do
   done
   [ "$MISSING" = 0 ] || exit 1
 
-  # 5. JNI library
+  # 5. JNI library; a cache configured for the other path (host or container) is wiped
+  wipe_if_other_source "build-android/$ABI" "$ROOT"
   mkdir -p "build-android/$ABI" && cd "build-android/$ABI"
   cmake -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DANDROID_HOST="$TRIPLET" \
     -DCMAKE_C_FLAGS="$PREFIX_MAPS" -DCMAKE_CXX_FLAGS="$PREFIX_MAPS" ../..
