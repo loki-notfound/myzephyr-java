@@ -57,6 +57,7 @@ import zephyr.wallet.model.ZephyrWalletListenerI;
  */
 abstract class ZephyrWalletDefault implements ZephyrWallet {
   
+  /** The registered listeners, in the order they were added. */
   protected Set<ZephyrWalletListenerI> listeners;
   
   public ZephyrWalletDefault() {
@@ -369,6 +370,13 @@ abstract class ZephyrWalletDefault implements ZephyrWallet {
     close(false); // close without saving
   }
   
+  /**
+   * Returns a copy of the query (a new query for null) whose tx query refers back to it, so that
+   * the transfer filter and the tx filter can be applied together.
+   *
+   * @param query is the transfer query (null for every transfer)
+   * @return the normalized copy
+   */
   protected ZephyrTransferQuery normalizeTransferQuery(ZephyrTransferQuery query) {
     if (query == null) query = new ZephyrTransferQuery();
     else {

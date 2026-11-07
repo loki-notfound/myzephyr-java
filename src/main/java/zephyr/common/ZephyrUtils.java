@@ -27,6 +27,11 @@ import zephyr.wallet.model.ZephyrIntegratedAddress;
  */
 public class ZephyrUtils {
   
+  /**
+   * The implicit public constructor, made explicit to document it: every member is static.
+   */
+  public ZephyrUtils() { }
+  
   // load JNI binding if available
   static {
     tryLoadNativeLibrary();
@@ -135,6 +140,7 @@ public class ZephyrUtils {
     }
   }
   
+  /** The ring size the Zephyr network enforces: 16 (Monero's is 12). */
   public static final int RING_SIZE = 16; // network-enforced ring size of the Zephyr core
   
   private static int LOG_LEVEL = 0;
@@ -431,6 +437,11 @@ public class ZephyrUtils {
     }
   }
 
+  /**
+   * Validates the length of a payment ID: 16 hex characters (short, integrated addresses) or 64.
+   *
+   * @param paymentId is the payment ID to validate
+   */
   // TODO: improve validation
   public static void validatePaymentId(String paymentId) {
     GenUtils.assertTrue(paymentId.length() == 16 || paymentId.length() == 64);
@@ -462,10 +473,22 @@ public class ZephyrUtils {
     }
   }
 
+  /**
+   * Validates that a string is hex with an even number of characters.
+   *
+   * @param str is the string to validate
+   * @throws ZephyrError if the string is not hex
+   */
   public static void validateHex(String str) {
     if (!str.matches("^([0-9A-Fa-f]{2})+$")) throw new ZephyrError("Invalid hex: " + str);
   }
 
+  /**
+   * Validates that a string uses only the characters of the base58 alphabet.
+   *
+   * @param standardAddress is the string to validate
+   * @throws ZephyrError if a character is not in the base58 alphabet
+   */
   public static void validateBase58(String standardAddress) {
     for (char c : standardAddress.toCharArray()) {
       if (!CHARS.contains(c)) throw new ZephyrError("Invalid Base58 " + standardAddress);
@@ -508,14 +531,33 @@ public class ZephyrUtils {
     txs.add(tx);
   }
   
+  /**
+   * Converts a map to the daemon's binary (portable storage) format, using the native library.
+   *
+   * @param map is the map to convert
+   * @return the binary form
+   */
   public static byte[] mapToBinary(Map<String, Object> map) {
     return jsonToBinaryJni(JsonUtils.serialize(map));
   }
   
+  /**
+   * Converts the daemon's binary (portable storage) format to a map, using the native library.
+   *
+   * @param bin is the binary form
+   * @return the map
+   */
   public static Map<String, Object> binaryToMap(byte[] bin) {
     return JsonUtils.deserialize(binaryToJsonJni(bin), new TypeReference<Map<String, Object>>(){});
   }
   
+  /**
+   * Converts the daemon's binary blocks response to a map whose "blocks" entry is a list of
+   * block maps, using the native library.
+   *
+   * @param binBlocks is the binary blocks response
+   * @return the map
+   */
   @SuppressWarnings("unchecked")
   public static Map<String, Object> binaryBlocksToMap(byte[] binBlocks) {
     

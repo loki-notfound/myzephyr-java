@@ -20,6 +20,15 @@ public class ZephyrAccount {
     super();
   }
   
+  /**
+   * Constructs an account.
+   *
+   * @param index is the account index
+   * @param primaryAddress is the account's primary address
+   * @param balance is the account's balance per asset
+   * @param unlockedBalance is the account's unlocked balance per asset
+   * @param subaddresses are the account's subaddresses (may be null)
+   */
   public ZephyrAccount(int index, String primaryAddress, ZephyrBalance balance, ZephyrBalance unlockedBalance, List<ZephyrSubaddress> subaddresses) {
     super();
     this.index = index;
@@ -45,18 +54,39 @@ public class ZephyrAccount {
     this.primaryAddress = primaryAddress;
   }
   
+  /**
+   * Returns the account's balance per asset. It lists only the assets the account holds; an
+   * absent asset is zero ({@link ZephyrBalance#get(String)}, {@link ZephyrBalance#equals(Object)}).
+   *
+   * @return the account's balance per asset in atomic units
+   */
   public ZephyrBalance getBalance() {
     return balance;
   }
   
+  /**
+   * Sets the account's balance per asset.
+   *
+   * @param balance is the account's balance per asset in atomic units
+   */
   public void setBalance(ZephyrBalance balance) {
     this.balance = balance;
   }
   
+  /**
+   * Returns the account's unlocked (spendable) balance per asset; an absent asset is zero.
+   *
+   * @return the account's unlocked balance per asset in atomic units
+   */
   public ZephyrBalance getUnlockedBalance() {
     return unlockedBalance;
   }
   
+  /**
+   * Sets the account's unlocked balance per asset.
+   *
+   * @param unlockedBalance is the account's unlocked balance per asset in atomic units
+   */
   public void setUnlockedBalance(ZephyrBalance unlockedBalance) {
     this.unlockedBalance = unlockedBalance;
   }

@@ -69,19 +69,42 @@ public class ZephyrSubaddress {
     return this;
   }
   
+  /**
+   * Returns the subaddress's balance per asset. It lists only the assets the subaddress holds; an
+   * absent asset is zero ({@link ZephyrBalance#get(String)}, {@link ZephyrBalance#equals(Object)}).
+   *
+   * @return the subaddress's balance per asset in atomic units
+   */
   public ZephyrBalance getBalance() {
     return balance;
   }
   
+  /**
+   * Sets the subaddress's balance per asset.
+   *
+   * @param balance is the subaddress's balance per asset in atomic units
+   * @return this subaddress for chaining
+   */
   public ZephyrSubaddress setBalance(ZephyrBalance balance) {
     this.balance = balance;
     return this;
   }
   
+  /**
+   * Returns the subaddress's unlocked (spendable) balance per asset; an absent asset is zero.
+   *
+   * @return the subaddress's unlocked balance per asset in atomic units
+   */
   public ZephyrBalance getUnlockedBalance() {
     return unlockedBalance;
   }
   
+  /**
+   * Sets the subaddress's unlocked balance per asset.
+   *
+   * @param unlockedBalance is the subaddress's unlocked balance per asset in atomic units
+   * @return this subaddress for chaining
+   */
   public ZephyrSubaddress setUnlockedBalance(ZephyrBalance unlockedBalance) {
     this.unlockedBalance = unlockedBalance;
     return this;

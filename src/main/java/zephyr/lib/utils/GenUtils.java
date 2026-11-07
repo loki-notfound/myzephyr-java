@@ -16,6 +16,11 @@ import java.util.concurrent.TimeUnit;
  */
 public class GenUtils {
   
+  /**
+   * The implicit public constructor, made explicit to document it: every member is static.
+   */
+  public GenUtils() { }
+  
   private static final int[] EMPTY_INT_ARRAY = new int[0];
   
   /**

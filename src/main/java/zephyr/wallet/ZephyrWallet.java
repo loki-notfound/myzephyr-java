@@ -63,6 +63,7 @@ import zephyr.wallet.model.ZephyrWalletListenerI;
  */
 public interface ZephyrWallet {
   
+  /** The mnemonic language of new random wallets when the config names none. */
   public static final String DEFAULT_LANGUAGE = "English";
   
   /**

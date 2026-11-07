@@ -7,6 +7,11 @@ import java.math.BigInteger;
  */
 public class ZephyrWalletListener implements ZephyrWalletListenerI {
 
+  /**
+   * Constructs a listener that ignores every notification; override the callbacks you need.
+   */
+  public ZephyrWalletListener() { }
+
   @Override
   public void onSyncProgress(long height, long startHeight, long endHeight, double percentDone, String message) { }
 
@@ -16,7 +21,14 @@ public class ZephyrWalletListener implements ZephyrWalletListenerI {
   @Override
   public void onBalancesChanged(BigInteger newBalance, BigInteger newUnlockedBalance, String assetType) { }
   
-  /** Not called by zephyr-java: balances change per asset. Kept final so that a listener ported from monero-java fails to compile here instead of never being notified. */
+  /**
+   * Not called by zephyr-java: balances change per asset. Kept final so that a listener ported
+   * from monero-java fails to compile here instead of never being notified.
+   *
+   * @param newBalance is not used
+   * @param newUnlockedBalance is not used
+   * @deprecated override {@link #onBalancesChanged(BigInteger, BigInteger, String)} instead
+   */
   @Deprecated
   public final void onBalancesChanged(BigInteger newBalance, BigInteger newUnlockedBalance) { }
 

@@ -31,6 +31,10 @@ public class ZephyrReserveInfo {
   private BigInteger zyieldCirc;
   private BigInteger zyieldRsv;
   
+  /**
+   * Constructs an empty reserve info; {@link zephyr.wallet.ZephyrWallet#getReserveInfo()} returns a
+   * filled one.
+   */
   public ZephyrReserveInfo() {
     // nothing to construct
   }
@@ -299,6 +303,12 @@ public class ZephyrReserveInfo {
     return toString(0);
   }
   
+  /**
+   * Returns one line per field.
+   *
+   * @param indent indents the lines
+   * @return the human-readable string
+   */
   public String toString(int indent) {
     StringBuilder sb = new StringBuilder();
     sb.append(GenUtils.kvLine("ZPH reserve", this.getZephReserve(), indent));

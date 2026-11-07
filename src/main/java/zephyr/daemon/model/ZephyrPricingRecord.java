@@ -32,10 +32,18 @@ public class ZephyrPricingRecord {
   private BigInteger timestamp;
   private String signature;
   
+  /**
+   * Constructs an empty pricing record.
+   */
   public ZephyrPricingRecord() {
     super();
   }
   
+  /**
+   * Constructs a copy of the given pricing record.
+   *
+   * @param record is the record to copy
+   */
   public ZephyrPricingRecord(ZephyrPricingRecord record) {
     this.spot = record.spot;
     this.movingAverage = record.movingAverage;
@@ -50,6 +58,11 @@ public class ZephyrPricingRecord {
     this.signature = record.signature;
   }
   
+  /**
+   * Returns a copy of this pricing record.
+   *
+   * @return the copy
+   */
   public ZephyrPricingRecord copy() {
     return new ZephyrPricingRecord(this);
   }
@@ -296,6 +309,14 @@ public class ZephyrPricingRecord {
     return this;
   }
   
+  /**
+   * Merges another record of the same block into this one: a field set in only one of them is
+   * taken, a field set in both must be equal.
+   *
+   * @param record is the record to merge into this one
+   * @return this record, merged
+   * @throws zephyr.common.ZephyrError if a field is set in both records with different values
+   */
   public ZephyrPricingRecord merge(ZephyrPricingRecord record) {
     GenUtils.assertNotNull(record);
     if (this == record) return this;
@@ -317,6 +338,12 @@ public class ZephyrPricingRecord {
     return toString(0);
   }
   
+  /**
+   * Returns one line per field.
+   *
+   * @param indent indents the lines
+   * @return the human-readable string
+   */
   public String toString(int indent) {
     StringBuilder sb = new StringBuilder();
     sb.append(GenUtils.kvLine("Spot", getSpot(), indent));

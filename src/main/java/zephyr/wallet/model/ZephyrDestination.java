@@ -44,10 +44,25 @@ public class ZephyrDestination {
     this.address = address;
   }
   
+  /**
+   * Returns the amount of this destination in atomic units.
+   * 
+   * For a conversion the meaning depends on where the destination comes from: on the transaction
+   * that createTxs or sweepUnlocked returns it is the source amount (in the source currency); in
+   * getTxs() after confirmation it is the destination amount (in the destination currency, from
+   * the core's dest_amount). The outgoing transfer's own amount stays the source amount.
+   * 
+   * @return the amount in atomic units
+   */
   public BigInteger getAmount() {
     return amount;
   }
   
+  /**
+   * Sets the amount of this destination; on a send it is the amount in the source currency.
+   * 
+   * @param amount is the amount in atomic units
+   */
   public void setAmount(BigInteger amount) {
     this.amount = amount;
   }

@@ -136,7 +136,25 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     if (daemonConnection != null) wallet.setDaemonConnection(daemonConnection);
     return wallet;
   }
+  /**
+   * Open an existing wallet from its files, without a daemon connection.
+   *
+   * @param path is the path to the wallet file to open
+   * @param password is the password of the wallet file to open
+   * @param networkType is the wallet's network type
+   * @return the opened wallet
+   */
   public static ZephyrWalletFull openWallet(String path, String password, ZephyrNetworkType networkType) { return openWallet(path, password, networkType, (ZephyrRpcConnection) null); }
+  
+  /**
+   * Open an existing wallet from its files and connect it to a daemon.
+   *
+   * @param path is the path to the wallet file to open
+   * @param password is the password of the wallet file to open
+   * @param networkType is the wallet's network type
+   * @param daemonUri is the daemon's URI (null for an unconnected wallet)
+   * @return the opened wallet
+   */
   public static ZephyrWalletFull openWallet(String path, String password, ZephyrNetworkType networkType, String daemonUri) { return openWallet(path, password, networkType, daemonUri == null ? null : new ZephyrRpcConnection(daemonUri)); }
 
   /**
