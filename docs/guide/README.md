@@ -20,5 +20,4 @@ and a complete quick-start program.
 | [9. Building from source and verifying releases](09-building-and-verifying.md) | the pins, the patches, the builds, reproducibility, the manifest, signatures |
 
 Statements about the Zephyr core in this guide come from the pinned sources and from test runs
-against mainnet in 2026-11; each one names its source in an HTML comment next to it, visible in
-the Markdown source of the page.
+against mainnet in 2026-11.

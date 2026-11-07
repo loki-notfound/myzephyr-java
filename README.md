@@ -6,7 +6,6 @@ built from the security-hardened forks of [zephyr-backports](https://github.com/
 linked statically into one native library per platform. The Java API mirrors
 [monero-java](https://github.com/woodser/monero-java), from which this project is derived, with
 Zephyr's assets, conversions and reserve information added.
-<!-- pins: bin/pins.env (zephyr v2.3.0-sec.2 and zephyr-cpp v2.3.0-sec.1, the zephyr-backports release set of 2026-11-07); static linking: register D17 -->
 
 **Not affiliated with ZephyrProtocol.** An independent project. Report Zephyr vulnerabilities to the
 ZephyrProtocol team, not here.
@@ -15,26 +14,21 @@ ZephyrProtocol team, not here.
 
 Pre-release: there is no release yet. The first release, `v2.3.0-sec.2-java.1`, is built from the
 zephyr-backports release set of 2026-11-07: zephyr `v2.3.0-sec.2` and zephyr-cpp `v2.3.0-sec.1`.
-<!-- RELEASES §2; PLAN §7.9; bin/pins.env (ZEPHYR_TAG, ZEPHYR_CPP_TAG, RELEASE_SET) -->
 
 What works today, on the development branches:
 
 - **The full wallet on mainnet**: create, open, sync, balances per asset, transfers, a ZPH → ZRS
   conversion and sweeps, run against a mainnet node with real funds.
-  <!-- PLAN §5, R8 results (both parts): TestZephyrIntegration and TestZephyrIntegrationFunds -->
 - **The AAR** for Android, minSdk 24, with the native library for `arm64-v8a`, `armeabi-v7a` and
   `x86_64`. The `armeabi-v7a` library needs a CPU with VFPv4, which every device that runs
   Android 7 has. The AAR is built and checked (16 KB page alignment, uncompressed native libraries)
   in a throwaway consumer app; it has not yet run on a device or an emulator.
-  <!-- PLAN §5 R9 and R10 results; RELEASES §6 (minSdk 24) and §7 (VFPv4); evidence/r9/armv7-checks.txt; evidence/r13/release-candidate-r13.md (the consumer app check: AGP 9.5.0, zipalign -c -P 16, the three libraries stored) -->
 - **The JAR** with the native libraries for Linux `x86_64` and `arm64` inside, loaded from the JAR.
   Release natives are built in a Debian 12 container and need glibc 2.36 or newer (Debian 12,
   Ubuntu 23.04 and later, RHEL 10); everything else is linked statically. The `arm64` library is
   built and checked, not yet run.
-  <!-- PLAN §5 R10 and R11 results; PLAN §7.10 (option A); RELEASES §4 "Linux build environment" -->
 - **The RPC classes** (`ZephyrWalletRpc`, `ZephyrDaemonRpc`) are a first pass only: the wallet RPC
   client serves the base coin and rejects the per-asset calls with a clear message.
-  <!-- register D11; PLAN §5 R7 result -->
 
 ## Coordinates
 
@@ -43,7 +37,6 @@ GitHub Pages, `https://loki-notfound.github.io/zephyr-java/maven` (available wit
 release). Maven Central may follow once the API has settled. The repository and the Javadoc live on
 the project's GitHub Pages, built by `bin/make_site.sh` from each release (`dist/<version>/site/`)
 and published with the first release.
-<!-- RELEASES §5; PLAN §2 "Distribution"; bin/make_maven_repo.sh, bin/make_site.sh -->
 
 Android (Gradle, Kotlin DSL). The AAR has its own artifactId, `zephyr-java-android`, and brings
 its POM's dependencies (Jackson and the Apache HTTP client) along:
@@ -57,7 +50,6 @@ dependencies {
     implementation("io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.1")
 }
 ```
-<!-- artifactId: android/gradle.properties ARTIFACT_ID (QUESTIONS R12-3 answer); AAR POM dependencies: android/build.gradle.kts (jackson-core, jackson-databind, httpclient5); PLAN §5 R10 result -->
 
 Every Android app that uses the AAR also needs this line in its `android { }` block:
 
@@ -68,7 +60,6 @@ packaging { resources.excludes += "/META-INF/DEPENDENCIES" }
 Three of the Apache HTTP client's jars carry a file `META-INF/DEPENDENCIES`, and the app's resource
 merge fails on the duplicates. The file is Maven metadata that nothing reads at run time. A library
 cannot fix this for the app.
-<!-- QUESTIONS R10-5 item 1 (mergeDebugJavaResource, httpclient5, httpcore5, httpcore5-h2); PLAN §5 R10 result -->
 
 Desktop and server (Maven), the JAR with the Linux natives:
 
@@ -86,7 +77,6 @@ Desktop and server (Maven), the JAR with the Linux natives:
   <version>2.3.0-sec.2-java.1</version>
 </dependency>
 ```
-<!-- pom.xml groupId and artifactId; RELEASES §2 (Maven version = tag without the v) -->
 
 ## Quick start
 
@@ -179,7 +169,6 @@ public class QuickStart {
 Every send names a source and a destination currency; a plain transfer uses the same asset for
 both, a conversion two different ones. The [user guide](docs/guide/README.md) explains the
 pairs, the fees and the locks.
-<!-- ZEPHYR-DELTA §1 "Tx config: sourceCurrency and destinationCurrency are required for every send" -->
 
 ## Documentation
 
@@ -204,7 +193,6 @@ zephyr-backports tag `v2.3.0-sec.2` and zephyr-cpp at `v2.3.0-sec.1` (the releas
 2026-11-07), by sha, never a branch. A build against ZephyrProtocol's original of the same
 release (zephyr `v2.3.0`, zephyr-cpp `4a99272`) must work as well; the backports are the same
 software plus Monero security fixes.
-<!-- bin/pins.env; PLAN §2 "Source pins" -->
 
 ```sh
 git clone https://github.com/loki-notfound/zephyr-java.git
@@ -225,7 +213,6 @@ git submodule update --init external/zephyr-cpp
 `SOURCE_DATE_EPOCH`, every depends package with its sha256, the build-layer patches, the
 toolchain versions and the sha256 of every artifact. Chapter 9 of the guide has the details and
 the steps to reproduce a release.
-<!-- bin/build_*.sh header comments; bin/make_manifest.sh; dist/ manifest of R11 run 1 (keys core, depends, patches, toolchain, zephyr_java, artifacts) -->
 
 ## Verifying a release
 
@@ -237,7 +224,6 @@ Release tags and `SHA256SUMS` are signed with the maintainer key:
 
 The public key is [`KEYS.asc`](KEYS.asc) in this repository, and from the first release on
 keys.openpgp.org as well. To check a release:
-<!-- PLAN §7.8; RELEASES §3 (SHA256SUMS + signature) -->
 
 ```sh
 gpg --import KEYS.asc
@@ -249,14 +235,12 @@ gpg --verify SHA256SUMS.asc && sha256sum -c SHA256SUMS
 site are the archive `site-<version>.tar.gz`, whose hash is in `SHA256SUMS`; Pages serves its
 contents. The release flow builds every artifact twice in the same environment and the hashes must
 match before the owner signs.
-<!-- bin/make_manifest.sh header ("SHA256SUMS is sha256sum over the top-level files"); bin/package_release.sh step 7 (the site archive); RELEASES §4 "Release flow" -->
 
 The core's tags are signed by zephyr-backports with its release key,
 `FB39 94F0 997C A6F0 43D7  2491 9EFF 03F5 27D2 40A1` (`keys/zephyr-backports.asc` in the
 zephyr-backports repository). The build scripts run `git verify-tag` on them when the tag is
 present locally; without gpg or without that key in the keyring they print a warning and build
 anyway, so that a build without the keys still works.
-<!-- bin/pins.env comment; verify_pin_tag in bin/build_libzephyr_java.sh, bin/build_linux.sh, bin/build_android.sh -->
 
 ## Versioning
 
@@ -272,7 +256,6 @@ Maven version is the same without the `v`.
 - The version does not encode API compatibility. Changes to the Java API are listed under
   "Breaking changes" in the release notes.
 - Tags are annotated and signed, and never moved or reused.
-<!-- RELEASES §2 including the per-fork refinement (owner agreed 2026-11-07) -->
 
 ## Credits and licence
 

@@ -25,7 +25,6 @@ own `bin/update_submodules.sh` is never used, because it checks out a branch. No
 built from a branch. When a tree's own tag (`ZEPHYR_TAG`, `ZEPHYR_CPP_TAG`) is present locally,
 the scripts check that it points at the pinned commit and run `git verify-tag` on it (see
 "Signatures" below).
-<!-- bin/pins.env (ZEPHYR_TAG, ZEPHYR_CPP_TAG, RELEASE_SET, RELEASE_SET_MEMBERS); bin/place_zephyr_tree.sh (steps 1-2, verify_pin_tag); bin/build_libzephyr_java.sh header steps 1-2; .gitmodules; RELEASES §2 refinement -->
 
 The backports are ZephyrProtocol's Zephyr 2.3.0 plus Monero security fixes, with no changes to the
 headers that zephyr-java compiles against. A build against ZephyrProtocol's original release must
@@ -34,7 +33,6 @@ zephyr-cpp `4a99272f6d7a171cf6625016939094637459975a` (zephyr-cpp has no tag the
 in `bin/pins.env` name both; to build against them, put their URLs and commits into the four
 variables and check out the submodule at that commit. This is a requirement on the sources, not a
 CI job; releases are always built from the backports.
-<!-- PLAN §2 "Source pins" (paper requirement, no CI matrix); ZEPHYR-DELTA design goal 3 (no header changes between 4a99272 and 56abaf9); bin/pins.env comments (ZEPHYR_CPP_URL, ZEPHYR_CPP_SHA, ZEPHYR_URL, ZEPHYR_SHA) -->
 
 ## Build-layer patches
 
@@ -50,13 +48,11 @@ libraries from pinned archives):
 | `0003-android-ndk-x86_64` | pass `--arch x86_64` for the x86_64 standalone toolchain | the x86_64 Android toolchain is not built otherwise |
 | `0004-openssl-openssldir` | build OpenSSL with `OPENSSLDIR /etc/ssl` | the default embedded the build directory, an empty CA store on any other machine |
 | `0005-neutral-engines-and-unbound-sysconfdir` | neutral `ENGINESDIR`, `MODULESDIR` and unbound `sysconfdir` | they embedded the build directory, which breaks reproducibility across paths |
-<!-- patches/depends/000[1-5]*.patch Description lines; register D21; PLAN §5 R9 result (three patches) and R11 result (0004, 0005); QUESTIONS R11-2 answer (0005 values; unused with no-dso); evidence/r10/packaging-r10.md stage E (OPENSSLDIR embedded the build path) -->
 
 Two more build-layer settings: the JNI library is compiled with `-include map`, because
 zephyr-cpp's model header relies on boost to include `<map>` and newer boost does not (register
 D20); and zephyr's dead `blocks` library is not linked, because the pinned tree never builds it
 (D22).
-<!-- CMakeLists.txt:369 (target_compile_options -include map); register D20, D22 -->
 
 ## The builds
 
@@ -90,12 +86,10 @@ There are four entry points:
   build-tools 36.0.0 in `ANDROID_HOME`, which it mounts read-only. `BUILD_LINUX_ARCHES` and
   `BUILD_ANDROID_ABIS` choose the platforms; an empty value builds none. `SKIP_NATIVES=1` packages
   the natives already in `build/` again.
-<!-- bin/build_libzephyr_java.sh, bin/build_linux.sh, bin/build_linux_container.sh, bin/build_android.sh, bin/build_android_container.sh, bin/package_release_container.sh, bin/build_release.sh header comments; .github/workflows/build.yml (java job "System libraries of the developer build"; natives job container debian:12@sha256:366a6da5...) -->
 
 Every step is a plain shell command, so the same scripts serve a developer, CI and an F-Droid
 build. The first depends build takes a while: about 14 minutes per Android ABI and 10 minutes
 for Linux x86_64 on the machine this project is developed on.
-<!-- bin/build_release.sh header ("F-Droid runs this script; CI runs the same scripts"); PLAN §5 R9 result (about 14 minutes of depends per ABI); QUESTIONS R11-13 (13 depends packages in 9 m 55 s in the container) -->
 
 ## Reproducibility
 
@@ -112,7 +106,6 @@ Two builds from the same commit give the same files:
   rebuild at the same path.
 - The JARs and the AAR were equal across clean builds. Stripping is deterministic, and the debug
   symbols are packed into a tar with fixed order, times and owners.
-<!-- bin/build_release.sh (SOURCE_DATE_EPOCH, OUTPUT_TIMESTAMP, tar --sort=name --mtime --owner=0); RELEASES §4 (refined 2026-11-07, R11); PLAN §5 R11 result ("Linux x86_64 library and .debug equal across two checkout paths; arm64-v8a equal on a same-path rebuild; jars and AAR equal across clean builds") -->
 
 ## The manifest
 
@@ -126,12 +119,10 @@ Two builds from the same commit give the same files:
 | `toolchain` | gcc, binutils, CMake, glibc, JDK and Maven of the packaging environment (`packaging_env`, `packaging_container`), NDK (version and sha256) and its clang, Android Gradle plugin, Gradle (distribution and sha256), compile and min SDK, build-tools, the Android SDK package revisions; per Linux native its compiler, glibc and container; per Android native its NDK, clang, API level, build path and container |
 | `zephyr_java` | the commit, its `SOURCE_DATE_EPOCH`, the version |
 | `artifacts` | every release file with its size and sha256 |
-<!-- bin/make_manifest.sh header; dist/2.3.0-sec.1-java.1-SNAPSHOT/manifest.json of the R11 run (keys core, depends, patches, toolchain, zephyr_java, artifacts) -->
 
 `SHA256SUMS` lists every file of the release, the manifest included. The Maven repository and the
 site are the archive `site-<version>.tar.gz`, whose hash is in `SHA256SUMS`; Pages serves its
 contents.
-<!-- bin/make_manifest.sh header ("SHA256SUMS is sha256sum over the top-level files"); bin/package_release.sh step 7 (the site archive) -->
 
 ## Signatures
 
@@ -142,7 +133,6 @@ Two keys are involved:
 - **The zephyr-backports release key** `FB39 94F0 997C A6F0 43D7  2491 9EFF 03F5 27D2 40A1` signs the
   core's tags. The build scripts verify them with `git verify-tag` when the tag is present; without
   gpg or without the key they print a warning and build anyway, and a bad signature stops the build.
-<!-- PLAN §7.8; RELEASES §3; bin/pins.env comment; verify_pin_tag in the build scripts -->
 
 To check a release you downloaded:
 
@@ -192,9 +182,7 @@ in CI and locally alike, so the source paths that NDK r18b leaves in the Android
 `/work/...` on both sides and the libraries match. The image installs its packages from the Debian
 snapshot `20261107T000000Z` (`snapshot.debian.org`, recorded in the manifest as
 `toolchain.debian_snapshot`), so both builds use the same compilers and binutils.
-<!-- RELEASES §4 "Release flow" and "Linux build environment"; QUESTIONS R13b-4 answer (packaging in the pinned image, umask 022, tar modes); bin/package_release_container.sh, bin/package_release.sh header ("File modes"), .github/workflows/build.yml package job; bin/build_release.sh steps; PLAN §5 R10 result (JAR carries linux-x86_64/libzephyr-java.so) and R11 result; QUESTIONS R11-11 answer (R13 builds Linux in the container only); QUESTIONS R13-6 answer and bin/build_android_container.sh, bin/container-build-deps.sh (DEBIAN_SNAPSHOT), .github/workflows/build.yml natives job (/work) -->
 
 The stripped libraries carry a `gnu_debuglink` to their debug files, which ship in
 `debug-symbols-<version>.tar.gz`, so a crash report from a release can be symbolised without
 rebuilding.
-<!-- bin/strip_natives.sh header (objcopy --only-keep-debug, strip --strip-unneeded, --add-gnu-debuglink); bin/build_release.sh step 6 -->
