@@ -15,12 +15,13 @@
 #   depends      every package of zephyr's contrib/depends/packages/*.mk: version, file name
 #                and sha256 as declared there
 #   artifacts    every file in dist/<version>/ except manifest.json and SHA256SUMS: name, size,
-#                sha256
-#                The Maven repository and the site (dist/<version>/maven/, site/) are not listed:
-#                they hold copies of these artifacts plus metadata (bin/package_release.sh builds
-#                them before the manifest).
-# SHA256SUMS is sha256sum over every file under dist/<version>/, the manifest and the files in
-# maven/ and site/ included, one line per file with its path relative to dist/<version>/.
+#                sha256; for the site archive site-<version>.tar.gz also its entry count
+#                The site directory (dist/<version>/site/, with the Maven repository in
+#                site/maven/) is not listed: the archive holds it (bin/package_release.sh builds
+#                both before the manifest).
+# SHA256SUMS is sha256sum over the top-level files of dist/<version>/, the release assets: the
+# manifest and the site archive included, nothing below site/ (QUESTIONS R13-4: sha256sum -c
+# works on the downloaded assets), one line per file.
 # With --sums-only, only SHA256SUMS is rewritten (bin/package_release.sh does that last).
 # A tool that is not installed is recorded as null.
 #
@@ -48,6 +49,7 @@ import os
 import re
 import subprocess
 import sys
+import tarfile
 import xml.etree.ElementTree as ET
 
 ROOT = os.getcwd()
@@ -201,7 +203,11 @@ def main():
         path = os.path.join(dist, name)
         if name in ("manifest.json", "SHA256SUMS") or not os.path.isfile(path):
             continue
-        artifacts.append({"name": name, "size": os.path.getsize(path), "sha256": sha256(path)})
+        entry = {"name": name, "size": os.path.getsize(path), "sha256": sha256(path)}
+        if name.startswith("site-") and name.endswith(".tar.gz"):
+            with tarfile.open(path, "r:gz") as t:
+                entry["entries"] = len(t.getmembers())
+        artifacts.append(entry)
     manifest = {
         "zephyr_java": {
             "version": version,
@@ -231,5 +237,5 @@ main()
 PY
 
 DIST="${1:-dist/$(python3 -I -c 'import sys,xml.etree.ElementTree as E; print(E.parse(sys.argv[1]).getroot().find("{http://maven.apache.org/POM/4.0.0}version").text.strip())' pom.xml)}"
-(cd "$DIST" && find . -type f ! -path ./SHA256SUMS -printf '%P\n' | LC_ALL=C sort | xargs -d '\n' sha256sum > SHA256SUMS)
+(cd "$DIST" && find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%P\n' | LC_ALL=C sort | xargs -d '\n' sha256sum > SHA256SUMS)
 echo "wrote $DIST/SHA256SUMS: $(wc -l < "$DIST/SHA256SUMS") files"

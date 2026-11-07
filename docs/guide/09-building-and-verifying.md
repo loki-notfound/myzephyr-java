@@ -117,8 +117,10 @@ Two builds from the same commit give the same files:
 | `artifacts` | every release file with its size and sha256 |
 <!-- bin/make_manifest.sh header; dist/2.3.0-sec.1-java.1-SNAPSHOT/manifest.json of the R11 run (keys core, depends, patches, toolchain, zephyr_java, artifacts) -->
 
-`SHA256SUMS` lists every file of the release, the manifest included.
-<!-- bin/make_manifest.sh line 19 and line 223 -->
+`SHA256SUMS` lists every file of the release, the manifest included. The Maven repository and the
+site are the archive `site-<version>.tar.gz`, whose hash is in `SHA256SUMS`; Pages serves its
+contents.
+<!-- bin/make_manifest.sh header ("SHA256SUMS is sha256sum over the top-level files"); bin/package_release.sh step 7 (the site archive) -->
 
 ## Signatures
 

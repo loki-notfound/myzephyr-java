@@ -244,9 +244,11 @@ git verify-tag v2.3.0-sec.1-java.1
 gpg --verify SHA256SUMS.asc && sha256sum -c SHA256SUMS
 ```
 
-`SHA256SUMS` covers every release file, `manifest.json` included. The release flow builds every
-artifact twice in the same environment and the hashes must match before the owner signs.
-<!-- bin/make_manifest.sh line 19 ("the manifest included"); RELEASES §4 "Release flow" -->
+`SHA256SUMS` covers every release file, `manifest.json` included. The Maven repository and the
+site are the archive `site-<version>.tar.gz`, whose hash is in `SHA256SUMS`; Pages serves its
+contents. The release flow builds every artifact twice in the same environment and the hashes must
+match before the owner signs.
+<!-- bin/make_manifest.sh header ("SHA256SUMS is sha256sum over the top-level files"); bin/package_release.sh step 7 (the site archive); RELEASES §4 "Release flow" -->
 
 The core's tags are signed by zephyr-backports with its release key,
 `FB39 94F0 997C A6F0 43D7  2491 9EFF 03F5 27D2 40A1` (`keys/zephyr-backports.asc` in the

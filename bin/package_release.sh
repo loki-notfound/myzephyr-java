@@ -21,10 +21,18 @@
 #  4. dist/<version>/                the artifacts under release names, the debug symbols as a
 #                                    reproducible tar.gz
 #  5. bin/make_maven_repo.sh         dist/<version>/maven/, the static Maven repository
-#  6. bin/make_site.sh               dist/<version>/site/, the GitHub Pages content
-#  7. bin/make_manifest.sh           manifest.json in dist/<version>/
-#  8. bin/make_manifest.sh --sums-only
-#                                    SHA256SUMS over every file under dist/<version>/, checked
+#  6. bin/make_site.sh               dist/<version>/site/, the GitHub Pages content, with the
+#                                    repository as site/maven/ (the only copy: the top-level
+#                                    maven/ is removed afterwards)
+#  7. site-<version>.tar.gz          the site as one reproducible archive, a release asset
+#                                    (QUESTIONS R13-4): sorted names, mtime SOURCE_DATE_EPOCH,
+#                                    numeric owner 0, no atime/ctime pax records, gzip -n
+#  8. bin/make_manifest.sh           manifest.json in dist/<version>/
+#  9. bin/make_manifest.sh --sums-only
+#                                    SHA256SUMS over the top-level files of dist/<version>/ (the
+#                                    release assets), checked
+# dist/<version>/site/ stays for the Pages publication; its files are covered by the archive's
+# hash, not listed in SHA256SUMS, so sha256sum -c SHA256SUMS works on the downloaded assets.
 #
 # Reproducibility: SOURCE_DATE_EPOCH is the commit time of this checkout unless set; it is
 # exported to every step, and Maven gets it as project.build.outputTimestamp (ISO 8601).
@@ -140,20 +148,28 @@ fi
 tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 --numeric-owner --format=gnu \
     -C build/debug -cf - "${PLATFORMS[@]}" | gzip -9n > "$DIST/debug-symbols-$VERSION.tar.gz"
 
-# 5, 6: the Maven repository and the Pages site
+# 5, 6: the Maven repository and the Pages site; the repository lives in site/maven/ only
 phase "make_maven_repo.sh"
 bin/make_maven_repo.sh "$DIST"
 phase "make_site.sh"
 bin/make_site.sh "$DIST"
+rm -rf "$DIST/maven"
 
-# 7: manifest.json (of the release files above)
+# 7: the site as one reproducible archive
+phase "site-$VERSION.tar.gz"
+tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 --numeric-owner \
+    --pax-option=exthdr.name=%d/PaxHeaders/%f,delete=atime,delete=ctime \
+    -C "$DIST" -cf - site | gzip -n -9 > "$DIST/site-$VERSION.tar.gz"
+echo "site-$VERSION.tar.gz: $(tar -tzf "$DIST/site-$VERSION.tar.gz" | wc -l) entries"
+
+# 8: manifest.json (of the release files above, the archive included)
 phase "make_manifest.sh"
 bin/make_manifest.sh "$DIST"
 
-# 8: SHA256SUMS over everything, the manifest, maven/ and site/ included
+# 9: SHA256SUMS over the release assets (the top-level files)
 phase "make_manifest.sh --sums-only"
 bin/make_manifest.sh --sums-only "$DIST"
 (cd "$DIST" && sha256sum -c --quiet SHA256SUMS)
 
 phase "packaged $DIST"
-(cd "$DIST" && ls -l && grep -v ' maven/\| site/' SHA256SUMS && echo "SHA256SUMS: $(wc -l < SHA256SUMS) files ($(grep -c ' maven/' SHA256SUMS) in maven/, $(grep -c ' site/' SHA256SUMS) in site/)")
+(cd "$DIST" && ls -l && cat SHA256SUMS && echo "SHA256SUMS: $(wc -l < SHA256SUMS) files")

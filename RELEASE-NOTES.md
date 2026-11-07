@@ -142,7 +142,10 @@ gpg --import KEYS.asc
 git verify-tag v2.3.0-sec.1-java.1
 gpg --verify SHA256SUMS.asc && sha256sum -c SHA256SUMS
 ```
-<!-- PLAN §7.8; RELEASES §3; README "Verifying a release" (the same commands) -->
+
+The Maven repository and the site are the archive `site-<version>.tar.gz`, whose hash is in
+`SHA256SUMS`; Pages serves its contents.
+<!-- PLAN §7.8; RELEASES §3; README "Verifying a release" (the same commands); bin/package_release.sh step 7 (the site archive) -->
 
 ### Build manifest
 
