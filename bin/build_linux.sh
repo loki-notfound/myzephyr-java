@@ -24,7 +24,11 @@
 # 4. Builds zephyr's library targets with the depends toolchain in build/<triplet>/release of the
 #    zephyr tree (configured afresh every time; make rebuilds only what changed).
 # 5. Builds the JNI library in build-linux/<arch>/ (CMakeLists.txt of this repo, with
-#    DEPENDS_PREFIX set) and copies it to build/natives/linux-<arch>/libzephyr-java.so.
+#    DEPENDS_PREFIX set, configured afresh every time) and copies it to
+#    build/natives/linux-<arch>/libzephyr-java.so, with build/natives/linux-<arch>/build-env
+#    (container image or none, glibc, compiler) for the manifest.
+# The release natives are built in the debian:12 image: bin/build_linux_container.sh runs this
+# script there; run directly, it builds on the host.
 #
 # Reproducibility: SOURCE_DATE_EPOCH is exported (the commit time of this checkout unless set),
 # and zephyr and the JNI library are compiled with -ffile-prefix-map=<this checkout>=. and
@@ -171,13 +175,22 @@ for ARCH in $ARCHES; do
   done
   [ "$MISSING" = 0 ] || exit 1
 
-  # 5. JNI library
+  # 5. JNI library; configured afresh: host and container builds (bin/build_linux_container.sh)
+  # share this directory, and its CMake cache records the checkout path (/work in the container)
   mkdir -p "build-linux/$ARCH" && cd "build-linux/$ARCH"
+  rm -f CMakeCache.txt
   cmake -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DDEPENDS_PREFIX="$PREFIX" \
     -DCMAKE_C_FLAGS="$PREFIX_MAPS" -DCMAKE_CXX_FLAGS="$PREFIX_MAPS" ../..
   cmake --build . -j"$(nproc)"
   cd "$ROOT"
   mkdir -p "build/natives/linux-$ARCH"
   cp "build-linux/$ARCH/libzephyr-java.so" "build/natives/linux-$ARCH/libzephyr-java.so"
-  echo "built build/natives/linux-$ARCH/libzephyr-java.so"
+  # the build environment, for bin/make_manifest.sh: the container image (set by
+  # bin/build_linux_container.sh) or none, the C library and the compiler (not packaged)
+  {
+    echo "container=${ZEPHYR_JAVA_CONTAINER:-none}"
+    echo "glibc=$(ldd --version | head -1)"
+    echo "compiler=$(case "$ARCH" in x86_64) g++ --version ;; arm64) aarch64-linux-gnu-g++ --version ;; esac | head -1)"
+  } > "build/natives/linux-$ARCH/build-env"
+  echo "built build/natives/linux-$ARCH/libzephyr-java.so ($(tr '\n' ' ' < "build/natives/linux-$ARCH/build-env"))"
 done
