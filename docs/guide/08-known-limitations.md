@@ -203,7 +203,7 @@ certificate directory as `SSL_CERT_DIR` is untested ([chapter 6](06-android.md#t
 
 **Android 7: the RPC classes need core library desugaring.** `ZephyrDaemonRpc` and
 `ZephyrWalletRpc` send their requests through the Apache HTTP client, which needs `java.time`, and
-Android has it from API 26. On API 24 and 25 their first request throws a `ZephyrError` that says
+Android has it from API 26. On API 24 and 25 every request throws a `ZephyrError` that says
 so, unless the app enables core library desugaring
 ([chapter 6](06-android.md#the-rpc-classes-below-api-26)). `ZephyrWalletFull` is not affected.
 *Status:* lasts while minSdk is 24.

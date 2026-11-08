@@ -137,7 +137,7 @@ checked the same way (exports, page alignment, packaging) but have **not yet run
 ## The RPC classes below API 26
 
 `ZephyrDaemonRpc` and `ZephyrWalletRpc` send their requests through the Apache HTTP client, which
-needs `java.time`; Android has it from API 26 (8.0). On API 24 and 25 the first request throws a
+needs `java.time`; Android has it from API 26 (8.0). On API 24 and 25 every request throws a
 `ZephyrError` "The RPC classes need java.time: Android 8.0 (API 26) or newer, or core library
 desugaring in the app (user guide, chapter 6)", with the `NoClassDefFoundError` in its causes.
 
@@ -240,8 +240,9 @@ and API 35). `ZephyrUtils.configureNativeLogging(path, false)` sends the core's 
 example in `context.getFilesDir()`; on Android this has not been tried yet.
 
 zephyr-java's own messages (`ZephyrUtils.setLogLevel(...)`) are printed with `System.out`, and
-Android shows `System.out` and `System.err` in logcat under those tags. At the first RPC request
-`System.err` shows three SLF4J lines ("Failed to load class org.slf4j.impl.StaticLoggerBinder",
+Android shows `System.out` and `System.err` in logcat under those tags. When the first
+`ZephyrRpcConnection` is created (an RPC class, or a wallet given a server URI), `System.err` shows
+three SLF4J lines ("Failed to load class org.slf4j.impl.StaticLoggerBinder",
 "Defaulting to no-operation (NOP) logger implementation"): the Apache HTTP client finds no logging
 backend and logs nothing. They are harmless.
 

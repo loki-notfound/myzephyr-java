@@ -14,7 +14,7 @@ and a complete quick-start program.
 | [3. Assets and balances](03-assets-and-balances.md) | ZPH, ZSD, ZRS, ZYS and the V1 names, `ZephyrBalance`, the four balance shapes, locked and unlocked |
 | [4. Sending and converting](04-sending-and-converting.md) | the currency pair, valid pairs and the reserve-ratio rules, fees, conversions and the mint formula, sweeps, history |
 | [5. Reserve info and circulating supply](05-reserve-and-supply.md) | every field of `ZephyrReserveInfo`, the six supply keys, pricing records |
-| [6. Android](06-android.md) | the dependency and the packaging line, devices and ABIs, R8 rules, storage, lifecycle, TLS to a node |
+| [6. Android](06-android.md) | the dependency and the packaging line, devices and ABIs, the RPC classes below API 26, the network, storage, backup, lifecycle, logs, a first test, R8 rules, TLS to a node |
 | [7. Coming from monero-java](07-coming-from-monero-java.md) | the renaming rules, what is different, both libraries in one program |
 | [8. Known limitations](08-known-limitations.md) | the core findings and the open points, each with its status |
 | [9. Building from source and verifying releases](09-building-and-verifying.md) | the pins, the patches, the builds, reproducibility, the manifest, signatures |
