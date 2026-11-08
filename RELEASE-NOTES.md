@@ -120,6 +120,13 @@ status. The ones a wallet app meets first: `getOutputs()` reports no asset; the 
 unconfirmed output notification is empty; `checkTxKey` returns amount 0; on Android, TLS to a node
 needs the app's help (the native wallet does not use Android's certificate store).
 
+### Known issue
+
+The `x86_64` library in the AAR (`jni/x86_64/libzephyr-java.so`) is marked as needing an
+executable stack: NDK r18b's linker does that for the core's assembly files, which carry no
+non-executable-stack note. Android may refuse to load it, or it weakens the hardening of the app on
+`x86_64` devices and emulators; the other libraries are not affected, and the next release fixes it.
+
 ### Verification
 
 The release tag and `SHA256SUMS` are signed with the maintainer key
