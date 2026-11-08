@@ -191,13 +191,22 @@ differs), but they have not been seen working.
 
 ## In the build and the packaging
 
-**Android: not yet run on a device or an emulator.** The Android libraries and the AAR are built
-and checked (exports, page alignment, packaging), but the build host has no hardware
-virtualisation, so nothing has run on Android yet. *Status:* pending a device test.
+**Android: the ARM libraries have not yet run on hardware.** The `x86_64` library and the wallet
+run on the Android emulator, on API 24 and on API 35 with 16 KB pages, as a release check
+([chapter 6](06-android.md#devices)). The `arm64-v8a` and `armeabi-v7a` libraries are built and
+checked (exports, page alignment, packaging) but have not run on a device. *Status:* pending a
+device test.
 
 **Android: TLS needs the app's help.** The native wallet does not use Android's certificate store;
 `https://` nodes need `SSL_CERT_FILE` or `SSL_CERT_DIR` in the environment, and Android's own
 certificate directory as `SSL_CERT_DIR` is untested ([chapter 6](06-android.md#tls-to-a-node)).
+
+**Android 7: the RPC classes need core library desugaring.** `ZephyrDaemonRpc` and
+`ZephyrWalletRpc` send their requests through the Apache HTTP client, which needs `java.time`, and
+Android has it from API 26. On API 24 and 25 their first request throws a `ZephyrError` that says
+so, unless the app enables core library desugaring
+([chapter 6](06-android.md#the-rpc-classes-below-api-26)). `ZephyrWalletFull` is not affected.
+*Status:* lasts while minSdk is 24.
 
 **Android libraries contain build paths.** The Android natives are built with NDK r18b, whose
 clang 7 cannot rewrite the paths in `__FILE__`. About 700 strings per library (source file names

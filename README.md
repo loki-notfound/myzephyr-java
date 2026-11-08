@@ -25,8 +25,9 @@ What works:
   conversion and sweeps, run against a mainnet node with real funds.
 - **The AAR** for Android, minSdk 24, with the native library for `arm64-v8a`, `armeabi-v7a` and
   `x86_64`. The `armeabi-v7a` library needs a CPU with VFPv4, which every device that runs
-  Android 7 has. The AAR is built and checked (16 KB page alignment, uncompressed native libraries)
-  in a throwaway consumer app; it has not yet run on a device or an emulator.
+  Android 7 has. The `x86_64` library and the wallet run on the Android emulator (API 24, and
+  API 35 with 16 KB pages), a release check; the ARM libraries have not yet run on hardware. The
+  RPC classes need API 26 or core library desugaring in the app.
 - **The JAR** with the native libraries for Linux `x86_64` and `arm64` inside, loaded from the JAR.
   Release natives are built in a Debian 12 container and need glibc 2.36 or newer (Debian 12,
   Ubuntu 23.04 and later, RHEL 10); everything else is linked statically. The `arm64` library is
@@ -42,13 +43,20 @@ the API has settled. The repository and the Javadoc live on the project's GitHub
 `bin/make_site.sh` from each release (`dist/<version>/site/`); the repository keeps every release.
 
 Android (Gradle, Kotlin DSL). The AAR has its own artifactId, `zephyr-java-android`, and brings
-its POM's dependencies (Jackson and the Apache HTTP client) along:
+its POM's dependencies (Jackson and the Apache HTTP client) along. The repository goes into
+`settings.gradle.kts`, the dependency into the app module's `build.gradle.kts`:
 
 ```kotlin
-repositories {
-    maven { url = uri("https://loki-notfound.github.io/myzephyr-java/maven") }
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url = uri("https://loki-notfound.github.io/myzephyr-java/maven") }
+    }
 }
+```
 
+```kotlin
 dependencies {
     implementation("io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.2")
 }
@@ -63,6 +71,11 @@ packaging { resources.excludes += "/META-INF/DEPENDENCIES" }
 Three of the Apache HTTP client's jars carry a file `META-INF/DEPENDENCIES`, and the app's resource
 merge fails on the duplicates. The file is Maven metadata that nothing reads at run time. A library
 cannot fix this for the app.
+
+The app declares the `INTERNET` permission to reach a node. On API 24 and 25 the RPC classes also
+need core library desugaring in the app; the native wallet does not.
+[Chapter 6 of the user guide](docs/guide/06-android.md) has the Groovy and version catalog forms,
+the desugaring lines, ABIs and sizes, backup, logs and a first test.
 
 Desktop and server (Maven), the JAR with the Linux natives:
 

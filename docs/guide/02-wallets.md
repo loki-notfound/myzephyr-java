@@ -103,7 +103,8 @@ An `http://` URI sends everything in clear text, which is fine for a node you ru
 network you trust. An `https://` URI makes the core verify the node's certificate against
 OpenSSL's default certificate store, and on Android that store is empty unless the app provides
 one. [Chapter 6](06-android.md#tls-to-a-node) explains what to do. When verification fails, the
-Java side only sees "Wallet is not connected to daemon"; the reason is in the native log.
+Java side only sees "Wallet is not connected to daemon"; the reason is in the native log, which on
+Android does not reach logcat ([chapter 6](06-android.md#logs)).
 
 ## Syncing
 
