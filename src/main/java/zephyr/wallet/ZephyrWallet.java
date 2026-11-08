@@ -23,9 +23,12 @@
 package zephyr.wallet;
 
 import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import zephyr.common.ZephyrRpcConnection;
 import zephyr.daemon.model.ZephyrKeyImage;
@@ -819,6 +822,11 @@ public interface ZephyrWallet {
    * (i.e. that the wallet can spend one time).  Outputs are part of
    * transactions which are stored in blocks on the blockchain.
    * 
+   * <p>Zephyr: in the full wallet ({@link ZephyrWalletFull}) the outputs carry no asset
+   * ({@link ZephyrOutputWallet#getAssetType()} is {@code null}): the core keeps an output's asset
+   * but does not serialize it. {@link #getOutputAssetType(ZephyrOutputWallet)} takes the asset from
+   * the output's transaction. See the user guide, {@code docs/guide/08-known-limitations.md}, section "getOutputs() reports no asset".</p>
+   * 
    * @return all wallet outputs
    */
   public List<ZephyrOutputWallet> getOutputs();
@@ -843,10 +851,59 @@ public interface ZephyrWallet {
    * &nbsp;&nbsp; txQuery - get outputs whose transaction meets this filter (optional)<br>
    * </p>
    * 
+   * <p>Zephyr: in the full wallet ({@link ZephyrWalletFull}) the outputs carry no asset
+   * ({@link ZephyrOutputWallet#getAssetType()} is {@code null}): the core keeps an output's asset
+   * but does not serialize it. {@link #getOutputAssetType(ZephyrOutputWallet)} takes the asset from
+   * the output's transaction. See the user guide, {@code docs/guide/08-known-limitations.md}, section "getOutputs() reports no asset".</p>
+   * 
    * @param query specifies attributes of outputs to get
    * @return the queried outputs
    */
   public List<ZephyrOutputWallet> getOutputs(ZephyrOutputQuery query);
+  
+  /**
+   * Get the asset of an output from its transaction.
+   * 
+   * <p>Zephyr: the outputs that {@link #getOutputs()} returns carry no asset, so this method takes it
+   * from the output's transaction with one {@link #getTxs(List, Collection)} call:</p>
+   * <ul>
+   *   <li>If the wallet spent from the output's account in that transaction, the output is either the
+   *       converted output of a conversion to this account (an incoming transfer at the output's
+   *       account and subaddress in another asset than the outgoing transfer's, with the output's
+   *       amount: that asset) or change or a same-asset send to this account (the outgoing transfer's
+   *       asset, the source asset). The core lists no incoming transfer for the latter.</li>
+   *   <li>Otherwise the output was received: the asset of the incoming transfer at the output's
+   *       account and subaddress. A received transaction credits one asset per subaddress.</li>
+   * </ul>
+   * 
+   * <p>Known residue: in a conversion to one's own account whose converted amount is split over
+   * several outputs at one subaddress, or whose change equals the converted amount, the converted
+   * outputs read as the source asset. One {@code getTxs} call per output; cache by transaction hash
+   * when looking up many outputs. Tested with the full wallet ({@link ZephyrWalletFull}). See the user
+   * guide, {@code docs/guide/08-known-limitations.md}, section "getOutputs() reports no asset".</p>
+   * 
+   * @param output an output of this wallet, with its transaction hash, account and subaddress index
+   * @return the asset name (see {@link zephyr.wallet.model.ZephyrAssets}), or {@code null} if the
+   *         output's transaction is not in the wallet or no transfer matches
+   */
+  public default String getOutputAssetType(ZephyrOutputWallet output) {
+    List<ZephyrTxWallet> txs = getTxs(Arrays.asList(output.getTx().getHash()), new ArrayList<String>());
+    if (txs.isEmpty()) return null;  // the transaction is not in the wallet
+    ZephyrTxWallet tx = txs.get(0);
+    ZephyrOutgoingTransfer outgoing = tx.getOutgoingTransfer();
+    boolean spentFromThisAccount = outgoing != null && output.getAccountIndex().equals(outgoing.getAccountIndex());
+    if (tx.getIncomingTransfers() != null) {
+      for (ZephyrIncomingTransfer transfer : tx.getIncomingTransfers()) {
+        if (!output.getAccountIndex().equals(transfer.getAccountIndex())) continue;
+        if (!output.getSubaddressIndex().equals(transfer.getSubaddressIndex())) continue;
+        if (!spentFromThisAccount) return transfer.getAssetType();  // a received transaction: one asset per subaddress
+        if (!Objects.equals(transfer.getAssetType(), outgoing.getAssetType()) && transfer.getAmount().equals(output.getAmount())) {
+          return transfer.getAssetType();  // the converted output of a conversion to this account
+        }
+      }
+    }
+    return spentFromThisAccount ? outgoing.getAssetType() : null;  // change and same-asset sends to this account: the source asset
+  }
   
   /**
    * Export outputs since the last export.
@@ -1127,6 +1184,13 @@ public interface ZephyrWallet {
   /**
    * Check a transaction in the blockchain with its secret key.
    * 
+   * <p>Zephyr: in the full wallet ({@link ZephyrWalletFull}) the received amount of the result is 0
+   * for every current transaction. The core reads the amount of the asset {@code ZEPH} only, and
+   * since hard fork 11 (height 536,000) no output is {@code ZEPH}. {@link ZephyrCheckTx#isGood()} and
+   * the confirmations are right. Read the amount from {@link #getTxs(String...)} instead: the
+   * receiver's incoming transfers, or the sender's outgoing destinations, each with its asset. See
+   * the user guide, {@code docs/guide/08-known-limitations.md}, section "checkTxKey returns amount 0".</p>
+   * 
    * @param txHash specifies the transaction to check
    * @param txKey is the transaction's secret key
    * @param address is the destination public address of the transaction
@@ -1155,6 +1219,12 @@ public interface ZephyrWallet {
   
   /**
    * Prove a transaction by checking its signature.
+   * 
+   * <p>Zephyr: in the full wallet ({@link ZephyrWalletFull}) the received amount of the result is 0
+   * for every current transaction, from the same core code as {@link #checkTxKey}: the core reads
+   * the amount of the asset {@code ZEPH} only, which no output has carried since hard fork 11.
+   * {@link ZephyrCheckTx#isGood()} and the confirmations are right. Read the amount from
+   * {@link #getTxs(String...)} instead. See the user guide, {@code docs/guide/08-known-limitations.md}, section "checkTxKey returns amount 0".</p>
    * 
    * @param txHash specifies the transaction to prove
    * @param address is the destination public address of the transaction

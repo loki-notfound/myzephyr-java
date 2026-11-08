@@ -1146,6 +1146,17 @@ public class ZephyrWalletRpc extends ZephyrWalletDefault {
     return transfers;
   }
   
+  /**
+   * Get the outputs which meet the criteria defined in a query object.
+   * 
+   * <p>Zephyr: zephyr-wallet-rpc returns the asset of every output ({@code asset_type} in
+   * {@code incoming_transfers}), which this first-pass RPC client does not read yet, so the outputs
+   * carry no asset ({@link ZephyrOutputWallet#getAssetType()} is {@code null}). Planned with the port
+   * to zephyr-wallet-rpc.</p>
+   * 
+   * @param query specifies attributes of outputs to get
+   * @return the queried outputs
+   */
   @Override
   public List<ZephyrOutputWallet> getOutputs(ZephyrOutputQuery query) {
     
@@ -1535,6 +1546,20 @@ public class ZephyrWalletRpc extends ZephyrWalletDefault {
     }
   }
 
+  /**
+   * Check a transaction in the blockchain with its secret key.
+   * 
+   * <p>Zephyr: zephyr-wallet-rpc returns the received amount per asset ({@code received_assets},
+   * {@code received_amounts}), which this first-pass RPC client does not read yet, so
+   * {@link ZephyrCheckTx#getReceivedAmount()} comes back {@code null}; {@link ZephyrCheckTx#isGood()}
+   * and the confirmations are read. Planned with the port to zephyr-wallet-rpc. Until then read the
+   * amount from {@link #getTxs(String...)}, as for the full wallet.</p>
+   * 
+   * @param txHash specifies the transaction to check
+   * @param txKey is the transaction's secret key
+   * @param address is the destination public address of the transaction
+   * @return the result of the check
+   */
   @SuppressWarnings("unchecked")
   @Override
   public ZephyrCheckTx checkTxKey(String txHash, String txKey, String address) {
@@ -1578,6 +1603,21 @@ public class ZephyrWalletRpc extends ZephyrWalletDefault {
     }
   }
 
+  /**
+   * Prove a transaction by checking its signature.
+   * 
+   * <p>Zephyr: zephyr-wallet-rpc returns the received amount per asset ({@code received_assets},
+   * {@code received_amounts}), which this first-pass RPC client does not read yet, so
+   * {@link ZephyrCheckTx#getReceivedAmount()} comes back {@code null}; {@link ZephyrCheckTx#isGood()}
+   * and the confirmations are read. Planned with the port to zephyr-wallet-rpc. Until then read the
+   * amount from {@link #getTxs(String...)}, as for the full wallet.</p>
+   * 
+   * @param txHash specifies the transaction to prove
+   * @param address is the destination public address of the transaction
+   * @param message is a message included with the signature to further authenticate the proof (optional)
+   * @param signature is the transaction signature to confirm
+   * @return the result of the check
+   */
   @SuppressWarnings("unchecked")
   @Override
   public ZephyrCheckTx checkTxProof(String txHash, String address, String message, String signature) {

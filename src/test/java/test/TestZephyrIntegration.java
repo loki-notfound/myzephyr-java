@@ -3,6 +3,7 @@ package test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -21,6 +22,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -46,6 +48,8 @@ import zephyr.wallet.model.ZephyrAddressType;
 import zephyr.wallet.model.ZephyrAssets;
 import zephyr.wallet.model.ZephyrBalance;
 import zephyr.wallet.model.ZephyrDecodedAddress;
+import zephyr.wallet.model.ZephyrOutgoingTransfer;
+import zephyr.wallet.model.ZephyrOutputWallet;
 import zephyr.wallet.model.ZephyrReserveInfo;
 import zephyr.wallet.model.ZephyrSubaddress;
 import zephyr.wallet.model.ZephyrTransfer;
@@ -59,7 +63,7 @@ import zephyr.wallet.model.ZephyrWalletListener;
  * <p>Configured by system properties only; nothing is hardcoded:</p>
  * <ul>
  *   <li>{@code zephyr.daemon.uri}: the node's RPC uri, required by every test (all skip without it);</li>
- *   <li>{@code zephyr.test.password}: the password of the persistent test wallet (tests 4 to 9 and 11);</li>
+ *   <li>{@code zephyr.test.password}: the password of the persistent test wallet (tests 4 to 9, 11 and 12);</li>
  *   <li>{@code zephyr.wallet.rpc.bin}: a zephyr-wallet-rpc binary (test 11);</li>
  *   <li>{@code zephyr.view.address}, {@code zephyr.view.key}, {@code zephyr.view.height}: a view-only
  *       wallet with history (test 10).</li>
@@ -120,6 +124,10 @@ public class TestZephyrIntegration {
   private static void walletClosed() {
     walletsOpen--;
     log("wallets open: " + walletsOpen);
+  }
+
+  private static String coins(BigInteger atomicUnits) {
+    return new BigDecimal(atomicUnits, 12).toPlainString();
   }
 
   private static void log(String msg) {
@@ -511,6 +519,67 @@ public class TestZephyrIntegration {
       walletRpc.close();
       walletClosed();
     }
+  }
+
+  /**
+   * getOutputs() reports no asset (the core does not serialize it); getOutputAssetType takes it from
+   * the output's transaction. Every output of the funded test wallet must resolve to ZPH or ZRS, and
+   * the unspent outputs must add up to the balance per asset. Uses the wallet of test 4 when it is
+   * open, otherwise opens the test wallet itself (one wallet; synced, closed without saving).
+   */
+  @Test
+  @Order(12)
+  public void testOutputAssetType() {
+    assumeDaemon();
+    Assumptions.assumeTrue(TEST_PASSWORD != null && !TEST_PASSWORD.isEmpty(), "zephyr.test.password not set");
+    Assumptions.assumeTrue(ZephyrWalletFull.walletExists(WALLET_PATH), "no test wallet at " + WALLET_PATH);
+    assertTimeoutPreemptively(SYNC_TIMEOUT, () -> {
+      boolean own = wallet == null || wallet.isClosed();
+      ZephyrWalletFull w = own ? ZephyrWalletFull.openWallet(WALLET_PATH, TEST_PASSWORD, ZephyrNetworkType.MAINNET, DAEMON_URI) : wallet;
+      if (own) walletOpened();
+      try {
+        if (own) {
+          long before = w.getHeight();
+          w.sync();
+          log("opened the test wallet; synced from " + before + " to " + w.getHeight() + ", daemon height " + getDaemon().getHeight());
+        }
+        List<ZephyrOutputWallet> outputs = w.getOutputs();
+        assertFalse(outputs.isEmpty(), "the test wallet has no outputs");
+        Map<String, BigInteger> unspent = new TreeMap<String, BigInteger>();
+        Map<String, Integer> counts = new TreeMap<String, Integer>();
+        for (ZephyrOutputWallet output : outputs) {
+          assertNull(output.getAssetType(), "getOutputs() reported an asset; the quirk is gone, update the guide");
+          String asset = w.getOutputAssetType(output);
+          ZephyrTxWallet tx = w.getTxs(output.getTx().getHash()).get(0);
+          ZephyrOutgoingTransfer outgoing = tx.getOutgoingTransfer();
+          boolean ownTx = outgoing != null && output.getAccountIndex().equals(outgoing.getAccountIndex());
+          int incoming = tx.getIncomingTransfers() == null ? 0 : tx.getIncomingTransfers().size();
+          String kind = !ownTx ? "received" : incoming == 0 ? "change" : "own tx with incoming";
+          log("output " + output.getTx().getHash().substring(0, 8) + " (" + output.getAccountIndex() + "," + output.getSubaddressIndex() + ") "
+              + coins(output.getAmount()) + (output.isSpent() ? " spent" : " unspent") + ": " + asset + " [" + kind
+              + (ownTx ? ", source " + outgoing.getAssetType() : "") + ", " + incoming + " incoming transfer(s)]");
+          assertNotNull(asset, "no asset for the output of tx " + output.getTx().getHash());
+          assertTrue(ZephyrAssets.ZPH.equals(asset) || ZephyrAssets.ZRS.equals(asset), "asset " + asset + " for the output of tx " + output.getTx().getHash());
+          counts.merge(asset + " " + kind, 1, Integer::sum);
+          if (!output.isSpent()) unspent.merge(asset, output.getAmount(), BigInteger::add);
+        }
+        log(outputs.size() + " outputs: " + counts);
+        ZephyrBalance balance = w.getBalance();
+        TreeSet<String> assets = new TreeSet<String>(balance.getAssetTypes());
+        assets.addAll(unspent.keySet());
+        for (String asset : assets) {
+          BigInteger expected = balance.get(asset) == null ? BigInteger.ZERO : balance.get(asset);
+          BigInteger actual = unspent.getOrDefault(asset, BigInteger.ZERO);
+          log(asset + ": balance " + coins(expected) + ", unspent outputs " + coins(actual));
+          assertEquals(expected, actual, "the unspent " + asset + " outputs do not add up to the balance");
+        }
+      } finally {
+        if (own) {
+          w.close(false);
+          walletClosed();
+        }
+      }
+    });
   }
 
   @AfterAll

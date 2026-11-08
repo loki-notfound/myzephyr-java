@@ -207,6 +207,24 @@ public class ZephyrOutputWallet extends ZephyrOutput {
     return this;
   }
   
+  /**
+   * Returns the asset of this output.
+   * 
+   * <p>Zephyr: {@code null} for the outputs that {@code getOutputs()} returns in the full wallet
+   * ({@code ZephyrWalletFull}): the core keeps an output's asset but does not serialize it. Through
+   * {@code ZephyrWalletRpc} it is {@code null} as well for now (the RPC client does not read the
+   * asset yet). The wallet's {@code getOutputAssetType(output)} takes the asset from the output's
+   * transaction. The outputs of the listener callbacks carry the asset, except for an output seen in
+   * the pool ({@code ""}). See the user guide, {@code docs/guide/08-known-limitations.md}, section "getOutputs() reports no asset".</p>
+   * 
+   * @return the asset name (see {@link ZephyrAssets}), null if not known
+   */
+  @Override
+  @JsonProperty("asset_type")
+  public String getAssetType() {
+    return super.getAssetType();
+  }
+  
   @Override
   public ZephyrOutputWallet setAssetType(String assetType) {
     super.setAssetType(assetType);

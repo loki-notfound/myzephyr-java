@@ -115,10 +115,11 @@ static List<ZephyrOutputWallet> unspentOutputs(ZephyrWallet wallet, String asset
 }
 ```
 
-The next release adds this rule to the API as `ZephyrWallet.getOutputAssetType(output)`; the snippet
-is the interim form. It costs one `getTxs` call per output; cache by transaction hash for many
-outputs. On the mainnet test wallet it named all five outputs right, among them a 50 ZPH → ZRS
-conversion to the wallet's own address whose ZRS output and ZPH change sit at the same subaddress.
+`ZephyrWallet.getOutputAssetType(output)` implements this rule from release `2.3.0-sec.2-java.2`
+on; with earlier releases, use the snippet. It costs one `getTxs` call per output; cache by
+transaction hash for many outputs. On the mainnet test wallet it named all five outputs right,
+among them a 50 ZPH → ZRS conversion to the wallet's own address whose ZRS output and ZPH change
+sit at the same subaddress.
 
 The alternative is the listener: `onOutputReceived` carries the asset for every output once it is
 in a block, change included (read in the core's code), so an app that follows all syncs with a

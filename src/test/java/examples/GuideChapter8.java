@@ -51,7 +51,7 @@ public class GuideChapter8 {
     return sent;
   }
 
-  // getOutputs() reports no asset: take it from the output's transaction (the interim form of ZephyrWallet.getOutputAssetType)
+  // getOutputs() reports no asset: take it from the output's transaction (the rule of ZephyrWallet.getOutputAssetType, for earlier releases)
   static String assetOf(ZephyrWallet wallet, ZephyrOutputWallet output) {
     List<ZephyrTxWallet> txs = wallet.getTxs(Arrays.asList(output.getTx().getHash()), new ArrayList<String>());
     if (txs.isEmpty()) return null;  // the transaction is not in the wallet
