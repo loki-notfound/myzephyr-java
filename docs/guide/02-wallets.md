@@ -147,7 +147,9 @@ monero-java that overrides it fails to compile instead of silently never being c
 `onOutputReceived` arrives with `getAssetType()` equal to `""`, because the core's callback for
 pool payments carries no asset. The notification for the same output once it is in a block
 carries the asset (from the core's code; the mainnet test run did not get to observe it). Use
-`onBalancesChanged` or `getTxs()` for the asset of a pending payment.
+`onBalancesChanged` or `getTxs()` for the asset of a pending payment. The outputs that
+`getOutputs()` returns carry no asset at all; [chapter 8](08-known-limitations.md#getoutputs-reports-no-asset)
+shows how to take it from the output's transaction.
 
 The callbacks run on a native thread; keep them short and never call the wallet from inside one
 ([chapter 1](01-getting-started.md#threads)).

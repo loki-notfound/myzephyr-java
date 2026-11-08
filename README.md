@@ -174,6 +174,23 @@ Every send names a source and a destination currency; a plain transfer uses the 
 both, a conversion two different ones. The [user guide](docs/guide/README.md) explains the
 pairs, the fees and the locks.
 
+## Known limitations
+
+- **`checkTxKey` returns amount 0.** The core reads the received amount of the old asset `ZEPH`
+  only, so for every current transaction the amount is 0 while `isGood()` and the confirmations are
+  right. Workaround: read the amount per asset from `getTxs(hash)`, the receiver's incoming
+  transfers or the sender's destinations
+  ([guide](docs/guide/08-known-limitations.md#checktxkey-returns-amount-0)).
+- **`getOutputs()` reports no asset.** The core does not serialize an output's asset, so
+  `getAssetType()` of every output is `null`. Workaround: take the asset from the output's
+  transaction in `getTxs(hash)`
+  ([guide](docs/guide/08-known-limitations.md#getoutputs-reports-no-asset)).
+- **TLS on Android needs the app's help.** The native wallet does not use Android's certificate
+  store. Workaround: set `SSL_CERT_FILE` or `SSL_CERT_DIR` before connecting to an `https://` node
+  ([guide](docs/guide/06-android.md#tls-to-a-node)).
+
+[Chapter 8 of the guide](docs/guide/08-known-limitations.md) has the full list, with code.
+
 ## Documentation
 
 - [User guide](docs/guide/README.md):

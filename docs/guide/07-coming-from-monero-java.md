@@ -57,7 +57,8 @@ A helper from `common.utils`, such as `common.utils.GenUtils`, is now
 
 ## What is different
 
-These are the changes a port has to make by hand. The compiler finds every one of them.
+These are the changes a port has to make by hand. The compiler finds all of them except the
+currency pair and the two results that differ.
 
 **Balances are per asset.** monero-java's six balance methods return a `BigInteger`. In
 zephyr-java:
@@ -75,17 +76,27 @@ The unlocked balance has the same four shapes, and `ZephyrAccount` and `ZephyrSu
 **The listener names the asset.** `onBalancesChanged(BigInteger, BigInteger)` became
 `onBalancesChanged(BigInteger, BigInteger, String assetType)`. The old method still exists in
 `ZephyrWalletListener` but is `final` and deprecated, so a ported listener that overrides it does
-not compile, rather than compiling and never being called. Outputs carry the asset in
-`getAssetType()` (empty for unconfirmed outputs, [chapter 2](02-wallets.md#the-listener)).
+not compile, rather than compiling and never being called. The listener's outputs carry the asset
+in `getAssetType()` (empty for unconfirmed outputs, [chapter 2](02-wallets.md#the-listener)).
 
 **Every send names a currency pair.** A `ZephyrTxConfig` without `setSourceCurrency` and
 `setDestinationCurrency` fails with "Must specify source currency", a plain transfer included.
-This is the one difference the compiler does not find; [chapter 4](04-sending-and-converting.md)
+The compiler does not find this one; [chapter 4](04-sending-and-converting.md)
 has the pairs.
 
 **New calls.** `getReserveInfo()` and `getCirculatingSupply()` on the wallet
 ([chapter 5](05-reserve-and-supply.md)), `ZephyrAssets` with the asset names, and the pricing record
 on daemon block headers.
+
+**Two results differ without a compile error.** Code that works in monero-java compiles and runs,
+but reads something the Zephyr core does not deliver:
+
+- `checkTxKey` (and `checkTxProof`): monero-java returns the received amount; in zephyr-java's
+  full wallet the amount is 0, and the amount comes from the transaction in `getTxs(hash)`
+  ([chapter 8](08-known-limitations.md#checktxkey-returns-amount-0)).
+- `getOutputs()`: monero-java's outputs have no asset concept; zephyr-java's outputs have an
+  `assetType` field, but `getOutputs()` leaves it `null`, and the asset comes from the output's
+  transaction ([chapter 8](08-known-limitations.md#getoutputs-reports-no-asset)).
 
 **Addresses and constants.** Address decoding stays pure Java (no native library needed) but
 knows Zephyr's prefixes, which are multi-byte varints: mainnet addresses start with `ZEPHYR`.
