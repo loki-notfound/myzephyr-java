@@ -363,6 +363,8 @@ public class ZephyrRpcConnection {
       return respMap;
     } catch (ZephyrRpcError e1) {
       throw e1;
+    } catch (ZephyrError e3) {
+      throw e3;
     } catch (Exception e2) {
       throw new ZephyrError(e2);
     } finally {
@@ -452,6 +454,8 @@ public class ZephyrRpcConnection {
       return respMap;
     } catch (ZephyrRpcError e1) {
       throw e1;
+    } catch (ZephyrError e3) {
+      throw e3;
     } catch (Exception e2) {
       throw new ZephyrError(e2);
     } finally {
@@ -520,6 +524,8 @@ public class ZephyrRpcConnection {
       }
     } catch (ZephyrRpcError e1) {
       throw e1;
+    } catch (ZephyrError e3) {
+      throw e3;
     } catch (Exception e2) {
       throw new ZephyrError(e2);
     } finally {
@@ -609,7 +615,8 @@ public class ZephyrRpcConnection {
       return proxyUri == null ? client.execute(request) : requestWithProxy(request);
     } catch (NoClassDefFoundError e) {
       String msg = e.getMessage();
-      if (msg == null || !(msg.contains("java/time") || msg.contains("java.time"))) throw e;
+      if (msg == null || !(msg.contains("java/time") || msg.contains("java.time")
+          || msg.contains("org.apache.hc.core5.util.Deadline") || msg.contains("org/apache/hc/core5/util/Deadline"))) throw e;
       ZephyrError err = new ZephyrError("The RPC classes need java.time: Android 8.0 (API 26) or newer, or core library desugaring in the app (user guide, chapter 6)");
       err.initCause(e);
       throw err;
