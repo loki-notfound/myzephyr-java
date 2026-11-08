@@ -1,5 +1,9 @@
 # zephyr-java
 
+Repository: `loki-notfound/myzephyr-java`. The library and its artifacts are named `zephyr-java`
+(`io.github.loki-notfound:zephyr-java` and `:zephyr-java-android`); only the repository carries the
+`my` prefix.
+
 Java bindings for the [Zephyr Protocol](https://github.com/ZephyrProtocol) wallet core, for Android
 (AAR) and for desktop and server JVMs (JAR). The native core is `zephyr-cpp` over Zephyr's `wallet2`,
 built from the security-hardened forks of [zephyr-backports](https://github.com/zephyr-backports),
