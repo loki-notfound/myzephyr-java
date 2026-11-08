@@ -51,16 +51,33 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends build-essential cmake ccache pkg-config python3 libboost-atomic-dev libboost-chrono-dev libboost-date-time-dev libboost-filesystem-dev libboost-program-options-dev libboost-regex-dev libboost-serialization-dev libboost-system-dev libboost-thread-dev libssl-dev libunbound-dev libsodium-dev libzmq3-dev libpgm-dev libnorm-dev libkrb5-dev libbsd-dev libmd-dev zlib1g-dev libhidapi-dev libusb-1.0-0-dev libudev-dev libprotobuf-dev protobuf-compiler libreadline-dev libncurses-dev
+      - name: CPU of the runner
+        # the developer build is CPU-independent (ARCH=default); the model and the AVX-512 flags
+        # still help to read a crash (|| true: no AVX-512 is no failure under pipefail)
+        run: |
+          grep -m1 'model name' /proc/cpuinfo
+          { grep -o -m1 'avx512[a-z]*' /proc/cpuinfo || true; } | sort -u | tr '\n' ' '
+          echo
       - uses: actions/cache@v4
         with:
           path: .ccache
-          key: ccache-java-${{ github.sha }}
+          # v2: the v1 entries hold zephyr objects built with -march=native on other runner CPUs
+          key: ccache-java-v2-${{ github.sha }}
           restore-keys: |
-            ccache-java-
+            ccache-java-v2-
       - name: Native library against the system libraries
         run: bin/build_libzephyr_java.sh
       - name: Pure tests
         run: mvn -q test
+      - uses: actions/upload-artifact@v4
+        # the surefire reports and the JVM's crash log, to diagnose a failed or crashed test run
+        if: failure()
+        with:
+          name: java-test-reports
+          path: |
+            target/surefire-reports/**
+            hs_err_pid*.log
+          if-no-files-found: ignore
 
   natives:
     # one release native per platform through zephyr's contrib/depends, stripped, with debug

@@ -17,8 +17,9 @@
 #    tree is not committed anywhere; it is excluded in the submodule's git directory
 #    (info/exclude, inside .git, not in the tree) so the submodule stays clean.
 # 3. Builds zephyr in external/zephyr-cpp/external/zephyr/build/release with the settings of
-#    zephyr's "make release-static" target plus ccache, library targets only. cmake is skipped
-#    when the build directory has a CMakeCache.txt; make always runs (a no-op when up to date).
+#    zephyr's "make release-static" target plus ccache and ARCH=default (no -march), library
+#    targets only. cmake is skipped when the build directory has a CMakeCache.txt with
+#    ARCH=default; make always runs (a no-op when up to date).
 # 4. Builds the JNI library in build/ (CMakeLists.txt of this repo).
 # 5. Copies it to target/natives/linux-x86_64/, which Maven packages into the JAR.
 #
@@ -97,12 +98,18 @@ EXCLUDE="$(git -C external/zephyr-cpp rev-parse --path-format=absolute --git-pat
 mkdir -p "$(dirname "$EXCLUDE")"
 grep -qxF 'external/zephyr' "$EXCLUDE" 2>/dev/null || echo 'external/zephyr' >> "$EXCLUDE"
 
-# 3. zephyr, release-static settings plus ccache
+# 3. zephyr, release-static settings plus ccache, for the generic CPU target. zephyr's default
+# ARCH is native (-march=native); ccache hashes that flag literally, not the CPU, so a cache
+# restored from a machine with wider instructions (AVX-512) hands out objects that a CPU without
+# them cannot run (the CI java job aborted that way). ARCH=default passes no -march at all. The
+# release natives (contrib/depends) are CPU-independent already: they build byte-identical on
+# different machines. A cache configured with another ARCH (an existing checkout) is configured
+# again.
 mkdir -p "$Z/build/release" && cd "$Z/build/release"
-if [ -f CMakeCache.txt ]; then
-  echo "zephyr: $Z/build/release/CMakeCache.txt exists, skipping cmake"
+if [ -f CMakeCache.txt ] && [ "$(grep '^ARCH:' CMakeCache.txt | cut -d= -f2)" = default ]; then
+  echo "zephyr: $Z/build/release/CMakeCache.txt exists (ARCH=default), skipping cmake"
 else
-  cmake -D STATIC=ON -D BUILD_64=ON -D CMAKE_BUILD_TYPE=Release -D USE_CCACHE=ON ../..
+  cmake -D STATIC=ON -D BUILD_64=ON -D CMAKE_BUILD_TYPE=Release -D USE_CCACHE=ON -D ARCH=default ../..
 fi
 # Only the wallet targets: the daemon, the tests and miniupnpc's sample are not needed,
 # and the sample does not compile with gcc 14 (strdup undeclared under -std=c11).
