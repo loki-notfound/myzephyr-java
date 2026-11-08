@@ -13,7 +13,7 @@ code { overflow-wrap: anywhere; }
 <body>
 <h1>zephyr-java</h1>
 <p>Java bindings for the Zephyr Protocol wallet core, for Android (AAR) and for desktop and server
-JVMs (JAR), built from the security-hardened forks of zephyr-backports. Version 2.3.0-sec.2-java.1.</p>
+JVMs (JAR), built from the security-hardened forks of zephyr-backports. Version 2.3.0-sec.2-java.2.</p>
 <p><strong>Not affiliated with ZephyrProtocol.</strong> An independent project. Report Zephyr
 vulnerabilities to the ZephyrProtocol team, not here.</p>
 
@@ -27,7 +27,7 @@ android {
 }
 
 dependencies {
-    implementation("io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.1")
+    implementation("io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.2")
 }</pre>
 
 <h2>Desktop and server (Maven)</h2>
@@ -41,13 +41,22 @@ dependencies {
 &lt;dependency&gt;
   &lt;groupId&gt;io.github.loki-notfound&lt;/groupId&gt;
   &lt;artifactId&gt;zephyr-java&lt;/artifactId&gt;
-  &lt;version&gt;2.3.0-sec.2-java.1&lt;/version&gt;
+  &lt;version&gt;2.3.0-sec.2-java.2&lt;/version&gt;
 &lt;/dependency&gt;</pre>
+
+<h2>Older releases</h2>
+<p>The Maven repository keeps every release, so a build can stay on an older version with the same
+repository line. The <a href="javadoc/index.html">Javadoc</a> on this site is that of version
+2.3.0-sec.2-java.2 only; an older version's Javadoc is its <code>zephyr-java-&lt;version&gt;-javadoc.jar</code>,
+in the repository and among the files of its release.</p>
+<ul>
+<li>2.3.0-sec.2-java.1 (<a href="https://github.com/loki-notfound/myzephyr-java/releases/tag/v2.3.0-sec.2-java.1">release</a>): <code>io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.1</code>, <code>io.github.loki-notfound:zephyr-java:2.3.0-sec.2-java.1</code></li>
+</ul>
 
 <h2>Documentation</h2>
 <ul>
 <li><a href="https://github.com/loki-notfound/myzephyr-java/blob/main/docs/guide/README.md">User guide</a> (on GitHub)</li>
-<li><a href="javadoc/index.html">Javadoc</a></li>
+<li><a href="javadoc/index.html">Javadoc</a> of version 2.3.0-sec.2-java.2</li>
 <li><a href="https://github.com/loki-notfound/myzephyr-java/releases">Releases</a> with the build manifest and the signed SHA256SUMS</li>
 <li><a href="https://github.com/loki-notfound/myzephyr-java">Source</a></li>
 </ul>
