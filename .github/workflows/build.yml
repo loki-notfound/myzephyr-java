@@ -35,7 +35,9 @@ jobs:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
     steps:
       - uses: actions/checkout@v4
+        # the pushed commit, not the PR's test merge commit: SOURCE_DATE_EPOCH, manifest read HEAD
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           submodules: true
       - uses: actions/setup-java@v4
         with:
@@ -92,11 +94,14 @@ jobs:
       - uses: actions/checkout@v4
         # the image has no git yet, so this first checkout downloads the files only (REST API),
         # enough to run bin/container-build-deps.sh: nothing is installed from the live mirror
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Debian 12 build packages from the pinned snapshot
         run: bash bin/container-build-deps.sh
       - uses: actions/checkout@v4
         # now with git: the repository and the zephyr-cpp submodule
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           submodules: true
       - name: git and the environment
         # the workspace belongs to the runner's user, the container runs as root
@@ -174,10 +179,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         # the image has no git yet: the files only (REST API), enough for the next step
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Debian 12 packages from the pinned snapshot (JDK 17, Maven)
         run: bash bin/container-build-deps.sh
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           submodules: true
       - name: git and the environment
         run: |
