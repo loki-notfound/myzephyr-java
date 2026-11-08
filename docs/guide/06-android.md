@@ -16,7 +16,7 @@ android {
 }
 
 dependencies {
-    implementation("io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.1")
+    implementation("io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.2")
 }
 ```
 

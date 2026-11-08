@@ -51,7 +51,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.1")
+    implementation("io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.2")
 }
 ```
 
@@ -78,7 +78,7 @@ Desktop and server (Maven), the JAR with the Linux natives:
 <dependency>
   <groupId>io.github.loki-notfound</groupId>
   <artifactId>zephyr-java</artifactId>
-  <version>2.3.0-sec.2-java.1</version>
+  <version>2.3.0-sec.2-java.2</version>
 </dependency>
 ```
 
@@ -248,7 +248,7 @@ keys.openpgp.org as well. To check a release:
 
 ```sh
 gpg --import KEYS.asc
-git verify-tag v2.3.0-sec.2-java.1
+git verify-tag v2.3.0-sec.2-java.2
 gpg --verify SHA256SUMS.asc && sha256sum -c SHA256SUMS
 ```
 

@@ -7,6 +7,56 @@ A release's date is the date of its signed tag and of its GitHub release.
 **Not affiliated with ZephyrProtocol.** An independent project. Report Zephyr vulnerabilities to the
 ZephyrProtocol team, not here.
 
+## v2.3.0-sec.2-java.2
+
+The second release on the same core as `v2.3.0-sec.2-java.1`: a fix for the Android `x86_64`
+library, a helper for the asset of an output, and build changes. No breaking change.
+
+### Built from
+
+The same zephyr-backports release set of 2026-11-07 as the previous release, unchanged:
+
+| | Tag | Commit | Tag subject |
+|---|---|---|---|
+| zephyr | `v2.3.0-sec.2` | `8c6a120256b4bd887d6e7167d929d76e3507e0e5` | zephyr v2.3.0 + 30 security backports from Monero |
+| zephyr-cpp | `v2.3.0-sec.1` | `3a2ee602ee28e6b7941b617ad4706349ad992641` | zephyr-cpp master (4a99272f6d7a171cf6625016939094637459975a) + 4 security backports from monero-cpp |
+
+### Fixed
+
+- The `x86_64` library in the AAR no longer needs an executable stack: every native library is
+  now linked with `-z noexecstack` (the core's assembly files carry no non-executable-stack note,
+  and NDK r18b's linker marked that library as needing one).
+
+### Added
+
+- `ZephyrWallet.getOutputAssetType(output)`: the asset of an output from `getOutputs()`, which
+  the core does not report, read from the output's transaction in the wallet's history. Guide
+  chapter 8 has the rule and its limits.
+- Javadoc starting "Zephyr:" on `checkTxKey`, `checkTxProof`, `ZephyrCheckTx.getReceivedAmount()`,
+  `getOutputs()` and `ZephyrOutputWallet.getAssetType()`: the amount of a payment check is 0 and
+  an output carries no asset in the full wallet, why, and the workaround.
+
+### Build
+
+- The developer build (`bin/build_libzephyr_java.sh`) compiles for the generic CPU instead of the
+  build machine's, so a library or a compiler cache made on one machine runs on another.
+- The Maven repository on Pages keeps every release: this release's site carries
+  `2.3.0-sec.2-java.1` next to `2.3.0-sec.2-java.2`, and each `maven-metadata.xml` lists both.
+
+### The dependency
+
+Android: `io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.2`; the JVM:
+`io.github.loki-notfound:zephyr-java:2.3.0-sec.2-java.2`. The repository line, the `packaging`
+line and the dependencies are those of the previous release, below.
+
+### Verification
+
+```sh
+gpg --import KEYS.asc
+git verify-tag v2.3.0-sec.2-java.2
+gpg --verify SHA256SUMS.asc && sha256sum -c SHA256SUMS
+```
+
 ## v2.3.0-sec.2-java.1
 
 The first release of zephyr-java: Java bindings for the Zephyr wallet core (`zephyr-cpp` over
@@ -126,6 +176,7 @@ The `x86_64` library in the AAR (`jni/x86_64/libzephyr-java.so`) is marked as ne
 executable stack: NDK r18b's linker does that for the core's assembly files, which carry no
 non-executable-stack note. Android may refuse to load it, or it weakens the hardening of the app on
 `x86_64` devices and emulators; the other libraries are not affected, and the next release fixes it.
+Fixed in v2.3.0-sec.2-java.2.
 
 ### Verification
 
