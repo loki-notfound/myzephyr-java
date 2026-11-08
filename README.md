@@ -33,7 +33,7 @@ What works today, on the development branches:
 ## Coordinates
 
 Releases are published as GitHub releases and in a static Maven repository on this project's
-GitHub Pages, `https://loki-notfound.github.io/zephyr-java/maven` (available with the first
+GitHub Pages, `https://loki-notfound.github.io/myzephyr-java/maven` (available with the first
 release). Maven Central may follow once the API has settled. The repository and the Javadoc live on
 the project's GitHub Pages, built by `bin/make_site.sh` from each release (`dist/<version>/site/`)
 and published with the first release.
@@ -43,7 +43,7 @@ its POM's dependencies (Jackson and the Apache HTTP client) along:
 
 ```kotlin
 repositories {
-    maven { url = uri("https://loki-notfound.github.io/zephyr-java/maven") }
+    maven { url = uri("https://loki-notfound.github.io/myzephyr-java/maven") }
 }
 
 dependencies {
@@ -67,7 +67,7 @@ Desktop and server (Maven), the JAR with the Linux natives:
 <repositories>
   <repository>
     <id>zephyr-java</id>
-    <url>https://loki-notfound.github.io/zephyr-java/maven</url>
+    <url>https://loki-notfound.github.io/myzephyr-java/maven</url>
   </repository>
 </repositories>
 
@@ -184,7 +184,7 @@ pairs, the fees and the locks.
   [9 Building and verifying](docs/guide/09-building-and-verifying.md).
 - Javadoc: on this project's GitHub Pages with the first release, and as the `-javadoc.jar` of
   every release; `mvn javadoc:javadoc` builds it from a checkout.
-- Releases: <https://github.com/loki-notfound/zephyr-java/releases>.
+- Releases: <https://github.com/loki-notfound/myzephyr-java/releases>.
 
 ## Building from source
 
@@ -195,7 +195,7 @@ release (zephyr `v2.3.0`, zephyr-cpp `4a99272`) must work as well; the backports
 software plus Monero security fixes.
 
 ```sh
-git clone https://github.com/loki-notfound/zephyr-java.git
+git clone https://github.com/loki-notfound/myzephyr-java.git
 cd zephyr-java
 git submodule update --init external/zephyr-cpp
 ```

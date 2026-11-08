@@ -8,7 +8,7 @@ the dependency, the devices it runs on, storage, lifecycle, threads, and TLS to 
 
 ```kotlin
 repositories {
-    maven { url = uri("https://loki-notfound.github.io/zephyr-java/maven") }
+    maven { url = uri("https://loki-notfound.github.io/myzephyr-java/maven") }
 }
 
 android {

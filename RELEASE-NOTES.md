@@ -54,7 +54,7 @@ Android (Gradle, Kotlin DSL):
 
 ```kotlin
 repositories {
-    maven { url = uri("https://loki-notfound.github.io/zephyr-java/maven") }
+    maven { url = uri("https://loki-notfound.github.io/myzephyr-java/maven") }
 }
 
 android {

@@ -7,7 +7,7 @@
 	<version>2.3.0-sec.2-java.1</version>
 	<name>Zephyr Java Library</name>
 	<description>Java bindings for the Zephyr wallet core (zephyr-cpp), for Android and the JVM</description>
-	<url>https://github.com/loki-notfound/zephyr-java</url>
+	<url>https://github.com/loki-notfound/myzephyr-java</url>
 	<properties>
 		<java-version>1.8</java-version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -69,9 +69,9 @@
 	</dependencies>
 
 	<scm>
-		<connection>scm:git:git://github.com/loki-notfound/zephyr-java.git</connection>
-		<developerConnection>scm:git:ssh://github.com/loki-notfound/zephyr-java.git</developerConnection>
-		<url>https://github.com/loki-notfound/zephyr-java/tree/main</url>
+		<connection>scm:git:git://github.com/loki-notfound/myzephyr-java.git</connection>
+		<developerConnection>scm:git:ssh://github.com/loki-notfound/myzephyr-java.git</developerConnection>
+		<url>https://github.com/loki-notfound/myzephyr-java/tree/main</url>
 	</scm>
 
 	<licenses>

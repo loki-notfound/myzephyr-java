@@ -58,7 +58,7 @@ zephyr's dead `blocks` library is not linked, because the pinned tree never buil
 Clone and fetch the submodule (not recursively; the scripts place the zephyr tree themselves):
 
 ```sh
-git clone https://github.com/loki-notfound/zephyr-java.git
+git clone https://github.com/loki-notfound/myzephyr-java.git
 cd zephyr-java
 git submodule update --init external/zephyr-cpp
 ```
