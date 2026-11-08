@@ -3,9 +3,13 @@
 # Every job calls the repository's own scripts, the same ones F-Droid and a local release run.
 name: build
 
+# one run per push: a push to a pull-request branch runs through the pull_request event only, a
+# landing on main or a release tag through push
 on:
-  - push
-  - pull_request
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
 
 concurrency:
   group: build-${{ github.ref }}
