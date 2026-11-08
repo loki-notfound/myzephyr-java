@@ -395,6 +395,7 @@ JNIEXPORT jstring JNICALL Java_zephyr_common_ZephyrUtils_binaryToJsonJni(JNIEnv 
   jboolean is_copy;
   jbyte* jbytes = bin ? env->GetByteArrayElements(bin, &is_copy) : nullptr;
   string bin_str = string((char*) jbytes, binLength);
+  if (bin) env->ReleaseByteArrayElements(bin, jbytes, JNI_ABORT);
 
   // convert monero's portable storage binary format to json
   string json_str;
@@ -411,6 +412,7 @@ JNIEXPORT jstring JNICALL Java_zephyr_common_ZephyrUtils_binaryBlocksToJsonJni(J
   jboolean is_copy;
   jbyte* jbytes = blocks_bin ? env->GetByteArrayElements(blocks_bin, &is_copy) : nullptr;
   string bin_str = string((char*) jbytes, binLength);
+  if (blocks_bin) env->ReleaseByteArrayElements(blocks_bin, jbytes, JNI_ABORT);
 
   // convert monero's portable storage binary format to json
   string json_str;
@@ -1189,6 +1191,7 @@ JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getSubaddressesJni
     for (int subaddressIndicesIdx = 0; subaddressIndicesIdx < numSubaddressIndices; subaddressIndicesIdx++) {
       subaddress_indices.push_back(intArr[subaddressIndicesIdx]);
     }
+    env->ReleaseIntArrayElements(jsubaddressIndices, intArr, JNI_ABORT);
   }
 
   // get subaddresses
@@ -1974,6 +1977,7 @@ JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getAddressBookEntr
     for (int indicesIdx = 0; indicesIdx < numIndices; indicesIdx++) {
       indices.push_back(intArr[indicesIdx]);
     }
+    env->ReleaseIntArrayElements(jindices, intArr, JNI_ABORT);
   }
 
   try {
@@ -2329,6 +2333,8 @@ JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_changePasswordJni(JNI
   const char* _new_password = jnew_password ? env->GetStringUTFChars(jnew_password, NULL) : nullptr;
   string old_password = string(_old_password ? _old_password : "");
   string new_password = string(_new_password ? _new_password : "");
+  if (jold_password) env->ReleaseStringUTFChars(jold_password, _old_password);
+  if (jnew_password) env->ReleaseStringUTFChars(jnew_password, _new_password);
   try {
     wallet->change_password(old_password, new_password);
   } catch (...) {
