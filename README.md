@@ -16,10 +16,10 @@ ZephyrProtocol team, not here.
 
 ## Status
 
-Pre-release: there is no release yet. The first release, `v2.3.0-sec.2-java.1`, is built from the
-zephyr-backports release set of 2026-11-07: zephyr `v2.3.0-sec.2` and zephyr-cpp `v2.3.0-sec.1`.
+The current release is `v2.3.0-sec.2-java.2`, built from the zephyr-backports release set of
+2026-11-07: zephyr `v2.3.0-sec.2` and zephyr-cpp `v2.3.0-sec.1`.
 
-What works today, on the development branches:
+What works:
 
 - **The full wallet on mainnet**: create, open, sync, balances per asset, transfers, a ZPH → ZRS
   conversion and sweeps, run against a mainnet node with real funds.
@@ -37,10 +37,9 @@ What works today, on the development branches:
 ## Coordinates
 
 Releases are published as GitHub releases and in a static Maven repository on this project's
-GitHub Pages, `https://loki-notfound.github.io/myzephyr-java/maven` (available with the first
-release). Maven Central may follow once the API has settled. The repository and the Javadoc live on
-the project's GitHub Pages, built by `bin/make_site.sh` from each release (`dist/<version>/site/`)
-and published with the first release.
+GitHub Pages, `https://loki-notfound.github.io/myzephyr-java/maven`. Maven Central may follow once
+the API has settled. The repository and the Javadoc live on the project's GitHub Pages, built by
+`bin/make_site.sh` from each release (`dist/<version>/site/`); the repository keeps every release.
 
 Android (Gradle, Kotlin DSL). The AAR has its own artifactId, `zephyr-java-android`, and brings
 its POM's dependencies (Jackson and the Apache HTTP client) along:
@@ -203,7 +202,7 @@ pairs, the fees and the locks.
   [7 Coming from monero-java](docs/guide/07-coming-from-monero-java.md),
   [8 Known limitations](docs/guide/08-known-limitations.md),
   [9 Building and verifying](docs/guide/09-building-and-verifying.md).
-- Javadoc: on this project's GitHub Pages with the first release, and as the `-javadoc.jar` of
+- Javadoc: on this project's GitHub Pages (the current release), and as the `-javadoc.jar` of
   every release; `mvn javadoc:javadoc` builds it from a checkout.
 - Releases: <https://github.com/loki-notfound/myzephyr-java/releases>.
 
@@ -243,8 +242,8 @@ Release tags and `SHA256SUMS` are signed with the maintainer key:
 31DA 39AB 43E0 CA67 F1F3  A661 BA2A FF22 DF8A 4A13
 ```
 
-The public key is [`KEYS.asc`](KEYS.asc) in this repository, and from the first release on
-keys.openpgp.org as well. To check a release:
+The public key is [`KEYS.asc`](KEYS.asc) in this repository and on keys.openpgp.org. To check a
+release:
 
 ```sh
 gpg --import KEYS.asc

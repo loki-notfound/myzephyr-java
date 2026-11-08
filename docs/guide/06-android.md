@@ -20,7 +20,7 @@ dependencies {
 }
 ```
 
-The repository goes live with the first release. The AAR is published as `zephyr-java-android`
+The AAR is published as `zephyr-java-android`
 (the JAR for the JVM is `zephyr-java`) and brings three dependencies: Jackson
 (`jackson-core`, `jackson-databind`, 2.13.5) and the Apache HTTP client 5 (`httpclient5` 5.2.1,
 used by the RPC classes). It brings no Kotlin standard library, no Bouncy Castle and no Apache
