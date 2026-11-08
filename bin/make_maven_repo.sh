@@ -61,7 +61,9 @@ mkdir -p "$REPO"
 echo "maven repository $REPO (version $VERSION, lastUpdated $LAST_UPDATED)"
 
 # the JAR, sources and Javadoc jars and the POM; maven-deploy-plugin 3.x takes id::url; the
-# install phase that deploy runs through is skipped (nothing goes into ~/.m2)
+# install phase that deploy runs through is skipped (nothing goes into ~/.m2). The Javadoc jar is
+# packaged again from target/apidocs, which bin/package_release.sh generated (bin/javadoc_sorted.sh);
+# the check below compares it with the copy in dist/
 mvn -q -DskipTests -Dmaven.install.skip=true "-Dproject.build.outputTimestamp=$OUTPUT_TIMESTAMP" deploy \
   "-DaltDeploymentRepository=dist::file://$REPO"
 

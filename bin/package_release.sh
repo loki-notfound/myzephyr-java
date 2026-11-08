@@ -15,8 +15,13 @@
 # Steps:
 #  1. bin/check_versions.sh          the pom version, VERSION_NAME and RELEASE_TAG (when set)
 #                                    agree, and <version> is that version
-#  2. mvn package                    the JAR (with the Linux natives), sources and Javadoc jars;
-#                                    the pure tests run on the depends-built x86_64 library
+#  2. bin/javadoc_sorted.sh, then mvn package
+#                                    the Javadoc in target/apidocs from a sorted source list (the
+#                                    same on every machine), then the JAR (with the Linux natives),
+#                                    sources and Javadoc jars (the latter target/apidocs, packaged
+#                                    by the default profile's javadoc-jar execution); the pure
+#                                    tests run on the depends-built x86_64 library. A developer's
+#                                    plain mvn package has no Javadoc jar by design
 #  3. android/ ./gradlew             the AAR (with the Android natives), its sources jar and POM,
 #                                    artifactId zephyr-java-android (ARTIFACT_ID in
 #                                    android/gradle.properties; the JAR is zephyr-java)
@@ -113,8 +118,9 @@ for ABI in $ANDROID_ABIS; do
 done
 [ "$MISSING" = 0 ] || exit 1
 
-# 2: the JAR, sources and Javadoc jars; the tests on the depends-built x86_64 library
-phase "mvn package"
+# 2: the Javadoc from a sorted source list, then the JAR, sources and Javadoc jars; the tests on
+# the depends-built x86_64 library
+phase "javadoc_sorted.sh, mvn package"
 # the checkout's modes reach the jars (see "File modes" above); LICENCE.txt and README.md are in
 # no jar
 chmod -R u+rwX,go+rX,go-w pom.xml src/main
@@ -129,10 +135,16 @@ case " $LINUX_ARCHES " in
   *" x86_64 "*) MVN_TESTS=("-Dnative.library.path=$ROOT/build/natives/linux-x86_64") ;;
   *) echo "no linux-x86_64 library in this build: the tests are skipped"; MVN_TESTS=(-DskipTests) ;;
 esac
+bin/javadoc_sorted.sh
 mvn -q "-Dproject.build.outputTimestamp=$OUTPUT_TIMESTAMP" "${MVN_TESTS[@]}" package
-# never an empty Javadoc jar (under a POSIX locale JDK 17's javadoc once failed and the jar held
+# never an empty Javadoc jar: the hard stop for a missing or empty target/apidocs (maven-jar-plugin
+# skips an empty directory, and under a POSIX locale JDK 17's javadoc once failed and the jar held
 # only its manifest)
 # (the listing first: grep -q in a pipe would end unzip with SIGPIPE, a failure under pipefail)
+[ -f "target/zephyr-java-$VERSION-javadoc.jar" ] || {
+  echo "no target/zephyr-java-$VERSION-javadoc.jar: bin/javadoc_sorted.sh wrote no target/apidocs" >&2
+  exit 1
+}
 JAVADOC_LIST="$(unzip -l "target/zephyr-java-$VERSION-javadoc.jar")"
 if ! grep -q ' index\.html$' <<< "$JAVADOC_LIST"; then
   echo "target/zephyr-java-$VERSION-javadoc.jar has no index.html: the Javadoc was not generated" >&2

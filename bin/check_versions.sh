@@ -4,6 +4,8 @@
 #   pom.xml                      project/version (the JAR, sources and Javadoc jars)
 #   android/gradle.properties    VERSION_NAME (the AAR and its POM)
 #   RELEASE_TAG (optional)       the tag being released must be v<version>
+# and that the Javadoc bottom text is the same in bin/javadoc-bottom.txt (bin/javadoc_sorted.sh,
+# the Javadoc jar and the site) and in every <bottom> of pom.xml (mvn javadoc:javadoc).
 # Prints the version and exits 0 when they agree; prints the differing values and exits 1
 # otherwise. bin/build_release.sh calls it first.
 #
@@ -31,5 +33,12 @@ if [ -n "${RELEASE_TAG:-}" ] && [ "$RELEASE_TAG" != "v$POM_VERSION" ]; then
   echo "version mismatch: RELEASE_TAG $RELEASE_TAG, expected v$POM_VERSION" >&2
   STATUS=1
 fi
+BOTTOM="$(cat bin/javadoc-bottom.txt)"
+while IFS= read -r POM_BOTTOM; do
+  if [ "$POM_BOTTOM" != "$BOTTOM" ]; then
+    echo "Javadoc bottom text: pom.xml '$POM_BOTTOM', bin/javadoc-bottom.txt '$BOTTOM'" >&2
+    STATUS=1
+  fi
+done < <(sed -n 's|.*<bottom>\(.*\)</bottom>.*|\1|p' pom.xml)
 [ "$STATUS" = 0 ] && echo "version $POM_VERSION${RELEASE_TAG:+ (tag $RELEASE_TAG)}"
 exit "$STATUS"

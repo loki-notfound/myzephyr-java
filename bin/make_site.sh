@@ -6,7 +6,8 @@
 #                on GitHub, the Javadoc, the releases, the maintainer key's fingerprint and, at
 #                the bottom, the donation address (the same sentence and address as the README's
 #                "Donations")
-#   javadoc/     the Javadoc of the JAR (mvn javadoc:javadoc, target/site/apidocs)
+#   javadoc/     the Javadoc of the JAR: target/apidocs, the generation bin/javadoc_sorted.sh made
+#                for the Javadoc jar (bin/package_release.sh runs it), so site and jar are the same
 #   maven/       a copy of dist/<version>/maven/ (bin/make_maven_repo.sh, which runs first)
 #   .nojekyll    GitHub Pages serves the files as they are instead of running Jekyll over them
 # The owner publishes the directory with the release (the gh-pages branch or the docs/ folder of
@@ -29,7 +30,6 @@ if [ -z "${SOURCE_DATE_EPOCH:-}" ]; then
   SOURCE_DATE_EPOCH="$(git log -1 --format=%ct HEAD)"
 fi
 export SOURCE_DATE_EPOCH
-OUTPUT_TIMESTAMP="$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)"
 
 VERSION="$(python3 -I - "$ROOT/pom.xml" <<'PY'
 import sys
@@ -47,11 +47,9 @@ SITE="$DIST/site"
 rm -rf "$SITE"
 mkdir -p "$SITE"
 
-# the Javadoc
-rm -rf target/site/apidocs
-mvn -q "-Dproject.build.outputTimestamp=$OUTPUT_TIMESTAMP" javadoc:javadoc
-[ -f target/site/apidocs/index.html ] || { echo "mvn javadoc:javadoc wrote no target/site/apidocs/index.html" >&2; exit 1; }
-cp -R target/site/apidocs "$SITE/javadoc"
+# the Javadoc: the same generation as the Javadoc jar's
+[ -f target/apidocs/index.html ] || { echo "no target/apidocs/index.html: run bin/javadoc_sorted.sh (bin/package_release.sh does)" >&2; exit 1; }
+cp -R target/apidocs "$SITE/javadoc"
 
 # the Maven repository
 cp -R "$DIST/maven" "$SITE/maven"

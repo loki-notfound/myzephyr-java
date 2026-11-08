@@ -159,7 +159,9 @@ CI's `package` job runs `bin/package_release.sh` in that image, and locally
 `bin/package_release_container.sh` does the same with the Android SDK mounted read-only. The jar
 entries and the tar archives carry normalised modes (`-rw-r--r--`, `-rwxr-xr-x` for the natives,
 `drwxr-xr-x`), so the jars, the AAR and the archives of the two builds can match byte for byte, not
-only the natives. The whole second build is two commands:
+only the natives. The Javadoc is generated from a sorted list of the source files
+(`bin/javadoc_sorted.sh`), because JDK 17's javadoc builds its index in the order it reads the
+files, which would otherwise be the file system's. The whole second build is two commands:
 
 ```sh
 git submodule update --init external/zephyr-cpp

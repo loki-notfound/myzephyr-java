@@ -1,0 +1,1 @@
+Copyright &#169; the zephyr-java contributors. MIT licence.
