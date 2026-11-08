@@ -140,7 +140,7 @@ To check a release you downloaded:
 
 ```sh
 gpg --import KEYS.asc
-git verify-tag v2.3.0-sec.2-java.2                      # in a clone of this repository
+git verify-tag v2.3.0-sec.2-java.3                      # in a clone of this repository
 gpg --verify SHA256SUMS.asc && sha256sum -c SHA256SUMS  # in the directory of the release files
 ```
 

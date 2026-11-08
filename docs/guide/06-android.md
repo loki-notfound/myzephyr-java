@@ -28,7 +28,7 @@ android {
 }
 
 dependencies {
-    implementation("io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.2")
+    implementation("io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.3")
 }
 ```
 
@@ -55,7 +55,7 @@ android {
 }
 
 dependencies {
-    implementation 'io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.2'
+    implementation 'io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.3'
 }
 ```
 
@@ -64,7 +64,7 @@ With a version catalog, `gradle/libs.versions.toml` gets the entry and the modul
 
 ```toml
 [versions]
-zephyrJava = "2.3.0-sec.2-java.2"
+zephyrJava = "2.3.0-sec.2-java.3"
 
 [libraries]
 zephyr-java-android = { module = "io.github.loki-notfound:zephyr-java-android", version.ref = "zephyrJava" }

@@ -16,7 +16,7 @@ ZephyrProtocol team, not here.
 
 ## Status
 
-The current release is `v2.3.0-sec.2-java.2`, built from the zephyr-backports release set of
+The current release is `v2.3.0-sec.2-java.3`, built from the zephyr-backports release set of
 2026-11-07: zephyr `v2.3.0-sec.2` and zephyr-cpp `v2.3.0-sec.1`.
 
 What works:
@@ -58,7 +58,7 @@ dependencyResolutionManagement {
 
 ```kotlin
 dependencies {
-    implementation("io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.2")
+    implementation("io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.3")
 }
 ```
 
@@ -90,7 +90,7 @@ Desktop and server (Maven), the JAR with the Linux natives:
 <dependency>
   <groupId>io.github.loki-notfound</groupId>
   <artifactId>zephyr-java</artifactId>
-  <version>2.3.0-sec.2-java.2</version>
+  <version>2.3.0-sec.2-java.3</version>
 </dependency>
 ```
 
@@ -260,7 +260,7 @@ release:
 
 ```sh
 gpg --import KEYS.asc
-git verify-tag v2.3.0-sec.2-java.2
+git verify-tag v2.3.0-sec.2-java.3
 gpg --verify SHA256SUMS.asc && sha256sum -c SHA256SUMS
 ```
 

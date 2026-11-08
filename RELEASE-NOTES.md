@@ -7,6 +7,71 @@ A release's date is the date of its signed tag and of its GitHub release.
 **Not affiliated with ZephyrProtocol.** An independent project. Report Zephyr vulnerabilities to the
 ZephyrProtocol team, not here.
 
+## v2.3.0-sec.2-java.3
+
+The third release on the same core as `v2.3.0-sec.2-java.1`: a fix in the JNI bridge for
+debuggable Android apps, a clear error for the RPC classes on Android 7, and the Android
+documentation. No breaking change.
+
+### Built from
+
+The same zephyr-backports release set of 2026-11-07 as the previous releases, unchanged:
+
+| | Tag | Commit | Tag subject |
+|---|---|---|---|
+| zephyr | `v2.3.0-sec.2` | `8c6a120256b4bd887d6e7167d929d76e3507e0e5` | zephyr v2.3.0 + 30 security backports from Monero |
+| zephyr-cpp | `v2.3.0-sec.1` | `3a2ee602ee28e6b7941b617ad4706349ad992641` | zephyr-cpp master (4a99272f6d7a171cf6625016939094637459975a) + 4 security backports from monero-cpp |
+
+### Fixed
+
+- The JNI bridge no longer releases `null` strings. Debuggable Android apps, in which ART's
+  CheckJNI is always on, aborted when a wallet was created from a mnemonic or keys, or opened,
+  with a connection without credentials: the bridge released the connection's `null` user name
+  and password. This affected `v2.3.0-sec.2-java.1` and `v2.3.0-sec.2-java.2`; release builds and
+  the JVM (without `-Xcheck:jni`) were not affected. Every string release in the bridge now checks
+  for `null` first, and the natives that read a path, a password or a byte array accept `null`
+  like the others.
+- Memory leaks in four calls of the native bridge, `ZephyrUtils.binaryToMap`,
+  `ZephyrUtils.binaryBlocksToMap`, `ZephyrWalletFull.getSubaddresses` and
+  `getAddressBookEntries`, which never released the array passed to them, and in `changePassword`,
+  which never released the two password strings.
+
+### Changed
+
+- The RPC classes (`ZephyrDaemonRpc`, `ZephyrWalletRpc`) report a missing `java.time` on
+  Android 7.x (API 24 and 25) with a `ZephyrError` that names the remedy, Android 8.0 or core
+  library desugaring in the app, on every request, instead of a bare `NoClassDefFoundError`.
+
+### Documentation
+
+- Guide chapter 6 (Android) completed: where the repository line goes, with the Groovy and
+  version catalog forms; the RPC classes below API 26 and the desugaring lines; how to check which
+  Jackson the app gets; ABI sizes and App Bundles; the `INTERNET` permission and clear text; Auto
+  Backup and wallet data; logs; a first smoke test; where the libraries have run. The README and
+  chapter 8 follow.
+
+### Tested
+
+- On the Android emulator (`x86_64`), with this release's AAR in debug builds (CheckJNI on), on
+  API 24 and on API 35 with 16 KB pages: the offline wallet; a wallet restored from its mnemonic
+  and synced against a mainnet node, then opened again from its bytes with a connection without
+  credentials; `ZephyrDaemonRpc` on API 35, and on API 24 with core library desugaring; without
+  desugaring, the new error on API 24. The ARM libraries have not yet run on hardware.
+
+### The dependency
+
+Android: `io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.3`; the JVM:
+`io.github.loki-notfound:zephyr-java:2.3.0-sec.2-java.3`. The repository line, the `packaging`
+line and the dependencies are those of the earlier releases; guide chapter 6 says where they go.
+
+### Verification
+
+```sh
+gpg --import KEYS.asc
+git verify-tag v2.3.0-sec.2-java.3
+gpg --verify SHA256SUMS.asc && sha256sum -c SHA256SUMS
+```
+
 ## v2.3.0-sec.2-java.2
 
 The second release on the same core as `v2.3.0-sec.2-java.1`: a fix for the Android `x86_64`

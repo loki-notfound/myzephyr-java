@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>io.github.loki-notfound</groupId>
 	<artifactId>zephyr-java</artifactId>
-	<version>2.3.0-sec.2-java.2</version>
+	<version>2.3.0-sec.2-java.3</version>
 	<name>Zephyr Java Library</name>
 	<description>Java bindings for the Zephyr wallet core (zephyr-cpp), for Android and the JVM</description>
 	<url>https://github.com/loki-notfound/myzephyr-java</url>
