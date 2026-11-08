@@ -429,6 +429,13 @@ target_link_libraries(zephyr-java
 # JNI entry points are exported from libzephyr-java
 target_link_options(zephyr-java PRIVATE "-Wl,--exclude-libs,ALL")
 
+# no executable stack, on Linux and Android alike: zephyr's supercop assembly objects (amd64) carry
+# no .note.GNU-stack, so without the flag the linker marks the stack executable (GNU_STACK RWE) and
+# the JVM may abort when it loads the library
+if (UNIX AND NOT APPLE)
+  target_link_options(zephyr-java PRIVATE -Wl,-z,noexecstack)
+endif()
+
 # exact export list (Java_zephyr_* and JNI_OnLoad) from src/main/cpp/zephyr-java.map
 if (NOT APPLE AND NOT WIN32)
   target_link_options(zephyr-java PRIVATE "-Wl,--version-script=${CMAKE_SOURCE_DIR}/src/main/cpp/zephyr-java.map")
@@ -465,7 +472,7 @@ endif()
 # Linux with depends: one self-contained library per architecture in the JAR, so libstdc++ and
 # libgcc are linked statically and the library needs only the C runtime of the host
 if (LINUX_DEPENDS)
-  target_link_options(zephyr-java PRIVATE -static-libstdc++ -static-libgcc -Wl,-z,noexecstack)
+  target_link_options(zephyr-java PRIVATE -static-libstdc++ -static-libgcc)
   message(STATUS "Linux with depends ${DEPENDS_HOST}, zephyr build ${MONERO_PROJECT_BUILD}")
 endif()
 
