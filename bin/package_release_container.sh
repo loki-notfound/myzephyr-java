@@ -32,6 +32,9 @@
 #                       writes files such as Javadoc's options file in ASCII, and the © of
 #                       the Javadoc footer fails
 #   BUILD_LINUX_ARCHES, BUILD_ANDROID_ABIS, RELEASE_TAG   passed through when set
+#   PREV_SITE_ARCHIVE   when set, a local copy of the previous release's site archive: the file is
+#                       mounted read-only at /opt/previous-release/ and the variable points there
+#                       (bin/merge_previous_release.sh checks its sha256 like a download's)
 # podman (rootless: files written in the container belong to the calling user) or, when podman
 # is absent, docker.
 #
@@ -67,6 +70,12 @@ MOUNTS=(-v "$ROOT":/work)
 [ -n "${BUILD_LINUX_ARCHES+x}" ] && ENV_ARGS+=(-e "BUILD_LINUX_ARCHES=$BUILD_LINUX_ARCHES")
 [ -n "${BUILD_ANDROID_ABIS+x}" ] && ENV_ARGS+=(-e "BUILD_ANDROID_ABIS=$BUILD_ANDROID_ABIS")
 [ -n "${RELEASE_TAG:-}" ] && ENV_ARGS+=(-e "RELEASE_TAG=$RELEASE_TAG")
+if [ -n "${PREV_SITE_ARCHIVE:-}" ]; then
+  [ -f "$PREV_SITE_ARCHIVE" ] || { echo "PREV_SITE_ARCHIVE $PREV_SITE_ARCHIVE is not a file" >&2; exit 1; }
+  PREV_IN="/opt/previous-release/$(basename "$PREV_SITE_ARCHIVE")"
+  MOUNTS+=(-v "$(realpath "$PREV_SITE_ARCHIVE")":"$PREV_IN":ro)
+  ENV_ARGS+=(-e "PREV_SITE_ARCHIVE=$PREV_IN")
+fi
 
 # the Android SDK, when there are ABIs: the pinned packages, read-only at /opt/android-sdk
 if [ -n "${BUILD_ANDROID_ABIS-arm64-v8a armeabi-v7a x86_64}" ]; then

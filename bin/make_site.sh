@@ -8,7 +8,9 @@
 #                "Donations")
 #   javadoc/     the Javadoc of the JAR: target/apidocs, the generation bin/javadoc_sorted.sh made
 #                for the Javadoc jar (bin/package_release.sh runs it), so site and jar are the same
-#   maven/       a copy of dist/<version>/maven/ (bin/make_maven_repo.sh, which runs first)
+#   maven/       a copy of dist/<version>/maven/ (bin/make_maven_repo.sh, which runs first);
+#                bin/merge_previous_release.sh then merges the earlier releases into it and adds
+#                their section to index.html
 #   .nojekyll    GitHub Pages serves the files as they are instead of running Jekyll over them
 # The owner publishes the directory with the release (the gh-pages branch or the docs/ folder of
 # main); the URLs below assume https://loki-notfound.github.io/myzephyr-java/.
@@ -106,7 +108,7 @@ dependencies {
 <h2>Documentation</h2>
 <ul>
 <li><a href="https://github.com/loki-notfound/myzephyr-java/blob/main/docs/guide/README.md">User guide</a> (on GitHub)</li>
-<li><a href="javadoc/index.html">Javadoc</a></li>
+<li><a href="javadoc/index.html">Javadoc</a> of version $VERSION</li>
 <li><a href="https://github.com/loki-notfound/myzephyr-java/releases">Releases</a> with the build manifest and the signed SHA256SUMS</li>
 <li><a href="https://github.com/loki-notfound/myzephyr-java">Source</a></li>
 </ul>

@@ -31,6 +31,11 @@
 #  6. bin/make_site.sh               dist/<version>/site/, the GitHub Pages content, with the
 #                                    repository as site/maven/ (the only copy: the top-level
 #                                    maven/ is removed afterwards)
+#     bin/merge_previous_release.sh  the previous release's Maven repository (bin/previous-release.env,
+#                                    its sha256-checked site archive, downloaded or PREV_SITE_ARCHIVE)
+#                                    merged into site/maven/, every artifactId's maven-metadata.xml
+#                                    listing all versions, the older releases on the index; skipped
+#                                    when there is no bin/previous-release.env (a first release)
 #  7. site-<version>.tar.gz          the site as one reproducible archive, a release asset
 #                                    (reproducible: sorted names, mtime SOURCE_DATE_EPOCH,
 #                                    numeric owner 0, no atime/ctime pax records, gzip -n
@@ -60,6 +65,7 @@
 #   BUILD_ANDROID_ABIS  Android ABIs to package (default "arm64-v8a armeabi-v7a x86_64"; empty:
 #                       none, and then no AAR)
 #   SOURCE_DATE_EPOCH   optional, see above
+#   PREV_SITE_ARCHIVE   optional, a local copy of the previous release's site archive (step 6)
 # Every platform named must have its stripped library and its debug file; a missing one stops
 # the script.
 #
@@ -191,12 +197,19 @@ tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 --numeric-owne
     --mode=u+rwX,go+rX,go-w --exclude=build-env \
     -C build/debug -cf - "${PLATFORMS[@]}" | gzip -9n > "$DIST/debug-symbols-$VERSION.tar.gz"
 
-# 5, 6: the Maven repository and the Pages site; the repository lives in site/maven/ only
+# 5, 6: the Maven repository and the Pages site; the repository lives in site/maven/ only, with
+# the previous releases merged in
 phase "make_maven_repo.sh"
 bin/make_maven_repo.sh "$DIST"
 phase "make_site.sh"
 bin/make_site.sh "$DIST"
 rm -rf "$DIST/maven"
+if [ -f bin/previous-release.env ]; then
+  phase "merge_previous_release.sh"
+  bin/merge_previous_release.sh "$DIST"
+else
+  echo "no bin/previous-release.env: no previous release to merge into the site"
+fi
 
 # 7: the site as one reproducible archive
 phase "site-$VERSION.tar.gz"
