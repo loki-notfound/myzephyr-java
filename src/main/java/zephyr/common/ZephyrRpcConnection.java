@@ -605,7 +605,15 @@ public class ZephyrRpcConnection {
   }
 
   private CloseableHttpResponse request(HttpUriRequest request) throws IOException, URISyntaxException {
-    return proxyUri == null ? client.execute(request) : requestWithProxy(request);
+    try {
+      return proxyUri == null ? client.execute(request) : requestWithProxy(request);
+    } catch (NoClassDefFoundError e) {
+      String msg = e.getMessage();
+      if (msg == null || !(msg.contains("java/time") || msg.contains("java.time"))) throw e;
+      ZephyrError err = new ZephyrError("The RPC classes need java.time: Android 8.0 (API 26) or newer, or core library desugaring in the app (user guide, chapter 6)");
+      err.initCause(e);
+      throw err;
+    }
   }
 
   private CloseableHttpResponse requestWithProxy(HttpUriRequest request) throws IOException {
