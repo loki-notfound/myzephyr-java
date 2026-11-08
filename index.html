@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>zephyr-java</title>
+<style>
+body { font-family: sans-serif; max-width: 46rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+pre { background: #f4f4f4; padding: 0.75rem; overflow-x: auto; }
+code { overflow-wrap: anywhere; }
+</style>
+</head>
+<body>
+<h1>zephyr-java</h1>
+<p>Java bindings for the Zephyr Protocol wallet core, for Android (AAR) and for desktop and server
+JVMs (JAR), built from the security-hardened forks of zephyr-backports. Version 2.3.0-sec.2-java.1.</p>
+<p><strong>Not affiliated with ZephyrProtocol.</strong> An independent project. Report Zephyr
+vulnerabilities to the ZephyrProtocol team, not here.</p>
+
+<h2>Android (Gradle, Kotlin DSL)</h2>
+<pre>repositories {
+    maven { url = uri("https://loki-notfound.github.io/myzephyr-java/maven") }
+}
+
+android {
+    packaging { resources.excludes += "/META-INF/DEPENDENCIES" }
+}
+
+dependencies {
+    implementation("io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.1")
+}</pre>
+
+<h2>Desktop and server (Maven)</h2>
+<pre>&lt;repositories&gt;
+  &lt;repository&gt;
+    &lt;id&gt;zephyr-java&lt;/id&gt;
+    &lt;url&gt;https://loki-notfound.github.io/myzephyr-java/maven&lt;/url&gt;
+  &lt;/repository&gt;
+&lt;/repositories&gt;
+
+&lt;dependency&gt;
+  &lt;groupId&gt;io.github.loki-notfound&lt;/groupId&gt;
+  &lt;artifactId&gt;zephyr-java&lt;/artifactId&gt;
+  &lt;version&gt;2.3.0-sec.2-java.1&lt;/version&gt;
+&lt;/dependency&gt;</pre>
+
+<h2>Documentation</h2>
+<ul>
+<li><a href="https://github.com/loki-notfound/myzephyr-java/blob/main/docs/guide/README.md">User guide</a> (on GitHub)</li>
+<li><a href="javadoc/index.html">Javadoc</a></li>
+<li><a href="https://github.com/loki-notfound/myzephyr-java/releases">Releases</a> with the build manifest and the signed SHA256SUMS</li>
+<li><a href="https://github.com/loki-notfound/myzephyr-java">Source</a></li>
+</ul>
+
+<h2>Verifying</h2>
+<p>Release tags and SHA256SUMS are signed with the maintainer key</p>
+<pre>31DA 39AB 43E0 CA67 F1F3  A661 BA2A FF22 DF8A 4A13</pre>
+<p>whose public key is <a href="https://github.com/loki-notfound/myzephyr-java/blob/main/KEYS.asc">KEYS.asc</a>
+in the repository.</p>
+
+<h2>Donations</h2>
+<p>If zephyr-java is useful to you, donations are welcome at this ZEPH address:</p>
+<p><code>ZEPHs8MmrN556ieVvv9YUZf3J5pW2uN1z5S88mb9DksG9bcEcqVGg9XbuQc6Q9e9Ka6bjMHYgaSidWfL1r1DGLyngj8NHT3Q6gp</code></p>
+</body>
+</html>

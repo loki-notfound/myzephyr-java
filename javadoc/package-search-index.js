@@ -1,0 +1,1 @@
+packageSearchIndex = [{"l":"All Packages","u":"allpackages-index.html"},{"l":"zephyr.common"},{"l":"zephyr.daemon"},{"l":"zephyr.daemon.model"},{"l":"zephyr.lib.types"},{"l":"zephyr.lib.utils"},{"l":"zephyr.wallet"},{"l":"zephyr.wallet.model"}];updateSearchResults();

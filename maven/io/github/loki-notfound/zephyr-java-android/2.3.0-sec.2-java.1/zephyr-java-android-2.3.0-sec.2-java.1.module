@@ -1,0 +1,124 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "io.github.loki-notfound",
+    "module": "zephyr-java-android",
+    "version": "2.3.0-sec.2-java.1",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "9.6.0"
+    }
+  },
+  "variants": [
+    {
+      "name": "releaseVariantReleaseApiPublication",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "com.fasterxml.jackson.core",
+          "module": "jackson-core",
+          "version": {
+            "requires": "2.13.5"
+          }
+        },
+        {
+          "group": "com.fasterxml.jackson.core",
+          "module": "jackson-databind",
+          "version": {
+            "requires": "2.13.5"
+          }
+        },
+        {
+          "group": "org.apache.httpcomponents.client5",
+          "module": "httpclient5",
+          "version": {
+            "requires": "5.2.1"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "zephyr-java-android-2.3.0-sec.2-java.1.aar",
+          "url": "zephyr-java-android-2.3.0-sec.2-java.1.aar",
+          "size": 23520366,
+          "sha512": "9e5d3ae2b4146628a74de46117d39987fe4459652d24372611b634af69e00bfa6656702b092aa530c62015a911b6c2b2189cf674a9a07b0c3af6c249f090df00",
+          "sha256": "177129a69d3162d4382355f61fa4835292bb8ce9590e7207e2915e4226bc48f1",
+          "sha1": "5b04e0fb516fffc1625d293c9c23c0040911de8a",
+          "md5": "d4ad8e8fa8e55dcfee78fbf5c54983e0"
+        }
+      ]
+    },
+    {
+      "name": "releaseVariantReleaseRuntimePublication",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "com.fasterxml.jackson.core",
+          "module": "jackson-core",
+          "version": {
+            "requires": "2.13.5"
+          }
+        },
+        {
+          "group": "com.fasterxml.jackson.core",
+          "module": "jackson-databind",
+          "version": {
+            "requires": "2.13.5"
+          }
+        },
+        {
+          "group": "org.apache.httpcomponents.client5",
+          "module": "httpclient5",
+          "version": {
+            "requires": "5.2.1"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "zephyr-java-android-2.3.0-sec.2-java.1.aar",
+          "url": "zephyr-java-android-2.3.0-sec.2-java.1.aar",
+          "size": 23520366,
+          "sha512": "9e5d3ae2b4146628a74de46117d39987fe4459652d24372611b634af69e00bfa6656702b092aa530c62015a911b6c2b2189cf674a9a07b0c3af6c249f090df00",
+          "sha256": "177129a69d3162d4382355f61fa4835292bb8ce9590e7207e2915e4226bc48f1",
+          "sha1": "5b04e0fb516fffc1625d293c9c23c0040911de8a",
+          "md5": "d4ad8e8fa8e55dcfee78fbf5c54983e0"
+        }
+      ]
+    },
+    {
+      "name": "releaseVariantReleaseSourcePublication",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "zephyr-java-android-2.3.0-sec.2-java.1-sources.jar",
+          "url": "zephyr-java-android-2.3.0-sec.2-java.1-sources.jar",
+          "size": 174310,
+          "sha512": "1a7439dd825392f6134c1955ebd877b622ea5aaa40cbedddb60d641eccd0de805ed205a373430eb04e620c8b2f927a0bd857c9e2f2842c9a7b459c2f1cd9efa7",
+          "sha256": "353454b2bf6ef74ba5aad5779b1663886c61bbbc386f26fb69f7d1e954f2d0c9",
+          "sha1": "5a2bbc30b3dd2dbfd9338a0c939164fbd193f00c",
+          "md5": "7c65867bb01f924ca58bc637c2cb977a"
+        }
+      ]
+    }
+  ]
+}
