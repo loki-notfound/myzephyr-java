@@ -34,12 +34,12 @@ jobs:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         # the pushed commit, not the PR's test merge commit: SOURCE_DATE_EPOCH, manifest read HEAD
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           submodules: true
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
@@ -58,7 +58,7 @@ jobs:
           grep -m1 'model name' /proc/cpuinfo
           { grep -o -m1 'avx512[a-z]*' /proc/cpuinfo || true; } | sort -u | tr '\n' ' '
           echo
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .ccache
           # v2: the v1 entries hold zephyr objects built with -march=native on other runner CPUs
@@ -69,7 +69,7 @@ jobs:
         run: bin/build_libzephyr_java.sh
       - name: Pure tests
         run: mvn -q test
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         # the surefire reports and the JVM's crash log, to diagnose a failed or crashed test run
         if: failure()
         with:
@@ -108,14 +108,14 @@ jobs:
           - platform: android-x86_64
             build: bin/build_android.sh x86_64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         # the image has no git yet, so this first checkout downloads the files only (REST API),
         # enough to run bin/container-build-deps.sh: nothing is installed from the live mirror
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Debian 12 build packages from the pinned snapshot
         run: bash bin/container-build-deps.sh
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         # now with git: the repository and the zephyr-cpp submodule
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -126,7 +126,7 @@ jobs:
           git config --global --add safe.directory "*"
           echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-$(dpkg --print-architecture)" >> "$GITHUB_ENV"
           echo "CCACHE_DIR=$GITHUB_WORKSPACE/.ccache" >> "$GITHUB_ENV"
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         # depends' package cache and downloaded sources; bin/pins.env fixes the zephyr tree and with
         # it every recipe in contrib/depends/packages/, patches/depends/ changes the recipes on
         # top, and bin/container-build-deps.sh fixes the compilers: together they decide the
@@ -136,7 +136,7 @@ jobs:
             external/zephyr-cpp/external/zephyr/contrib/depends/built
             external/zephyr-cpp/external/zephyr/contrib/depends/sources
           key: depends-${{ matrix.platform }}-${{ hashFiles('bin/pins.env', 'patches/depends/**', 'bin/container-build-deps.sh') }}
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .ccache
           key: ccache-${{ matrix.platform }}-${{ github.sha }}
@@ -162,7 +162,7 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/$DEPENDS"
           rm -rf "$GITHUB_WORKSPACE/$DEPENDS/built" "$GITHUB_WORKSPACE/$DEPENDS/sources"
           cp -a "$DEPENDS/built" "$DEPENDS/sources" "$GITHUB_WORKSPACE/$DEPENDS/"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         # paths relative to build/: natives/ (with build-env for the manifest), android/, debug/
         with:
           name: natives-${{ matrix.platform }}
@@ -194,13 +194,13 @@ jobs:
       GRADLE_USER_HOME: /work/.gradle-home
       MAVEN_OPTS: -Dmaven.repo.local=/work/.m2
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         # the image has no git yet: the files only (REST API), enough for the next step
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Debian 12 packages from the pinned snapshot (JDK 17, Maven)
         run: bash bin/container-build-deps.sh
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           submodules: true
@@ -220,7 +220,7 @@ jobs:
           # licences from process substitution: "yes |" would fail the step under pipefail (SIGPIPE)
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses < <(yes) > /dev/null
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" > /dev/null
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: natives-*
           merge-multiple: true
@@ -241,7 +241,7 @@ jobs:
           bin/package_release.sh "$(sed -n 's/^VERSION_NAME=//p' android/gradle.properties)"
           rm -rf "$GITHUB_WORKSPACE/dist"
           cp -a dist "$GITHUB_WORKSPACE/"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/
