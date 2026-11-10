@@ -59,6 +59,10 @@ JNIEXPORT void JNICALL Java_zephyr_common_ZephyrUtils_setLogLevelJni(JNIEnv *, j
 
 JNIEXPORT void JNICALL Java_zephyr_common_ZephyrUtils_configureLoggingJni(JNIEnv *, jclass, jstring jpath, jboolean);
 
+// ------------------------------- TLS (ZephyrTls) --------------------------------
+
+JNIEXPORT void JNICALL Java_zephyr_common_ZephyrTls_setEnvJni(JNIEnv *, jclass, jstring, jstring);
+
 // --------------------------- STATIC WALLET UTILS ----------------------------
 
 JNIEXPORT jboolean JNICALL Java_zephyr_wallet_ZephyrWalletFull_walletExistsJni(JNIEnv *, jclass, jstring);

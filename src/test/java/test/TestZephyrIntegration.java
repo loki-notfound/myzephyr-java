@@ -34,6 +34,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import zephyr.common.ZephyrError;
 import zephyr.common.ZephyrRpcConnection;
+import zephyr.common.ZephyrTls;
 import zephyr.common.ZephyrUtils;
 import zephyr.daemon.ZephyrDaemonRpc;
 import zephyr.daemon.model.ZephyrBlockHeader;
@@ -66,7 +67,11 @@ import zephyr.wallet.model.ZephyrWalletListener;
  *   <li>{@code zephyr.test.password}: the password of the persistent test wallet (tests 4 to 9, 11 and 12);</li>
  *   <li>{@code zephyr.wallet.rpc.bin}: a zephyr-wallet-rpc binary (test 11);</li>
  *   <li>{@code zephyr.view.address}, {@code zephyr.view.key}, {@code zephyr.view.height}: a view-only
- *       wallet with history (test 10).</li>
+ *       wallet with history (test 10);</li>
+ *   <li>{@code zephyr.daemon.uri.tls}: the node's {@code https://} uri, for the TLS tests 13 to 15.
+ *       They change the process environment ({@link ZephyrTls}) and run in a JVM of their own:
+ *       {@code -Dtest='TestZephyrIntegration#testTls*'}; in a run where another test has opened
+ *       a wallet they skip.</li>
  * </ul>
  *
  * <p>The tests run one after another; at most two wallets are open against the node at any time.
@@ -81,6 +86,7 @@ public class TestZephyrIntegration {
   private static final String VIEW_ADDRESS = System.getProperty("zephyr.view.address");
   private static final String VIEW_KEY = System.getProperty("zephyr.view.key");
   private static final String VIEW_HEIGHT = System.getProperty("zephyr.view.height");
+  private static final String TLS_URI = System.getProperty("zephyr.daemon.uri.tls");
 
   private static final String WALLET_PATH = "test_wallets/zephyr-java-r8";  // gitignored
   private static final String WALLET_RPC_DIR = System.getProperty("user.home") + "/tmp/zephyr-java-r8/wallets";
@@ -107,6 +113,26 @@ public class TestZephyrIntegration {
     assumeDaemon();
     Assumptions.assumeTrue(TEST_PASSWORD != null && !TEST_PASSWORD.isEmpty(), "zephyr.test.password not set");
     Assumptions.assumeTrue(wallet != null, "the test wallet of test 4 is not open");
+  }
+
+  /** The TLS tests: the https uri is given and no other test of this run has opened a wallet. */
+  private static void assumeTls() {
+    Assumptions.assumeTrue(TLS_URI != null && !TLS_URI.isEmpty(), "zephyr.daemon.uri.tls not set");
+    Assumptions.assumeTrue(walletsOpen == 0 && maxWalletsOpen == 0 || tlsRun,
+        "the TLS tests change the process environment and run on their own: -Dtest='TestZephyrIntegration#testTls*'");
+    tlsRun = true;
+  }
+
+  private static boolean tlsRun = false;
+
+  /** A random wallet with the https uri, one at a time. */
+  private static ZephyrWalletFull createTlsWallet() {
+    ZephyrWalletFull w = ZephyrWalletFull.createWallet(new ZephyrWalletConfig()
+        .setNetworkType(ZephyrNetworkType.MAINNET)
+        .setPassword("tls-test")
+        .setServerUri(TLS_URI));
+    walletOpened();
+    return w;
   }
 
   private static ZephyrDaemonRpc getDaemon() {
@@ -580,6 +606,74 @@ public class TestZephyrIntegration {
         }
       }
     });
+  }
+
+  /**
+   * 13: TLS without any ZephyrTls call. On the JVM nothing is applied: the native wallet verifies
+   * the node with OpenSSL's own default store (the host's) or the SSL_CERT_FILE/SSL_CERT_DIR of the
+   * environment, as in java.3. Runs before every other ZephyrTls use in this JVM (test order).
+   */
+  @Test
+  @Order(13)
+  public void testTlsWithoutConfiguration() {
+    assumeTls();
+    log("TLS without configuration; environment SSL_CERT_FILE=" + System.getenv("SSL_CERT_FILE") + " SSL_CERT_DIR=" + System.getenv("SSL_CERT_DIR"));
+    ZephyrWalletFull w = createTlsWallet();
+    try {
+      assertTrue(w.isConnectedToDaemon(), "not connected to the https node with the host's store");
+      long height = w.getDaemonHeight();
+      log("TLS without configuration: connected, daemon height " + height);
+      assertTrue(height > 900000, "daemon height " + height);
+    } finally {
+      w.close();
+      walletClosed();
+    }
+  }
+
+  /** 14: TLS with the defaults (the shipped root certificates only) applied by an explicit apply(). */
+  @Test
+  @Order(14)
+  public void testTlsShippedCertificates() throws Exception {
+    assumeTls();
+    File bundle = ZephyrTls.apply();
+    int count = 0;
+    for (String line : java.nio.file.Files.readAllLines(bundle.toPath(), StandardCharsets.US_ASCII)) {
+      if (line.equals("-----BEGIN CERTIFICATE-----")) count++;
+    }
+    log("TLS with the shipped certificates (" + ZephyrTls.getShippedCertificatesDate() + "): bundle " + bundle + ", " + count + " certificates");
+    ZephyrWalletFull w = createTlsWallet();
+    try {
+      assertTrue(w.isConnectedToDaemon(), "not connected to the https node with the shipped certificates");
+      long height = w.getDaemonHeight();
+      log("TLS with the shipped certificates: connected, daemon height " + height);
+      assertTrue(height > 900000, "daemon height " + height);
+    } finally {
+      w.close();
+      walletClosed();
+    }
+  }
+
+  /** 15: setCaFile at an empty file (applied by the wallet's hook, no explicit apply()): no connection. */
+  @Test
+  @Order(15)
+  public void testTlsEmptyCaFile() throws Exception {
+    assumeTls();
+    File empty = File.createTempFile("zephyr-java-empty", ".pem");
+    empty.deleteOnExit();
+    ZephyrTls.setCaFile(empty);
+    try {
+      ZephyrWalletFull w = createTlsWallet();
+      try {
+        boolean connected = w.isConnectedToDaemon();
+        log("TLS with an empty CA file: isConnectedToDaemon() " + connected);
+        assertFalse(connected, "connected to the https node with an empty CA file");
+      } finally {
+        w.close();
+        walletClosed();
+      }
+    } finally {
+      ZephyrTls.setCaFile(null);
+    }
   }
 
   @AfterAll

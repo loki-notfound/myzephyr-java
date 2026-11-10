@@ -37,6 +37,7 @@ import java.util.Set;
 import java.util.logging.Logger;
 import zephyr.common.ZephyrError;
 import zephyr.common.ZephyrRpcConnection;
+import zephyr.common.ZephyrTls;
 import zephyr.common.ZephyrUtils;
 import zephyr.daemon.model.ZephyrBlock;
 import zephyr.daemon.model.ZephyrKeyImage;
@@ -131,6 +132,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   public static ZephyrWalletFull openWallet(String path, String password, ZephyrNetworkType networkType, ZephyrRpcConnection daemonConnection) {
     if (!walletExistsJni(path)) throw new ZephyrError("Wallet does not exist at path: " + path);
     if (networkType == null) throw new ZephyrError("Must provide a network type");
+    if (daemonConnection != null) beforeDaemonUri(daemonConnection.getUri()); // before the wallet exists: a failure leaves nothing open
     long jniWalletHandle = openWalletJni(path, password, networkType.ordinal());
     ZephyrWalletFull wallet = new ZephyrWalletFull(jniWalletHandle, password);
     if (daemonConnection != null) wallet.setDaemonConnection(daemonConnection);
@@ -169,6 +171,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
    */
   public static ZephyrWalletFull openWalletData(String password, ZephyrNetworkType networkType, byte[] keysData, byte[] cacheData, ZephyrRpcConnection daemonConnection) {
     if (networkType == null) throw new ZephyrError("Must provide a network type");
+    if (daemonConnection != null) beforeDaemonUri(daemonConnection.getUri()); // before the wallet exists: a failure leaves nothing open
     long jniWalletHandle = openWalletDataJni(password, networkType.ordinal(), keysData, cacheData);
     ZephyrWalletFull wallet = new ZephyrWalletFull(jniWalletHandle, password);
     if (daemonConnection != null) wallet.setDaemonConnection(daemonConnection);
@@ -286,6 +289,9 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     }
     if (Boolean.TRUE.equals(config.getSaveCurrent() != null)) throw new ZephyrError("Cannot save current wallet when creating full wallet");
     
+    // the native side receives the server URI with the config (createWalletJni)
+    beforeDaemonUri(config.getServerUri());
+    
     // create wallet
     if (config.getMnemonic() != null) {
       if (config.getLanguage() != null) throw new ZephyrError("Cannot specify language when creating wallet from mnemonic");
@@ -325,6 +331,15 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     if (config.getLanguage() == null) config.setLanguage(DEFAULT_LANGUAGE);
     long jniWalletHandle = createWalletJni(serializeWalletConfig(config));
     return new ZephyrWalletFull(jniWalletHandle, config.getPassword());
+  }
+  
+  /**
+   * Runs before every hand-over of a daemon URI to the native side (create, open from a path, open
+   * from data, setDaemonConnection): ZephyrTls applies its root certificates for an https URI
+   * when they are due.
+   */
+  private static void beforeDaemonUri(String uri) {
+    ZephyrTls.beforeNativeConnection(uri);
   }
   
   private static String serializeWalletConfig(ZephyrWalletConfig config) {
@@ -459,6 +474,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     assertNotClosed();
     if (daemonConnection == null) setDaemonConnectionJni("", "", "");
     else {
+      beforeDaemonUri(daemonConnection.getUri());
       try {
         setDaemonConnectionJni(daemonConnection.getUri() == null ? "" : daemonConnection.getUri().toString(), daemonConnection.getUsername(), daemonConnection.getPassword());
       } catch (Exception e) {

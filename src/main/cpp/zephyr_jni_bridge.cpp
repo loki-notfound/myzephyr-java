@@ -34,6 +34,9 @@
  * limitations under the License.
  */
 
+#include <cerrno>
+#include <cstdlib>
+#include <cstring>
 #include <iostream>
 #include "chacha.h" // TODO: explicitly include because wallet2.h #include "crypto/chacha.h" is ignored
 #include "zephyr_jni_bridge.h"
@@ -431,6 +434,33 @@ JNIEXPORT void JNICALL Java_zephyr_common_ZephyrUtils_configureLoggingJni(JNIEnv
   string path = string(_path ? _path : "");
   if (jpath) env->ReleaseStringUTFChars(jpath, _path);
   mlog_configure(path, console); // zephyr-cpp is at monero-cpp 686fbdc, before ad7be65 added the monero_utils logging wrappers
+}
+
+// ------------------------------- TLS (ZephyrTls) --------------------------------
+
+JNIEXPORT void JNICALL Java_zephyr_common_ZephyrTls_setEnvJni(JNIEnv* env, jclass clazz, jstring jname, jstring jvalue) {
+  MTRACE("Java_zephyr_common_ZephyrTls_setEnvJni");
+  const char* _name = jname ? env->GetStringUTFChars(jname, NULL) : nullptr;
+  if (jname && !_name) return; // OutOfMemoryError pending
+  const char* _value = jvalue ? env->GetStringUTFChars(jvalue, NULL) : nullptr;
+  if (jvalue && !_value) {
+    env->ReleaseStringUTFChars(jname, _name);
+    return; // OutOfMemoryError pending
+  }
+  string name = string(_name ? _name : "");
+  string value = string(_value ? _value : "");
+  if (jname) env->ReleaseStringUTFChars(jname, _name);
+  if (jvalue) env->ReleaseStringUTFChars(jvalue, _value);
+
+  // set or unset the variable in the process environment, where OpenSSL reads SSL_CERT_FILE and
+  // SSL_CERT_DIR (patches/depends/0006 on Android)
+  try {
+    if (name.empty() || name.find('=') != string::npos) throw runtime_error("invalid environment variable name: '" + name + "'");
+    int result = jvalue ? setenv(name.c_str(), value.c_str(), 1) : unsetenv(name.c_str());
+    if (result != 0) throw runtime_error(string(jvalue ? "setenv " : "unsetenv ") + name + " failed: " + strerror(errno));
+  } catch (...) {
+    rethrow_cpp_exception_as_java_exception(env);
+  }
 }
 
 // --------------------------- STATIC WALLET UTILS ----------------------------
