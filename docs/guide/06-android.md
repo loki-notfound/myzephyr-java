@@ -312,9 +312,10 @@ directory (`java.io.tmpdir`) and names that file in `SSL_CERT_FILE`, with an emp
 alone: the app has chosen.
 
 **Correction.** In `java.1` to `java.3` this chapter told apps to set `SSL_CERT_FILE` or
-`SSL_CERT_DIR` themselves. On Android that setting had no effect: OpenSSL ignored the environment
-in an app process (it asked `getauxval(AT_SECURE)`, which is set in every app process), so
-`https://` nodes could not be used on Android at all. `java.4` fixes this in the build (patch
+`SSL_CERT_DIR` themselves. On the Android images this was measured on (the emulator, API 24 and
+API 35) that setting had no effect: OpenSSL ignored the environment in an app process (it asked
+`getauxval(AT_SECURE)`, which was set in the app process on both), so an `https://` node could not
+be verified there. Other devices were not measured. `java.4` fixes this in the build (patch
 `0006` of [chapter 9](09-building-and-verifying.md#build-layer-patches)) and adds `ZephyrTls`.
 
 **A node whose certificate comes from a private CA, or from a CA only the device knows**, needs

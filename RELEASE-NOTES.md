@@ -29,14 +29,17 @@ New build inputs: the root certificates of 2026-11-05 (Mozilla's list as curl pu
 
 ### Fixed
 
-- `https://` nodes on Android. The native wallet could not verify any `https://` node there:
-  OpenSSL ignored `SSL_CERT_FILE` and `SSL_CERT_DIR` in an app process, because it asked
-  `getauxval(AT_SECURE)`, which is set in every app process. The build now patches OpenSSL to
-  compare the user and group ids, as on every platform without `getauxval`.
+- `https://` nodes on Android. On the Android images this was measured on (the emulator, API 24
+  and API 35) the native wallet could not verify any `https://` node: OpenSSL ignored
+  `SSL_CERT_FILE` and `SSL_CERT_DIR` in an app process, because it asked `getauxval(AT_SECURE)`,
+  which was set in the app process on both. The build now patches OpenSSL to compare the user and
+  group ids, as on every platform without `getauxval`.
 - **Correction:** in `v2.3.0-sec.2-java.1` to `v2.3.0-sec.2-java.3` the guide, the README and
-  these notes told Android apps to set `SSL_CERT_FILE` or `SSL_CERT_DIR`. That had no effect on
-  Android, so `https://` nodes could not be used there. On the JVM the variables worked, and they
-  still work when `ZephyrTls` is not used.
+  these notes told Android apps to set `SSL_CERT_FILE` or `SSL_CERT_DIR`. On the emulator images
+  named above that had no effect, so an `https://` node could not be verified there; other
+  devices were not measured. A node that seemed to work with its scheme written `HTTPS://` was
+  spoken in clear text (below). On the JVM the variables worked, and they still work when
+  `ZephyrTls` is not used.
 - A daemon URI without a port: the core connected to port 0 and blocked for minutes without an
   error. An `http` or `https` URI without a port now gets the scheme's default port (80, 443).
 - `ZephyrUtils.getVersion()` returned "unknown" on Android: the AAR did not carry

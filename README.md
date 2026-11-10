@@ -200,9 +200,10 @@ pairs, the fees and the locks.
 - **TLS to a node: no pinning, and the host name must match.** On Android the native wallet trusts
   the root certificates shipped in the library by default; `ZephyrTls` adds the system store, user
   certificates or an own CA ([guide](docs/guide/06-android.md#tls-to-a-node)). In `java.1` to
-  `java.3` the documented `SSL_CERT_FILE`/`SSL_CERT_DIR` setting had no effect on Android, so
-  `https://` nodes could not be used there; fixed in `java.4`. On the JVM the variables worked and
-  still work when `ZephyrTls` is not used.
+  `java.3` the documented `SSL_CERT_FILE`/`SSL_CERT_DIR` setting had no effect on the Android
+  images it was measured on (the emulator, API 24 and API 35; other devices were not measured), so
+  `https://` nodes could not be verified there; fixed in `java.4`. On the JVM the variables worked
+  and still work when `ZephyrTls` is not used.
 
 [Chapter 8 of the guide](docs/guide/08-known-limitations.md) has the full list, with code.
 

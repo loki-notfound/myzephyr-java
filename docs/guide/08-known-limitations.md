@@ -203,9 +203,10 @@ store, user certificates, own certificates or one exact file), but it cannot pin
 certificate whose host name does not match the URI is refused (the core checks the name and
 passes no SSL options through), and the app's Network Security Configuration does not apply
 ([chapter 6](06-android.md#tls-to-a-node)). In `java.1` to `java.3` the documented
-`SSL_CERT_FILE`/`SSL_CERT_DIR` setting had no effect on Android (OpenSSL ignored the environment
-in an app process), so `https://` nodes could not be used there; fixed in `java.4`. On the JVM the
-variables worked and still work when `ZephyrTls` is not used. *Status:* pinning and own SSL
+`SSL_CERT_FILE`/`SSL_CERT_DIR` setting had no effect on the Android images it was measured on
+(the emulator, API 24 and API 35: OpenSSL ignored the environment in an app process; other devices
+were not measured), so `https://` nodes could not be verified there; fixed in `java.4`. On the JVM
+the variables worked and still work when `ZephyrTls` is not used. *Status:* pinning and own SSL
 options need the core.
 
 **Android 7: the RPC classes need core library desugaring.** `ZephyrDaemonRpc` and
