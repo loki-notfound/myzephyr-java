@@ -1,0 +1,432 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>io.github.loki-notfound</groupId>
+	<artifactId>zephyr-java</artifactId>
+	<version>2.3.0-sec.2-java.4</version>
+	<name>Zephyr Java Library</name>
+	<description>Java bindings for the Zephyr wallet core (zephyr-cpp), for Android and the JVM</description>
+	<url>https://github.com/loki-notfound/myzephyr-java</url>
+	<properties>
+		<java-version>1.8</java-version>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<apachelog-version>2.11.0</apachelog-version>
+		<jackson-version>2.13.5</jackson-version>
+		<maven.test.skip>false</maven.test.skip>
+		<!-- reproducible archives: fixed entry times; bin/build_release.sh passes the ISO-8601 time
+		     of SOURCE_DATE_EPOCH (-Dproject.build.outputTimestamp=...) -->
+		<project.build.outputTimestamp>2026-01-01T00:00:00Z</project.build.outputTimestamp>
+		<!-- the directory with libzephyr-java.so for the tests: build/ (bin/build_libzephyr_java.sh);
+		     the release script and CI pass build/natives/linux-x86_64 (the depends build) -->
+		<native.library.path>${project.basedir}/build</native.library.path>
+	</properties>
+
+	<dependencies>
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-core</artifactId>
+			<version>${jackson-version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+			<version>${jackson-version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.httpcomponents.client5</groupId>
+			<artifactId>httpclient5</artifactId>
+			<version>5.2.1</version>
+		</dependency>
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter-engine</artifactId>
+			<version>5.7.0</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.junit.platform</groupId>
+			<artifactId>junit-platform-runner</artifactId>
+			<version>1.7.0</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<!-- a logging binding for the tests only: a library must not force one on its users;
+			     src/main does not use slf4j -->
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-simple</artifactId>
+			<version>1.7.25</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<!-- optional: only ZephyrWalletRpc's ZMQ listener uses it; an application that uses that
+			     listener adds jeromq itself (the AAR declares it compileOnly) -->
+			<groupId>org.zeromq</groupId>
+			<artifactId>jeromq</artifactId>
+			<version>0.5.2</version>
+			<optional>true</optional>
+		</dependency>
+	</dependencies>
+
+	<scm>
+		<connection>scm:git:git://github.com/loki-notfound/myzephyr-java.git</connection>
+		<developerConnection>scm:git:ssh://github.com/loki-notfound/myzephyr-java.git</developerConnection>
+		<url>https://github.com/loki-notfound/myzephyr-java/tree/main</url>
+	</scm>
+
+	<licenses>
+		<license>
+			<name>MIT License</name>
+			<url>http://www.opensource.org/licenses/mit-license.php</url>
+		</license>
+		<license>
+			<name>The Apache License, Version 2.0</name>
+			<url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+		</license>
+	</licenses>
+
+	<developers>
+		<developer>
+			<name>loki-notfound</name>
+			<email>loki@lateo.dev</email>
+			<url>https://github.com/loki-notfound</url>
+		</developer>
+	</developers>
+
+	<distributionManagement>
+		<snapshotRepository>
+			<id>ossrh</id>
+			<url>https://oss.sonatype.org/content/repositories/snapshots</url>
+		</snapshotRepository>
+		<repository>
+			<id>ossrh</id>
+			<url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+		</repository>
+	</distributionManagement>
+
+	<build>
+		<plugins>
+			<plugin>
+				<!-- reproducible with project.build.outputTimestamp (3.2.0 and later) -->
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jar-plugin</artifactId>
+				<version>3.4.1</version>
+			</plugin>
+			<!-- the plugins Maven would otherwise take from its own default bindings, pinned: the output
+			     must not depend on the Maven that runs it (Debian 12's Maven 3.8.7 binds resources 2.6,
+			     which drops the natives' exec bit, and deploy 2.7, which rejects id::url) -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-resources-plugin</artifactId>
+				<version>3.3.1</version>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-install-plugin</artifactId>
+				<version>3.1.2</version>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-deploy-plugin</artifactId>
+				<version>3.1.2</version>
+			</plugin>
+		</plugins>
+		<resources>
+			<resource>
+				<directory>src/main/resources</directory>
+				<filtering>true</filtering>
+			</resource>
+			<resource>
+				<!-- data that must reach the JAR byte for byte, never filtered: the shipped root
+				     certificates (zephyr/common/cacert.pem, bin/ca-bundle.env) -->
+				<directory>src/main/resources-raw</directory>
+				<filtering>false</filtering>
+			</resource>
+			<resource>
+				<!-- native libraries for the JAR, placed by bin/build_libzephyr_java.sh as
+				     <os>-<arch>/libzephyr-java.so; skipped when absent; never filtered (binary) -->
+				<directory>${project.build.directory}/natives</directory>
+				<filtering>false</filtering>
+			</resource>
+		</resources>
+	</build>
+
+	<profiles>
+		<profile>
+			<id>default</id>
+			<activation>
+				<activeByDefault>true</activeByDefault>
+			</activation>
+			<build>
+				<plugins>
+					<plugin>
+						<!-- force the JUnit 5 provider: auto-detection picks JUnit 4 via junit-platform-runner and silently runs zero tests -->
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-surefire-plugin</artifactId>
+						<version>3.2.5</version>
+						<dependencies>
+							<dependency>
+								<groupId>org.apache.maven.surefire</groupId>
+								<artifactId>surefire-junit-platform</artifactId>
+								<version>3.2.5</version>
+							</dependency>
+						</dependencies>
+						<configuration>
+							<!-- the pure suites; the integration suites need a daemon and wallets: mvn test -Pintegration -->
+							<includes>
+								<include>test/TestExamples.java</include>
+								<include>test/TestSerialization.java</include>
+								<include>test/TestZephyrModel.java</include>
+								<include>test/TestZephyrUtils.java</include>
+								<include>test/TestZephyrTls.java</include>
+								<include>test/TestDefaultPort.java</include>
+							</includes>
+							<argLine>-Djava.library.path=${native.library.path}</argLine>
+						</configuration>
+					</plugin>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-compiler-plugin</artifactId>
+						<version>3.8.0</version>
+						<configuration>
+							<source>${java-version}</source>
+							<target>${java-version}</target>
+							<!-- needs monero-java on the class path: only the coexistence profile compiles it -->
+							<testExcludes>
+								<testExclude>test/TestCoexistence.java</testExclude>
+							</testExcludes>
+						</configuration>
+					</plugin>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-source-plugin</artifactId>
+						<version>3.3.1</version>
+						<configuration>
+							<!-- the natives under target/natives are a resource of the JAR, not a source -->
+							<excludes>
+								<exclude>**/*.so</exclude>
+							</excludes>
+						</configuration>
+						<executions>
+							<execution>
+								<id>attach-sources</id>
+								<goals>
+									<goal>jar</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-javadoc-plugin</artifactId>
+						<version>3.6.3</version>
+						<!-- mvn javadoc:javadoc for developers (target/site/apidocs); the Javadoc jar and the site
+						     come from bin/javadoc_sorted.sh, which takes the same options from a sorted
+						     source list, so the jar does not depend on the file system's directory order -->
+						<configuration>
+							<source>8</source>
+							<!-- no generation date in the pages -->
+							<notimestamp>true</notimestamp>
+							<!-- the MIT licence, not the plugin's default "All rights reserved" footer;
+							     bin/javadoc-bottom.txt is the source, bin/check_versions.sh checks that they agree -->
+							<bottom>Copyright &#169; the zephyr-java contributors. MIT licence.</bottom>
+						</configuration>
+					</plugin>
+					<plugin>
+						<!-- the Javadoc jar: target/apidocs as bin/javadoc_sorted.sh generates it (bin/package_release.sh
+						     runs it before Maven and fails on a jar without index.html). Here in the default profile,
+						     which every script and CI use: -Prelease would switch this profile off (and surefire with
+						     it) and bind the release profile's gpg signing. skipIfEmpty: a developer's plain
+						     mvn package, without that generation, has no Javadoc jar by design -->
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-jar-plugin</artifactId>
+						<executions>
+							<execution>
+								<id>javadoc-jar</id>
+								<phase>package</phase>
+								<goals>
+									<goal>jar</goal>
+								</goals>
+								<configuration>
+									<classifier>javadoc</classifier>
+									<classesDirectory>${project.build.directory}/apidocs</classesDirectory>
+									<skipIfEmpty>true</skipIfEmpty>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+		<profile>
+			<id>integration</id>
+			<!-- activating a profile switches the default one off, so the JUnit 5 provider is repeated here -->
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-surefire-plugin</artifactId>
+						<version>3.2.5</version>
+						<dependencies>
+							<dependency>
+								<groupId>org.apache.maven.surefire</groupId>
+								<artifactId>surefire-junit-platform</artifactId>
+								<version>3.2.5</version>
+							</dependency>
+						</dependencies>
+						<configuration>
+							<!-- every suite; needs a daemon and wallet files -->
+							<includes>
+								<include>test/Test*.java</include>
+							</includes>
+							<argLine>-Djava.library.path=${native.library.path}</argLine>
+						</configuration>
+					</plugin>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-compiler-plugin</artifactId>
+						<version>3.8.0</version>
+						<configuration>
+							<source>${java-version}</source>
+							<target>${java-version}</target>
+							<!-- needs monero-java on the class path: only the coexistence profile compiles it -->
+							<testExcludes>
+								<testExclude>test/TestCoexistence.java</testExclude>
+							</testExcludes>
+						</configuration>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+		<profile>
+			<id>release</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-source-plugin</artifactId>
+						<version>3.3.1</version>
+						<configuration>
+							<!-- the natives under target/natives are a resource of the JAR, not a source -->
+							<excludes>
+								<exclude>**/*.so</exclude>
+							</excludes>
+						</configuration>
+						<executions>
+							<execution>
+								<id>attach-sources</id>
+								<goals>
+									<goal>jar</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-compiler-plugin</artifactId>
+						<version>3.8.0</version>
+						<configuration>
+							<source>${java-version}</source>
+							<target>${java-version}</target>
+							<!-- needs monero-java on the class path: only the coexistence profile compiles it -->
+							<testExcludes>
+								<testExclude>test/TestCoexistence.java</testExclude>
+							</testExcludes>
+						</configuration>
+					</plugin>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-javadoc-plugin</artifactId>
+						<version>3.6.3</version>
+						<configuration>
+							<source>8</source>
+							<!-- no generation date in the pages: the javadoc jar is reproducible -->
+							<notimestamp>true</notimestamp>
+							<!-- the MIT licence, not the plugin's default "All rights reserved" footer;
+							     bin/javadoc-bottom.txt is the source, bin/check_versions.sh checks that they agree -->
+							<bottom>Copyright &#169; the zephyr-java contributors. MIT licence.</bottom>
+						</configuration>
+					</plugin>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-gpg-plugin</artifactId>
+						<version>1.5</version>
+						<executions>
+							<execution>
+								<id>sign-artifacts</id>
+								<phase>verify</phase>
+								<goals>
+									<goal>sign</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+		<profile>
+			<id>coexistence</id>
+			<!-- zephyr-java and monero-java in one JVM: mvn -Pcoexistence -Dtest=TestCoexistence test.
+			     Activating it switches the default profile off, so compiler and surefire are repeated. -->
+			<properties>
+				<!-- the project's own Jackson dependencies use this property, and dependencyManagement
+				     does not override versions the POM declares directly -->
+				<jackson-version>2.21.7</jackson-version>
+			</properties>
+			<dependencyManagement>
+				<dependencies>
+					<!-- monero-java 0.8.65 needs Jackson 2.21.7 (StreamReadConstraints, Jackson 2.15+);
+					     an app with both libraries resolves to the highest anyway, so this run also
+					     shows zephyr-java on Jackson 2.21.x -->
+					<dependency>
+						<groupId>com.fasterxml.jackson</groupId>
+						<artifactId>jackson-bom</artifactId>
+						<version>2.21.7</version>
+						<type>pom</type>
+						<scope>import</scope>
+					</dependency>
+				</dependencies>
+			</dependencyManagement>
+			<dependencies>
+				<dependency>
+					<!-- the newest release on Maven Central (2026-11-07); its jar bundles linux-x86_64/libmonero-java.so -->
+					<groupId>io.github.woodser</groupId>
+					<artifactId>monero-java</artifactId>
+					<version>0.8.65</version>
+					<scope>test</scope>
+				</dependency>
+			</dependencies>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-compiler-plugin</artifactId>
+						<version>3.8.0</version>
+						<configuration>
+							<source>${java-version}</source>
+							<target>${java-version}</target>
+						</configuration>
+					</plugin>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-surefire-plugin</artifactId>
+						<version>3.2.5</version>
+						<dependencies>
+							<dependency>
+								<groupId>org.apache.maven.surefire</groupId>
+								<artifactId>surefire-junit-platform</artifactId>
+								<version>3.2.5</version>
+							</dependency>
+						</dependencies>
+						<configuration>
+							<includes>
+								<include>test/TestCoexistence.java</include>
+							</includes>
+							<argLine>-Djava.library.path=${native.library.path}</argLine>
+						</configuration>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
+</project>
