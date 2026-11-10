@@ -584,8 +584,17 @@ public final class ZephyrTls {
       dir.deleteOnExit();
       new File(dir, "ca-bundle.pem").deleteOnExit(); // deleted before the directory (reverse order)
     }
+    ownerOnlyWritable(dir);
     directory = dir;
     return dir;
+  }
+
+  /**
+   * Lets only the owner write the directory, whatever the umask: nobody else can replace the
+   * bundle or put a certificate into the directory SSL_CERT_DIR names.
+   */
+  private static void ownerOnlyWritable(File dir) throws IOException {
+    if (!dir.setWritable(false, false) || !dir.setWritable(true, true)) throw new IOException("cannot make " + dir + " writable by its owner only");
   }
 
   /** The empty directory SSL_CERT_DIR names, so that OpenSSL adds no directory of its own. */
@@ -595,6 +604,7 @@ public final class ZephyrTls {
       if (!empty.mkdir()) throw new IOException("cannot create " + empty);
       if (!isAndroid()) empty.deleteOnExit();
     }
+    ownerOnlyWritable(empty);
     File[] entries = empty.listFiles();
     if (entries == null) throw new IOException("cannot list " + empty);
     for (File entry : entries) {

@@ -276,4 +276,22 @@ public class TestZephyrTls {
       assertFalse(target.exists(), "a target was written");
     }
   }
+
+  /**
+   * The directory of the bundle and the empty directory beside it are writable by their owner
+   * only, whatever the umask (run this suite under "umask 000" to see that the umask plays no part).
+   */
+  @Test
+  @Order(10)
+  public void testDirectoriesWritableByOwnerOnly() throws Exception {
+    defaults();
+    File bundle = ZephyrTls.apply();
+    for (File dir : new File[] { bundle.getParentFile(), new File(bundle.getParentFile(), "empty") }) {
+      Set<java.nio.file.attribute.PosixFilePermission> permissions = Files.getPosixFilePermissions(dir.toPath());
+      System.out.println("TestZephyrTls: " + dir.getName() + " " + java.nio.file.attribute.PosixFilePermissions.toString(permissions));
+      assertTrue(permissions.contains(java.nio.file.attribute.PosixFilePermission.OWNER_WRITE), dir + " " + permissions);
+      assertFalse(permissions.contains(java.nio.file.attribute.PosixFilePermission.GROUP_WRITE), dir + " " + permissions);
+      assertFalse(permissions.contains(java.nio.file.attribute.PosixFilePermission.OTHERS_WRITE), dir + " " + permissions);
+    }
+  }
 }
