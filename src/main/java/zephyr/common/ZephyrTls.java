@@ -7,8 +7,10 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
 import java.nio.ByteBuffer;
 import java.security.KeyStore;
+import java.security.MessageDigest;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
@@ -18,6 +20,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
@@ -64,6 +68,10 @@ public final class ZephyrTls {
   private static final String SHIPPED_RESOURCE = "cacert.pem"; // zephyr/common/cacert.pem, src/main/resources-raw
   private static final String BASE64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
   private static final int PEM_LINE = 64;
+  private static final String DOWNLOAD_URL = "https://curl.se/ca/cacert.pem";
+  private static final int DOWNLOAD_TIMEOUT_MS = 30000;
+  private static final int DOWNLOAD_MAX_BYTES = 2 * 1024 * 1024;
+  private static final int DOWNLOAD_MIN_CERTIFICATES = 50;
 
   // the configuration
   private static boolean useSystem = false;
@@ -235,6 +243,110 @@ public final class ZephyrTls {
   }
 
   /**
+   * Download the current root certificates from curl ({@code https://curl.se/ca/cacert.pem},
+   * Mozilla's list), without a checksum: {@link #downloadCertificates(URL, File, String)} with that
+   * URL and {@code null}.
+   *
+   * @param target the file to write
+   * @return the number of certificates in the downloaded file
+   * @throws ZephyrError if anything fails; an existing target is then left untouched
+   */
+  public static synchronized int downloadCertificates(File target) {
+    try {
+      return downloadCertificates(new URL(DOWNLOAD_URL), target, null);
+    } catch (java.net.MalformedURLException e) {
+      throw error("Invalid URL " + DOWNLOAD_URL, e);
+    }
+  }
+
+  /**
+   * Download root certificates newer than those shipped in this library, for an app that wants
+   * them before its next zephyr-java release. The library never calls this itself, and it does not
+   * change the configuration: the app adds the file at start, when it exists:
+   *
+   * <pre>
+   * File roots = new File(context.getFilesDir(), "cacert.pem");
+   * if (roots.isFile()) ZephyrTls.addTrustedCertificates(roots);   // at start, before the wallet
+   * ...
+   * ZephyrTls.downloadCertificates(roots);                          // later, on a background thread
+   * </pre>
+   *
+   * <p>Only {@code https}. The connection trusts the certificates {@link #apply()} would write
+   * under the current configuration (system, shipped and added certificates), so Android 7.0,
+   * whose own store cannot verify curl.se, reaches it through the shipped certificates; the host
+   * name is checked as usual. No redirect is followed; connect and read time out after 30 s;
+   * the answer must be 200 and at most 2 MiB. When {@code expectedSha256} is given, the body's
+   * sha256 must match; every certificate block must parse, and there must be at least 50. Only
+   * then is {@code target} written (a temporary file in the same directory, then renamed).</p>
+   *
+   * <p>This contacts a third party (curl.se, unless the app names another source) and so shows it
+   * the device's address. Call it from a background thread and not more than once a day. The file
+   * is trusted because the https connection is: whoever could forge a certificate under the
+   * current roots could add a root. An app that can get the checksum from a source of its own
+   * should pass it. Apps that do not call this get new roots with each zephyr-java release.</p>
+   *
+   * @param source the https URL of a PEM file
+   * @param target the file to write
+   * @param expectedSha256 the sha256 of the file in hex, or null to skip the check
+   * @return the number of certificates in the downloaded file
+   * @throws ZephyrError if anything fails; an existing target is then left untouched
+   */
+  public static synchronized int downloadCertificates(URL source, File target, String expectedSha256) {
+    if (source == null) throw new ZephyrError("No source URL given");
+    if (target == null) throw new ZephyrError("No target file given");
+    if (!"https".equalsIgnoreCase(source.getProtocol())) throw new ZephyrError("The root certificates are downloaded over https only, not " + source);
+    if (expectedSha256 != null && !expectedSha256.matches("[0-9a-fA-F]{64}")) throw new ZephyrError("Not a sha256 in hex: " + expectedSha256);
+    try {
+      // trust exactly what apply() would write under the current configuration
+      KeyStore store = KeyStore.getInstance(KeyStore.getDefaultType());
+      store.load(null);
+      CertificateFactory factory = CertificateFactory.getInstance("X.509");
+      int i = 0;
+      for (byte[] der : bundle()) store.setCertificateEntry("root-" + (i++), factory.generateCertificate(new ByteArrayInputStream(der)));
+      TrustManagerFactory trust = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+      trust.init(store);
+      SSLContext context = SSLContext.getInstance("TLS");
+      context.init(null, trust.getTrustManagers(), null);
+
+      // the download
+      HttpsURLConnection connection = (HttpsURLConnection) source.openConnection();
+      byte[] body;
+      try {
+        connection.setSSLSocketFactory(context.getSocketFactory());
+        connection.setInstanceFollowRedirects(false);
+        connection.setConnectTimeout(DOWNLOAD_TIMEOUT_MS);
+        connection.setReadTimeout(DOWNLOAD_TIMEOUT_MS);
+        connection.setUseCaches(false);
+        connection.setRequestProperty("User-Agent", "zephyr-java");
+        int code = connection.getResponseCode();
+        if (code != 200) throw new ZephyrError(source + " answered " + code + ", expected 200");
+        InputStream in = connection.getInputStream();
+        try {
+          body = readAll(in, DOWNLOAD_MAX_BYTES);
+        } finally {
+          in.close();
+        }
+      } finally {
+        connection.disconnect();
+      }
+
+      // the checks, then the file
+      if (expectedSha256 != null) {
+        String sha256 = hex(MessageDigest.getInstance("SHA-256").digest(body));
+        if (!sha256.equalsIgnoreCase(expectedSha256)) throw new ZephyrError(source + ": sha256 " + sha256 + ", expected " + expectedSha256.toLowerCase());
+      }
+      List<byte[]> certs = parseCertificates(body, source.toString());
+      if (certs.size() < DOWNLOAD_MIN_CERTIFICATES) throw new ZephyrError(source + " holds " + certs.size() + " certificates, fewer than " + DOWNLOAD_MIN_CERTIFICATES);
+      writeAtomically(target.getAbsoluteFile(), body);
+      return certs.size();
+    } catch (ZephyrError e) {
+      throw e;
+    } catch (Exception e) {
+      throw error("Cannot download the root certificates from " + source, e);
+    }
+  }
+
+  /**
    * Internal: {@code ZephyrWalletFull} calls this before it hands a daemon URI to the native core.
    * Applications do not call it. For an {@code https://} URI it applies the configuration when the
    * app configured this class and the configuration changed since the last apply, or, on Android
@@ -258,6 +370,12 @@ public final class ZephyrTls {
   // ------------------------------- private ----------------------------------
 
   private static native void setEnvJni(String name, String value);
+
+  private static synchronized String hex(byte[] bytes) {
+    StringBuilder out = new StringBuilder(bytes.length * 2);
+    for (byte b : bytes) out.append(Character.forDigit((b >> 4) & 15, 16)).append(Character.forDigit(b & 15, 16));
+    return out.toString();
+  }
 
   private static synchronized boolean isAndroid() {
     return "Dalvik".equals(System.getProperty("java.vm.name"));

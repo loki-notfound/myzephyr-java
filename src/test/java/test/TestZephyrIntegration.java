@@ -71,7 +71,9 @@ import zephyr.wallet.model.ZephyrWalletListener;
  *   <li>{@code zephyr.daemon.uri.tls}: the node's {@code https://} uri, for the TLS tests 13 to 15.
  *       They change the process environment ({@link ZephyrTls}) and run in a JVM of their own:
  *       {@code -Dtest='TestZephyrIntegration#testTls*'}; in a run where another test has opened
- *       a wallet they skip.</li>
+ *       a wallet they skip;</li>
+ *   <li>{@code zephyr.tls.download=true}: the download of the current root certificates from
+ *       curl.se (tests 16 and 17; no node needed).</li>
  * </ul>
  *
  * <p>The tests run one after another; at most two wallets are open against the node at any time.
@@ -674,6 +676,40 @@ public class TestZephyrIntegration {
     } finally {
       ZephyrTls.setCaFile(null);
     }
+  }
+
+  /** 16: the default download of the current root certificates (curl.se). */
+  @Test
+  @Order(16)
+  public void testTlsDownload() throws Exception {
+    Assumptions.assumeTrue(Boolean.getBoolean("zephyr.tls.download"), "zephyr.tls.download not set");
+    File target = File.createTempFile("zephyr-java-download", ".pem");
+    target.deleteOnExit();
+    long start = System.currentTimeMillis();
+    int count = ZephyrTls.downloadCertificates(target);
+    log("download: " + count + " certificates, " + target.length() + " bytes, " + (System.currentTimeMillis() - start) + " ms");
+    assertTrue(count >= 100, "certificates downloaded: " + count);
+    int parsed;
+    try (java.io.FileInputStream in = new java.io.FileInputStream(target)) {
+      parsed = java.security.cert.CertificateFactory.getInstance("X.509").generateCertificates(in).size();
+    }
+    assertEquals(count, parsed, "the target parses");
+  }
+
+  /** 17: a wrong checksum throws and leaves an existing target untouched. */
+  @Test
+  @Order(17)
+  public void testTlsDownloadWrongChecksum() throws Exception {
+    Assumptions.assumeTrue(Boolean.getBoolean("zephyr.tls.download"), "zephyr.tls.download not set");
+    File target = File.createTempFile("zephyr-java-download", ".pem");
+    target.deleteOnExit();
+    byte[] before = "an existing file\n".getBytes(StandardCharsets.US_ASCII);
+    java.nio.file.Files.write(target.toPath(), before);
+    String zeros = "0000000000000000000000000000000000000000000000000000000000000000";
+    ZephyrError e = assertThrows(ZephyrError.class, () -> ZephyrTls.downloadCertificates(new java.net.URL("https://curl.se/ca/cacert.pem"), target, zeros));
+    log("download with a wrong sha256: " + e.getMessage());
+    assertTrue(e.getMessage().contains("expected " + zeros), e.getMessage());
+    assertTrue(Arrays.equals(before, java.nio.file.Files.readAllBytes(target.toPath())), "the existing target was changed");
   }
 
   @AfterAll

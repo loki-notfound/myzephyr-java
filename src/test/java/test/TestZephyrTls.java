@@ -11,6 +11,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.security.KeyStore;
@@ -220,5 +221,20 @@ public class TestZephyrTls {
     written = jdkParse(ZephyrTls.apply());
     assertEquals(SHIPPED_COUNT + 1, written.size(), "shipped certificates and the test CA, without duplicates");
     assertEquals(set(jdkParse(stream(TEST_CA))).iterator().next(), set(written).toArray()[SHIPPED_COUNT], "added certificates come last");
+  }
+
+  @Test
+  @Order(8)
+  public void testDownloadRefusals() throws Exception {
+    File target = File.createTempFile("zephyr-java-download", ".pem");
+    target.deleteOnExit();
+    ZephyrError e = assertThrows(ZephyrError.class, () -> ZephyrTls.downloadCertificates(new URL("http://curl.se/ca/cacert.pem"), target, null));
+    assertTrue(e.getMessage().contains("https only"), e.getMessage());
+    assertThrows(ZephyrError.class, () -> ZephyrTls.downloadCertificates(new URL("ftp://curl.se/ca/cacert.pem"), target, null));
+    assertThrows(ZephyrError.class, () -> ZephyrTls.downloadCertificates(new URL("https://curl.se/ca/cacert.pem"), null, null));
+    assertThrows(ZephyrError.class, () -> ZephyrTls.downloadCertificates(null));
+    assertThrows(ZephyrError.class, () -> ZephyrTls.downloadCertificates(null, target, null));
+    assertThrows(ZephyrError.class, () -> ZephyrTls.downloadCertificates(new URL("https://curl.se/ca/cacert.pem"), target, "not a hash"));
+    assertEquals(0, target.length(), "the target is untouched");
   }
 }
