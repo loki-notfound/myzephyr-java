@@ -171,7 +171,8 @@ API 28 and later is to refuse clear text (Android documentation, "Network securi
 configuration"; the documentation of `android:usesCleartextTraffic` notes that the socket API does
 not honour that flag). So the configuration neither blocks nor protects these connections:
 `cleartextTrafficPermitted="false"` does not stop an `http://` node, and the configuration's trust
-anchors and pins do not apply to an `https://` node ([TLS to a node](#tls-to-a-node)).
+anchors and pins do not apply to an `https://` node: the native wallet's root certificates are set
+with `ZephyrTls` ([TLS to a node](#tls-to-a-node)).
 
 ## Storage
 
@@ -293,31 +294,83 @@ yours through ordinary Java.
 ## TLS to a node
 
 The native wallet makes its own connections to the node, with the OpenSSL inside the native
-library. It does **not** use Android's certificate store, and the Java API has no option for a CA
-file or a certificate fingerprint for the native wallet (`SslOptions` exists only for
-`ZephyrWalletRpc`). With an `https://` URI the core verifies the node's certificate against
-OpenSSL's default store and checks the host name.
+library; with an `https://` URI the core verifies the node's certificate and checks its host name.
+Which root certificates it trusts is decided by `zephyr.common.ZephyrTls` (the Java RPC classes
+are not affected: they use the trust store of the Java runtime).
 
-That default store is empty on a device: the library's compiled-in OpenSSL directory is `/etc/ssl`,
-a Linux location. So with an `https://` node:
+**`https://` works without setup.** By default the native wallet trusts the root certificates
+shipped in the library and nothing else: Mozilla's list of root certificates as curl publishes it
+(`ZephyrTls.getShippedCertificatesDate()`, `2026-11-05` in this release: 118 certificates), the same
+on every device and renewed with each release. Before the first `https://` connection of a
+`ZephyrWalletFull` the library writes them to `zephyr-java-tls/ca-bundle.pem` in the app's cache
+directory (`java.io.tmpdir`) and names that file in `SSL_CERT_FILE`, with an empty directory in
+`SSL_CERT_DIR`, so that exactly the bundle is trusted. When the process environment already names
+`SSL_CERT_FILE` or `SSL_CERT_DIR` and the app has not called `ZephyrTls`, the library leaves it
+alone: the app has chosen.
 
-- **Without further setup the connection fails.** The Java side only sees "Wallet is not connected
-  to daemon"; the native log says "SSL certificate is not in the allowed list, connection dropped".
-- **The fix is the environment.** OpenSSL reads `SSL_CERT_FILE` (a PEM bundle) and `SSL_CERT_DIR`
-  (a hashed directory) from the process environment when the TLS context is set up. Set one before
-  the first wallet call, for example with a CA bundle the app ships and copies to its files
-  directory:
+**Correction.** In `java.1` to `java.3` this chapter told apps to set `SSL_CERT_FILE` or
+`SSL_CERT_DIR` themselves. On Android that setting had no effect: OpenSSL ignored the environment
+in an app process (it asked `getauxval(AT_SECURE)`, which is set in every app process), so
+`https://` nodes could not be used on Android at all. `java.4` fixes this in the build (patch
+`0006` of [chapter 9](09-building-and-verifying.md#build-layer-patches)) and adds `ZephyrTls`.
+
+**A node whose certificate comes from a private CA, or from a CA only the device knows**, needs
+`addTrustedCertificates` or `setUseSystemCertificates(true)`. The options, all in
+`src/test/java/examples/GuideChapter6.java` (compiled with the tests):
 
 ```java
-File bundle = new File(context.getFilesDir(), "cacert.pem");   // copied from the app's assets
-android.system.Os.setenv("SSL_CERT_FILE", bundle.getAbsolutePath(), true);
+ZephyrTls.addTrustedCertificates(caPem);    // your own CA, or a self-signed node certificate
+                                            // whose name matches the node's host name
+ZephyrTls.setUseSystemCertificates(true);   // the device's system store as well
+ZephyrTls.setUseUserCertificates(true);     // the certificates the user installed
+ZephyrTls.setUseShippedCertificates(false); // without the shipped root certificates
+ZephyrTls.setCaFile(pem);                   // exactly this file and nothing else (null: back)
 ```
 
-- Pointing `SSL_CERT_DIR` at Android's own `/system/etc/security/cacerts` is the obvious candidate,
-  but it is **untested**; whether OpenSSL accepts that directory's layout is not known yet. Test it
-  on your devices before you rely on it.
-- **Plain `http://` to a node you trust**, for example your own node on your own network, needs no
-  certificates at all.
+Configure `ZephyrTls` before the wallet is created or its connection is set: the core reads the
+bundle whenever a wallet sets up its connection, and a changed configuration is applied before the
+next `https://` connection of a wallet (`ZephyrTls.apply()` applies it at once and returns the
+file in use). The environment belongs to the whole process, so the configuration holds for every
+wallet of the app. Android 7.0's system store has no ISRG Root X1, the root of Let's Encrypt: with
+the system store alone a Let's Encrypt node fails there; the shipped certificates cover it.
 
-On the JVM the same applies: the Linux release library looks in `/etc/ssl`, and `SSL_CERT_FILE` or
-`SSL_CERT_DIR` override it. The Java RPC classes are different: they use the JVM's trust store.
+**Newer root certificates before the next release** (opt-in; the library never downloads by
+itself). `ZephyrTls.downloadCertificates(file)` fetches the current list from curl
+(`https://curl.se/ca/cacert.pem`) over a connection that trusts the certificates of the current
+configuration, checks it, and writes the file; it does not change the configuration. The app adds
+the file at start:
+
+```java
+File roots = new File(context.getFilesDir(), "cacert.pem");
+if (roots.isFile()) ZephyrTls.addTrustedCertificates(roots);   // at start, before the wallet
+...
+ZephyrTls.downloadCertificates(roots);                          // later, on a background thread
+```
+
+The download contacts a third party (curl.se, unless the app names another source with
+`downloadCertificates(url, file, sha256)`) and so shows it the device's address; call it from a
+background thread and not more than once a day. The file is trusted because the `https`
+connection is: whoever could forge a certificate under the current roots could add a root. An app
+that can get the checksum from a source of its own should pass it. Apps that do not call it get new
+roots with each zephyr-java release.
+
+**What it cannot do.** There is no certificate pinning. A certificate whose host name does not
+match the URI is refused (the core checks the name), so a self-signed certificate needs the right
+name. The app's Network Security Configuration does not apply to the native wallet.
+
+**The port.** A URI without a port gets the scheme's default (443 for `https://`, 80 for
+`http://`); `getDaemonConnection()` then reports the URI with the port. (In `java.1` to `java.3`
+the core connected to port 0 and blocked for minutes.)
+
+**When verification fails**, `isConnectedToDaemon()` returns false, and a call that needs the node
+(`sync()`, `getDaemonHeight()` and the like) throws "Wallet is not connected to daemon: the node is
+an https node; its certificate may not be trusted (see ZephyrTls and the user guide, chapter 6)".
+The native log says "SSL certificate is not in the allowed list, connection dropped"
+([Logs](#logs)).
+
+**Plain `http://` to a node you trust**, for example your own node on your own network, needs no
+certificates at all.
+
+On the desktop JVM nothing changes unless the application calls `ZephyrTls` itself: the Linux
+library uses OpenSSL's default store (`/etc/ssl`), and `SSL_CERT_FILE` or `SSL_CERT_DIR` in the
+environment override it, as before.

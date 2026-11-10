@@ -197,9 +197,16 @@ run on the Android emulator, on API 24 and on API 35 with 16 KB pages, as a rele
 checked (exports, page alignment, packaging) but have not run on a device. *Status:* pending a
 device test.
 
-**Android: TLS needs the app's help.** The native wallet does not use Android's certificate store;
-`https://` nodes need `SSL_CERT_FILE` or `SSL_CERT_DIR` in the environment, and Android's own
-certificate directory as `SSL_CERT_DIR` is untested ([chapter 6](06-android.md#tls-to-a-node)).
+**TLS to a node: no pinning, the host name must match.** The native wallet trusts root
+certificates (on Android by default those shipped in the library; `ZephyrTls` adds the system
+store, user certificates, own certificates or one exact file), but it cannot pin a certificate, a
+certificate whose host name does not match the URI is refused (the core checks the name and
+passes no SSL options through), and the app's Network Security Configuration does not apply
+([chapter 6](06-android.md#tls-to-a-node)). In `java.1` to `java.3` the documented
+`SSL_CERT_FILE`/`SSL_CERT_DIR` setting had no effect on Android (OpenSSL ignored the environment
+in an app process), so `https://` nodes could not be used there; fixed in `java.4`. On the JVM the
+variables worked and still work when `ZephyrTls` is not used. *Status:* pinning and own SSL
+options need the core.
 
 **Android 7: the RPC classes need core library desugaring.** `ZephyrDaemonRpc` and
 `ZephyrWalletRpc` send their requests through the Apache HTTP client, which needs `java.time`, and

@@ -34,6 +34,17 @@ in `bin/pins.env` name both; to build against them, put their URLs and commits i
 variables and check out the submodule at that commit. This is a requirement on the sources, not a
 CI job; releases are always built from the backports.
 
+## The root certificates
+
+The library ships Mozilla's root certificates as curl publishes them
+(`src/main/resources-raw/zephyr/common/cacert.pem`, the default trust of the native wallet on
+Android). They are a pinned input like the sources: `bin/ca-bundle.env` names the dated file by
+date, URL and sha256, `bin/update_ca_bundle.sh` downloads it and checks the hash, and
+`bin/check_versions.sh` (the first step of every release build) fails when the committed file
+differs from the pin. Builds never download it. Before each release
+`bin/update_ca_bundle.sh --check-latest` says whether curl has published a newer file; the
+release then moves the pin to it.
+
 ## Build-layer patches
 
 zephyr-java never patches zephyr or zephyr-cpp source code. It does patch build tooling: six

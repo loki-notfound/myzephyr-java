@@ -100,11 +100,15 @@ connection still opens: it shows the state of its last sync, but cannot sync or 
 Tor); it has not been tested with Zephyr.
 
 An `http://` URI sends everything in clear text, which is fine for a node you run yourself on a
-network you trust. An `https://` URI makes the core verify the node's certificate against
-OpenSSL's default certificate store, and on Android that store is empty unless the app provides
-one. [Chapter 6](06-android.md#tls-to-a-node) explains what to do. When verification fails, the
-Java side only sees "Wallet is not connected to daemon"; the reason is in the native log, which on
-Android does not reach logcat ([chapter 6](06-android.md#logs)).
+network you trust. An `https://` URI makes the core verify the node's certificate and its host
+name. On Android the native wallet trusts the root certificates shipped in the library by default;
+`ZephyrTls` changes that ([chapter 6](06-android.md#tls-to-a-node)). On the desktop JVM nothing
+changes unless the application calls `ZephyrTls` itself: OpenSSL's default store (`/etc/ssl`)
+and `SSL_CERT_FILE` or `SSL_CERT_DIR` in the environment apply. A URI without a port gets the
+scheme's default (443 or 80), and `getDaemonConnection()` reports it with the port. When
+verification fails, `isConnectedToDaemon()` is false and calls that need the node throw "Wallet is
+not connected to daemon" with a hint at TLS; the reason is in the native log, which on Android
+does not reach logcat ([chapter 6](06-android.md#logs)).
 
 ## Syncing
 
