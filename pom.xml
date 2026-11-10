@@ -179,6 +179,7 @@
 								<include>test/TestZephyrModel.java</include>
 								<include>test/TestZephyrUtils.java</include>
 								<include>test/TestZephyrTls.java</include>
+								<include>test/TestDefaultPort.java</include>
 							</includes>
 							<argLine>-Djava.library.path=${native.library.path}</argLine>
 						</configuration>

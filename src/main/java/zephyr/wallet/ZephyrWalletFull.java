@@ -27,6 +27,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import zephyr.lib.utils.GenUtils;
 import zephyr.lib.utils.JsonUtils;
 import java.math.BigInteger;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -290,7 +292,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     if (Boolean.TRUE.equals(config.getSaveCurrent() != null)) throw new ZephyrError("Cannot save current wallet when creating full wallet");
     
     // the native side receives the server URI with the config (createWalletJni)
-    beforeDaemonUri(config.getServerUri());
+    beforeDaemonUri(withDefaultPort(config.getServerUri()));
     
     // create wallet
     if (config.getMnemonic() != null) {
@@ -342,8 +344,55 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     ZephyrTls.beforeNativeConnection(uri);
   }
   
+  /**
+   * The scheme's default port (80 for http, 443 for https) for a URI without one: the core
+   * connects to port 0 otherwise and blocks for minutes. Everything else (another scheme, a port,
+   * no host, a URI that does not parse, null) goes through unchanged; user info, IPv6 literals,
+   * paths, queries and fragments are kept as they are.
+   */
+  private static String withDefaultPort(String uri) {
+    if (uri == null || uri.isEmpty()) return uri;
+    try {
+      URI parsed = new URI(uri);
+      String scheme = parsed.getScheme();
+      String authority = parsed.getRawAuthority();
+      if (scheme == null || authority == null || parsed.getHost() == null || parsed.getPort() != -1) return uri;
+      int port;
+      if (scheme.equalsIgnoreCase("http")) port = 80;
+      else if (scheme.equalsIgnoreCase("https")) port = 443;
+      else return uri;
+      int start = scheme.length() + 3; // "<scheme>://"
+      if (!uri.startsWith("://", scheme.length()) || !uri.startsWith(authority, start)) return uri;
+      int end = start + authority.length();
+      return uri.substring(0, end) + (authority.endsWith(":") ? "" : ":") + port + uri.substring(end);
+    } catch (URISyntaxException e) {
+      return uri;
+    }
+  }
+  
+  private static final String NOT_CONNECTED = "Wallet is not connected to daemon";
+  private static final String TLS_HINT = ": the node is an https node; its certificate may not be trusted (see ZephyrTls and the user guide, chapter 6)";
+  
+  /**
+   * The error of a call that needs the daemon: the core's "Wallet is not connected to daemon" gets
+   * a hint at TLS when the wallet's daemon URI is https.
+   */
+  private ZephyrError daemonError(Exception e) {
+    String message = e.getMessage();
+    if (NOT_CONNECTED.equals(message)) {
+      try {
+        String[] connection = getDaemonConnectionJni();
+        if (connection != null && connection[0] != null && connection[0].regionMatches(true, 0, "https://", 0, 8)) message += TLS_HINT;
+      } catch (Exception ignored) {
+        // the plain message
+      }
+    }
+    return new ZephyrError(message);
+  }
+  
   private static String serializeWalletConfig(ZephyrWalletConfig config) {
     Map<String, Object> configMap = JsonUtils.toMap(config);
+    if (config.getServerUri() != null) configMap.put("serverUri", withDefaultPort(config.getServerUri())); // the caller's config is not changed
     configMap.put("networkType", config.getNetworkType().ordinal());
     return JsonUtils.serialize(configMap);
   }
@@ -369,7 +418,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     try {
       return getDaemonMaxPeerHeightJni();
     } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      throw daemonError(e);
     }
   }
   
@@ -383,7 +432,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     try {
       return isDaemonSyncedJni();
     } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      throw daemonError(e);
     }
   }
   
@@ -469,14 +518,23 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     return isViewOnlyJni();
   }
   
+  /**
+   * Set the wallet's daemon connection. An {@code http} or {@code https} URI without a port gets
+   * the scheme's default port (80 or 443) before it reaches the native core, which would otherwise
+   * connect to port 0; {@link #getDaemonConnection()} then reports the URI with that port. For an
+   * {@code https} URI, {@link ZephyrTls} applies its root certificates first when they are due.
+   *
+   * @param daemonConnection the daemon connection, or null to disconnect
+   */
   @Override
   public void setDaemonConnection(ZephyrRpcConnection daemonConnection) {
     assertNotClosed();
     if (daemonConnection == null) setDaemonConnectionJni("", "", "");
     else {
-      beforeDaemonUri(daemonConnection.getUri());
+      String uri = withDefaultPort(daemonConnection.getUri() == null ? "" : daemonConnection.getUri());
+      beforeDaemonUri(uri);
       try {
-        setDaemonConnectionJni(daemonConnection.getUri() == null ? "" : daemonConnection.getUri().toString(), daemonConnection.getUsername(), daemonConnection.getPassword());
+        setDaemonConnectionJni(uri, daemonConnection.getUsername(), daemonConnection.getPassword());
       } catch (Exception e) {
         throw new ZephyrError(e.getMessage());
       }
@@ -610,7 +668,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     try {
       return getDaemonHeightJni();
     } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      throw daemonError(e);
     }
   }
   
@@ -637,7 +695,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       Object[] results = syncJni(startHeight);
       return new ZephyrSyncResult((long) results[0], (boolean) results[1]);
     } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      throw daemonError(e);
     } finally {
       if (listener != null) removeListener(listener); // unregister listener
     }
@@ -649,7 +707,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     try {
       startSyncingJni(syncPeriodInMs == null ? DEFAULT_SYNC_PERIOD_IN_MS : syncPeriodInMs);
     } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      throw daemonError(e);
     }
   }
   
@@ -670,7 +728,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     try {
       scanTxsJni(txMetadatasArr);
     } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      throw daemonError(e);
     }
   }
   
@@ -680,7 +738,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     try {
       rescanSpentJni();
     } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      throw daemonError(e);
     }
   }
 
@@ -690,7 +748,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     try {
       rescanBlockchainJni();
     } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      throw daemonError(e);
     }
   }
 

@@ -669,12 +669,45 @@ public class TestZephyrIntegration {
         boolean connected = w.isConnectedToDaemon();
         log("TLS with an empty CA file: isConnectedToDaemon() " + connected);
         assertFalse(connected, "connected to the https node with an empty CA file");
+        ZephyrError e = assertThrows(ZephyrError.class, () -> w.sync());
+        log("TLS with an empty CA file: sync() threw: " + e.getMessage());
+        assertEquals("Wallet is not connected to daemon: the node is an https node; its certificate may not be trusted (see ZephyrTls and the user guide, chapter 6)", e.getMessage());
       } finally {
         w.close();
         walletClosed();
       }
     } finally {
       ZephyrTls.setCaFile(null);
+    }
+  }
+
+  /**
+   * 18: the https uri without its port gets 443 (the core would connect to port 0 and hang), and
+   * getDaemonConnection() reports it with the port. Runs only for a uri that ends with ":443".
+   */
+  @Test
+  @Order(18)
+  public void testTlsDefaultPort() {
+    assumeTls();
+    Assumptions.assumeTrue(TLS_URI.endsWith(":443"), "zephyr.daemon.uri.tls does not end with :443");
+    String withoutPort = TLS_URI.substring(0, TLS_URI.length() - 4);
+    long start = System.currentTimeMillis();
+    ZephyrWalletFull w = ZephyrWalletFull.createWallet(new ZephyrWalletConfig()
+        .setNetworkType(ZephyrNetworkType.MAINNET)
+        .setPassword("tls-test")
+        .setServerUri(withoutPort));
+    walletOpened();
+    try {
+      boolean connected = w.isConnectedToDaemon();
+      log("TLS uri without a port: created and checked in " + (System.currentTimeMillis() - start) + " ms, isConnectedToDaemon() " + connected);
+      assertTrue(connected, "not connected with the uri without a port");
+      assertEquals(TLS_URI, w.getDaemonConnection().getUri(), "getDaemonConnection() reports the default port");
+      w.setDaemonConnection(new ZephyrRpcConnection(withoutPort));
+      assertTrue(w.isConnectedToDaemon(), "not connected after setDaemonConnection without a port");
+      assertEquals(TLS_URI, w.getDaemonConnection().getUri());
+    } finally {
+      w.close();
+      walletClosed();
     }
   }
 
