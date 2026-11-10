@@ -295,6 +295,10 @@ Maven version is the same without the `v`.
 Derived from monero-java by woodser (MIT), whose copyright notices are kept in the source files.
 zephyr-java is MIT licensed as well; see `LICENCE.txt`.
 
+Third-party data: the root certificates shipped in the library (`zephyr/common/cacert.pem`) are
+Mozilla's CA list in curl's PEM form, under the Mozilla Public License 2.0
+(<https://www.mozilla.org/MPL/2.0/>), from <https://curl.se/docs/caextract.html>.
+
 ## Security
 
 Vulnerabilities in the Zephyr core (zephyr, zephyr-cpp, `wallet2`) go to the ZephyrProtocol team.

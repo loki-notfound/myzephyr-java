@@ -5,6 +5,33 @@ plugins {
     `maven-publish`
 }
 
+// zephyr-java.properties as the Maven build filters it (src/main/resources is filtered there):
+// ${project.version} becomes VERSION_NAME, the only property it uses; ZephyrUtils.getVersion() and
+// ZephyrTls.getShippedCertificatesDate() read the file
+abstract class ZephyrJavaProperties : DefaultTask() {
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val template: RegularFileProperty
+
+    @get:Input
+    abstract val version: Property<String>
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun generate() {
+        val text = template.get().asFile.readText(Charsets.UTF_8).replace("\${project.version}", version.get())
+        outputDir.get().file("zephyr-java.properties").asFile.writeText(text, Charsets.UTF_8)
+    }
+}
+
+val zephyrJavaProperties = tasks.register<ZephyrJavaProperties>("zephyrJavaProperties") {
+    template.set(layout.projectDirectory.file("../src/main/resources/zephyr-java.properties"))
+    version.set(providers.gradleProperty("VERSION_NAME"))
+    outputDir.set(layout.buildDirectory.dir("generated/zephyr-java-resources"))
+}
+
 android {
     namespace = "io.github.lokinotfound.zephyrjava"
     compileSdk = 36
@@ -18,6 +45,9 @@ android {
     sourceSets["main"].java.srcDirs("../src/main/java")
     // arm64-v8a, armeabi-v7a, x86_64 from bin/build_android.sh (16 KB aligned at link time)
     sourceSets["main"].jniLibs.srcDirs("../build/android")
+    // Java resources in the AAR's classes.jar: the shipped root certificates, byte for byte
+    // (zephyr/common/cacert.pem); zephyr-java.properties comes from the task above
+    sourceSets["main"].resources.srcDirs("../src/main/resources-raw")
 
     packaging {
         // store the libraries uncompressed and page aligned in the APK, loaded in place
@@ -33,6 +63,12 @@ android {
         singleVariant("release") {
             withSourcesJar()
         }
+    }
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.sources.resources?.addGeneratedSourceDirectory(zephyrJavaProperties, ZephyrJavaProperties::outputDir)
     }
 }
 

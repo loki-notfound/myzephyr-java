@@ -137,6 +137,12 @@
 				<filtering>true</filtering>
 			</resource>
 			<resource>
+				<!-- data that must reach the JAR byte for byte, never filtered: the shipped root
+				     certificates (zephyr/common/cacert.pem, bin/ca-bundle.env) -->
+				<directory>src/main/resources-raw</directory>
+				<filtering>false</filtering>
+			</resource>
+			<resource>
 				<!-- native libraries for the JAR, placed by bin/build_libzephyr_java.sh as
 				     <os>-<arch>/libzephyr-java.so; skipped when absent; never filtered (binary) -->
 				<directory>${project.build.directory}/natives</directory>
