@@ -59,7 +59,8 @@ import javax.net.ssl.X509TrustManager;
  * not match the URI is refused: the core checks the name. The app's Network Security Configuration
  * does not apply to the native wallet.</p>
  *
- * <p>All members are static and synchronized.</p>
+ * <p>All members are static. Those that read or change the configuration are synchronized; a
+ * download holds the lock only while it reads the configuration, not during the connection.</p>
  */
 public final class ZephyrTls {
 
@@ -251,7 +252,7 @@ public final class ZephyrTls {
    * @return the number of certificates in the downloaded file
    * @throws ZephyrError if anything fails; an existing target is then left untouched
    */
-  public static synchronized int downloadCertificates(File target) {
+  public static int downloadCertificates(File target) {
     try {
       return downloadCertificates(new URL(DOWNLOAD_URL), target, null);
     } catch (java.net.MalformedURLException e) {
@@ -291,18 +292,23 @@ public final class ZephyrTls {
    * @return the number of certificates in the downloaded file
    * @throws ZephyrError if anything fails; an existing target is then left untouched
    */
-  public static synchronized int downloadCertificates(URL source, File target, String expectedSha256) {
+  public static int downloadCertificates(URL source, File target, String expectedSha256) {
     if (source == null) throw new ZephyrError("No source URL given");
     if (target == null) throw new ZephyrError("No target file given");
     if (!"https".equalsIgnoreCase(source.getProtocol())) throw new ZephyrError("The root certificates are downloaded over https only, not " + source);
     if (expectedSha256 != null && !expectedSha256.matches("[0-9a-fA-F]{64}")) throw new ZephyrError("Not a sha256 in hex: " + expectedSha256);
     try {
-      // trust exactly what apply() would write under the current configuration
+      // trust exactly what apply() would write under the current configuration; the lock is held
+      // only while the configuration is read
+      List<byte[]> roots;
+      synchronized (ZephyrTls.class) {
+        roots = bundle();
+      }
       KeyStore store = KeyStore.getInstance(KeyStore.getDefaultType());
       store.load(null);
       CertificateFactory factory = CertificateFactory.getInstance("X.509");
       int i = 0;
-      for (byte[] der : bundle()) store.setCertificateEntry("root-" + (i++), factory.generateCertificate(new ByteArrayInputStream(der)));
+      for (byte[] der : roots) store.setCertificateEntry("root-" + (i++), factory.generateCertificate(new ByteArrayInputStream(der)));
       TrustManagerFactory trust = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
       trust.init(store);
       SSLContext context = SSLContext.getInstance("TLS");
@@ -371,17 +377,17 @@ public final class ZephyrTls {
 
   private static native void setEnvJni(String name, String value);
 
-  private static synchronized String hex(byte[] bytes) {
+  private static String hex(byte[] bytes) {
     StringBuilder out = new StringBuilder(bytes.length * 2);
     for (byte b : bytes) out.append(Character.forDigit((b >> 4) & 15, 16)).append(Character.forDigit(b & 15, 16));
     return out.toString();
   }
 
-  private static synchronized boolean isAndroid() {
+  private static boolean isAndroid() {
     return "Dalvik".equals(System.getProperty("java.vm.name"));
   }
 
-  private static synchronized ZephyrError error(String message, Throwable cause) {
+  private static ZephyrError error(String message, Throwable cause) {
     ZephyrError err = new ZephyrError(message + ": " + cause);
     err.initCause(cause);
     return err;
@@ -452,7 +458,7 @@ public final class ZephyrTls {
   }
 
   /** The certificates of a PEM text, DER, in their order; throws when a block is not a certificate. */
-  private static synchronized List<byte[]> parseCertificates(byte[] pem, String source) {
+  private static List<byte[]> parseCertificates(byte[] pem, String source) {
     List<byte[]> out = new ArrayList<byte[]>();
     String text;
     try {
@@ -485,7 +491,7 @@ public final class ZephyrTls {
   }
 
   /** Decodes base64 between from and to; whitespace is skipped, anything else outside the alphabet is an error. */
-  private static synchronized byte[] base64Decode(String text, int from, int to) {
+  private static byte[] base64Decode(String text, int from, int to) {
     StringBuilder chars = new StringBuilder(to - from);
     for (int i = from; i < to; i++) {
       char c = text.charAt(i);
@@ -519,7 +525,7 @@ public final class ZephyrTls {
   }
 
   /** Encodes base64 with lines of 64 characters, each ended by a newline. */
-  private static synchronized String base64Encode(byte[] data) {
+  private static String base64Encode(byte[] data) {
     StringBuilder out = new StringBuilder((data.length + 2) / 3 * 4 + data.length / 48 + 2);
     int line = 0;
     for (int i = 0; i < data.length; i += 3) {
@@ -541,7 +547,7 @@ public final class ZephyrTls {
     return out.toString();
   }
 
-  private static synchronized byte[] writePem(List<byte[]> certs) throws IOException {
+  private static byte[] writePem(List<byte[]> certs) throws IOException {
     StringBuilder out = new StringBuilder();
     for (byte[] der : certs) {
       out.append(BEGIN).append('\n').append(base64Encode(der)).append(END).append('\n');
@@ -550,7 +556,7 @@ public final class ZephyrTls {
   }
 
   /** Reads a stream to its end; with a limit of 0 or more, more bytes than the limit is an error. */
-  private static synchronized byte[] readAll(InputStream in, int limit) throws IOException {
+  private static byte[] readAll(InputStream in, int limit) throws IOException {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     byte[] buffer = new byte[8192];
     for (int n = in.read(buffer); n >= 0; n = in.read(buffer)) {
@@ -597,7 +603,7 @@ public final class ZephyrTls {
     return empty;
   }
 
-  private static synchronized void writeAtomically(File target, byte[] data) throws IOException {
+  private static void writeAtomically(File target, byte[] data) throws IOException {
     File tmp = File.createTempFile(target.getName() + ".", ".tmp", target.getParentFile());
     boolean done = false;
     try {

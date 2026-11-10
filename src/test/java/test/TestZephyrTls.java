@@ -237,4 +237,43 @@ public class TestZephyrTls {
     assertThrows(ZephyrError.class, () -> ZephyrTls.downloadCertificates(new URL("https://curl.se/ca/cacert.pem"), target, "not a hash"));
     assertEquals(0, target.length(), "the target is untouched");
   }
+
+  /**
+   * A download does not hold the ZephyrTls lock while it connects: a local server accepts and never
+   * answers, so the download blocks in the TLS handshake; meanwhile the lock is free. Offline, no
+   * key material.
+   */
+  @Test
+  @Order(9)
+  public void testDownloadDoesNotHoldTheLock() throws Exception {
+    File target = new File(System.getProperty("java.io.tmpdir"), "zephyr-java-download-lock-" + System.nanoTime() + ".pem");
+    target.deleteOnExit();
+    try (java.net.ServerSocket server = new java.net.ServerSocket(0, 1, java.net.InetAddress.getByName("127.0.0.1"))) {
+      server.setSoTimeout(20000);
+      URL url = new URL("https://127.0.0.1:" + server.getLocalPort() + "/");
+      Throwable[] outcome = new Throwable[1];
+      Thread download = new Thread(() -> {
+        try {
+          ZephyrTls.downloadCertificates(url, target, null);
+        } catch (Throwable t) {
+          outcome[0] = t;
+        }
+      });
+      download.start();
+      try (java.net.Socket accepted = server.accept()) { // the download is connected and waits in the handshake
+        Thread.sleep(500);
+        assertTrue(download.isAlive(), "the download ended before the test");
+        long start = System.nanoTime();
+        assertEquals(ZephyrTls.getShippedCertificatesDate(), ZephyrTls.getShippedCertificatesDate());
+        ZephyrTls.beforeNativeConnection("http://x");
+        long ms = (System.nanoTime() - start) / 1000000;
+        assertTrue(ms < 2000, "the ZephyrTls calls took " + ms + " ms while a download was connecting");
+        assertTrue(download.isAlive(), "the download ended before the socket was closed");
+      }
+      download.join(20000);
+      assertFalse(download.isAlive(), "the download did not end after the socket was closed");
+      assertTrue(outcome[0] instanceof ZephyrError, "the download ended with " + outcome[0]);
+      assertFalse(target.exists(), "a target was written");
+    }
+  }
 }
