@@ -118,15 +118,37 @@ string strip_last_char(const string& str) {
 }
 
 // credit: https://stackoverflow.com/questions/41820039/jstringjni-to-stdstringc-with-utf8-characters
+// When a JNI call throws, returns "" with the Java exception pending: the caller checks
+// env->ExceptionCheck() before its next JNI call.
 std::string jstring2string(JNIEnv *env, jstring jStr) {
   if (!jStr) return "";
 
   const jclass stringClass = env->GetObjectClass(jStr);
   const jmethodID getBytes = env->GetMethodID(stringClass, "getBytes", "(Ljava/lang/String;)[B");
-  const jbyteArray stringJbytes = (jbyteArray) env->CallObjectMethod(jStr, getBytes, env->NewStringUTF("UTF-8"));
+  if (getBytes == nullptr) { // NoSuchMethodError pending
+    env->DeleteLocalRef(stringClass);
+    return "";
+  }
+  const jstring charsetName = env->NewStringUTF("UTF-8");
+  if (charsetName == nullptr) { // OutOfMemoryError pending
+    env->DeleteLocalRef(stringClass);
+    return "";
+  }
+  const jbyteArray stringJbytes = (jbyteArray) env->CallObjectMethod(jStr, getBytes, charsetName);
+  env->DeleteLocalRef(charsetName);
+  if (env->ExceptionCheck() || stringJbytes == nullptr) {
+    if (stringJbytes) env->DeleteLocalRef(stringJbytes);
+    env->DeleteLocalRef(stringClass);
+    return "";
+  }
 
   size_t length = (size_t) env->GetArrayLength(stringJbytes);
   jbyte* pBytes = env->GetByteArrayElements(stringJbytes, NULL);
+  if (pBytes == nullptr) { // OutOfMemoryError pending
+    env->DeleteLocalRef(stringJbytes);
+    env->DeleteLocalRef(stringClass);
+    return "";
+  }
 
   std::string ret = std::string((char *)pBytes, length);
   env->ReleaseByteArrayElements(stringJbytes, pBytes, JNI_ABORT);
@@ -342,7 +364,9 @@ JNIEXPORT jstring JNICALL Java_zephyr_common_ZephyrUtils_getIntegratedAddressJni
 
   // convert jstrings to strings
   string standard_address = jstring2string(env, jstandard_address);
+  if (env->ExceptionCheck()) return 0;
   string payment_id = jstring2string(env, jpayment_id);
+  if (env->ExceptionCheck()) return 0;
 
   // get integrated address
   try {
@@ -358,6 +382,7 @@ JNIEXPORT void JNICALL Java_zephyr_common_ZephyrUtils_validateAddressJni(JNIEnv 
 
   // convert jstring to string
   string address = jstring2string(env, jaddress);
+  if (env->ExceptionCheck()) return;
 
   // validate address with the core
   try {
@@ -371,6 +396,7 @@ JNIEXPORT jbyteArray JNICALL Java_zephyr_common_ZephyrUtils_jsonToBinaryJni(JNIE
 
   // convert json jstring to string
   string json_str = jstring2string(env, json);
+  if (env->ExceptionCheck()) return 0;
 
   // convert json to monero's portable storage binary format
   string bin_str;
