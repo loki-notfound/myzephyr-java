@@ -8,6 +8,10 @@
 #                release_set_members (RELEASE_SET_MEMBERS: name, tag, sha of every member; the
 #                zephyr and zephyr-cpp members must equal the pins)
 #   patches      every build-layer patch under patches/depends/: file name and sha256
+#   root_certificates
+#                the root certificates shipped in the library (bin/ca-bundle.env): date, URL and
+#                sha256 of curl's dated file; an error when the committed
+#                src/main/resources-raw/zephyr/common/cacert.pem has another sha256
 #   toolchain    gcc, aarch64-linux-gnu-g++, binutils, glibc, cmake, JDK ($JAVA_HOME) and Maven
 #                of the environment this script runs in, the packaging environment: the pinned
 #                image for a release (packaging_env "container", packaging_container the image
@@ -292,6 +296,12 @@ def main():
         previous_release = {"version": prev["PREV_VERSION"],
                             "site_archive_sha256": prev["PREV_SITE_SHA256"]}
     patches_dir = os.path.join(ROOT, "patches/depends")
+    ca = shell_vars("bin/ca-bundle.env")
+    ca_file = "src/main/resources-raw/zephyr/common/cacert.pem"
+    if sha256(os.path.join(ROOT, ca_file)) != ca["CA_BUNDLE_SHA256"]:
+        sys.exit(f"{ca_file} does not have the sha256 of bin/ca-bundle.env")
+    root_certificates = {"date": ca["CA_BUNDLE_DATE"], "url": ca["CA_BUNDLE_URL"],
+                         "sha256": ca["CA_BUNDLE_SHA256"]}
     artifacts = []
     for name in sorted(os.listdir(dist)):
         path = os.path.join(dist, name)
@@ -319,6 +329,7 @@ def main():
         },
         "patches": [{"name": n, "sha256": sha256(os.path.join(patches_dir, n))}
                     for n in sorted(os.listdir(patches_dir)) if n.endswith(".patch")],
+        "root_certificates": root_certificates,
         "toolchain": toolchain(),
         "previous_release": previous_release,
         "depends": depends_packages(),

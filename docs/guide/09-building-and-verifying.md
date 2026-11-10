@@ -131,6 +131,7 @@ Two builds from the same commit give the same files:
 | `core` | zephyr and zephyr-cpp: repository URL, tag, commit; `release_set` (the zephyr-backports release set, `2026-11-07`) and `release_set_members` (name, tag, commit of each member) |
 | `depends` | every package of zephyr's depends: archive name, version, sha256 |
 | `patches` | the build-layer patches: name, sha256 |
+| `root_certificates` | the shipped root certificates: date, URL and sha256 of curl's dated file |
 | `toolchain` | gcc, binutils, CMake, glibc, JDK and Maven of the packaging environment (`packaging_env`, `packaging_container`), NDK (version and sha256) and its clang, Android Gradle plugin, Gradle (distribution and sha256), compile and min SDK, build-tools, the Android SDK package revisions; per Linux native its compiler, glibc and container; per Android native its NDK, clang, API level, build path and container |
 | `zephyr_java` | the commit, its `SOURCE_DATE_EPOCH`, the version |
 | `artifacts` | every release file with its size and sha256 |
@@ -153,7 +154,7 @@ To check a release you downloaded:
 
 ```sh
 gpg --import KEYS.asc
-git verify-tag v2.3.0-sec.2-java.3                      # in a clone of this repository
+git verify-tag v2.3.0-sec.2-java.4                      # in a clone of this repository
 gpg --verify SHA256SUMS.asc && sha256sum -c SHA256SUMS  # in the directory of the release files
 ```
 

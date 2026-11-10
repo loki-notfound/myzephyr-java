@@ -7,6 +7,103 @@ A release's date is the date of its signed tag and of its GitHub release.
 **Not affiliated with ZephyrProtocol.** An independent project. Report Zephyr vulnerabilities to the
 ZephyrProtocol team, not here.
 
+## v2.3.0-sec.2-java.4
+
+The fourth release on the same core as `v2.3.0-sec.2-java.1`: `https://` nodes work on Android,
+with root certificates shipped in the library, and a daemon URI without a port works. No breaking
+change.
+
+### Built from
+
+The same zephyr-backports release set of 2026-11-07 as the previous releases, unchanged:
+
+| | Tag | Commit | Tag subject |
+|---|---|---|---|
+| zephyr | `v2.3.0-sec.2` | `8c6a120256b4bd887d6e7167d929d76e3507e0e5` | zephyr v2.3.0 + 30 security backports from Monero |
+| zephyr-cpp | `v2.3.0-sec.1` | `3a2ee602ee28e6b7941b617ad4706349ad992641` | zephyr-cpp master (4a99272f6d7a171cf6625016939094637459975a) + 4 security backports from monero-cpp |
+
+New build inputs: the root certificates of 2026-11-05 (Mozilla's list as curl publishes it,
+`https://curl.se/ca/cacert-2026-11-05.pem`, 118 certificates, sha256
+`427c064216761a1e72a8b30f0d954d08cb6e4435a82091fb865afd20c8497285`), and the build-layer patch
+`0006-openssl-android-environment` (guide chapter 9).
+
+### Fixed
+
+- `https://` nodes on Android. The native wallet could not verify any `https://` node there:
+  OpenSSL ignored `SSL_CERT_FILE` and `SSL_CERT_DIR` in an app process, because it asked
+  `getauxval(AT_SECURE)`, which is set in every app process. The build now patches OpenSSL to
+  compare the user and group ids, as on every platform without `getauxval`.
+- **Correction:** in `v2.3.0-sec.2-java.1` to `v2.3.0-sec.2-java.3` the guide, the README and
+  these notes told Android apps to set `SSL_CERT_FILE` or `SSL_CERT_DIR`. That had no effect on
+  Android, so `https://` nodes could not be used there. On the JVM the variables worked, and they
+  still work when `ZephyrTls` is not used.
+- A daemon URI without a port: the core connected to port 0 and blocked for minutes without an
+  error. An `http` or `https` URI without a port now gets the scheme's default port (80, 443).
+- `ZephyrUtils.getVersion()` returned "unknown" on Android: the AAR did not carry
+  `zephyr-java.properties`. It does now.
+- A daemon URI whose scheme was not written in lower case (`HTTPS://…`) was spoken in clear text
+  by the core; the scheme now reaches the core in lower case.
+
+### Added
+
+- `zephyr.common.ZephyrTls`: the root certificates the native wallet trusts for `https://` nodes.
+  By default the root certificates shipped in the library and nothing else, applied automatically
+  on Android before the first `https://` connection of a wallet (unless the environment already
+  names `SSL_CERT_FILE` or `SSL_CERT_DIR`); the system store, the user's certificates, the app's
+  own certificates and one exact file are options. Nothing changes on the desktop JVM unless the
+  application calls `ZephyrTls`.
+- The shipped root certificates (`zephyr/common/cacert.pem`, Mozilla Public License 2.0), renewed
+  with each release.
+- `ZephyrTls.downloadCertificates`, opt-in: fetches the current root certificates from curl.se
+  (or another `https` source, optionally checked by sha256) for apps that want them before the
+  next release. The library never calls it.
+
+### Changed
+
+- `ZephyrWalletFull.getDaemonConnection()` reports the URI with the default port when it was set
+  without one.
+- When a call that needs the node fails with "Wallet is not connected to daemon" and the daemon
+  URI is `https://`, the message adds ": the node is an https node; its certificate may not be
+  trusted (see ZephyrTls and the user guide, chapter 6)". `isConnectedToDaemon()` is unchanged.
+- The JNI bridge checks for a pending Java exception after the calls that convert strings, so
+  `-Xcheck:jni` reports no "JNI call made without checking exceptions" warnings any more.
+
+### Documentation
+
+- Guide chapter 6 "TLS to a node" rewritten (`ZephyrTls`, the shipped certificates, a private CA,
+  the download, what cannot be done, the port); chapters 2, 8 and 9 and the README follow.
+
+### Tested
+
+- On the JVM (Linux) against a mainnet node behind a publicly signed certificate: a wallet
+  without any `ZephyrTls` call connects through the host's store; with the shipped certificates
+  applied it connects and reads the daemon height; with an empty CA file it does not connect,
+  and `sync()` throws the error with the TLS hint; a URI without a port connects on 443; the
+  download returns 118 certificates, a wrong checksum leaves the target untouched. Unit and
+  integration tests under `-Xcheck:jni`: no warning.
+- On the Android emulator (`x86_64`), with this release's AAR in debug builds (CheckJNI on), on
+  API 24 (with and without core library desugaring) and on API 35 with 16 KB pages: the checks of
+  `java.3`, and `https://` to a mainnet node without any setup and with a URI without a port
+  (connected, a restored wallet synced over TLS, reopened from its bytes) and, on API 24 without
+  desugaring and on API 35, with the scheme written `HTTPS://` (connected, reported as
+  `https://`); the system store alone (connected on API 35; on API 24 not, with the TLS hint);
+  exactly one file (an empty file refused, ISRG Root X1 alone accepted); the download of the
+  current root certificates. The ARM libraries have not yet run on hardware.
+
+### The dependency
+
+Android: `io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.4`; the JVM:
+`io.github.loki-notfound:zephyr-java:2.3.0-sec.2-java.4`. The repository line, the `packaging`
+line and the dependencies are those of the earlier releases; guide chapter 6 says where they go.
+
+### Verification
+
+```sh
+gpg --import KEYS.asc
+git verify-tag v2.3.0-sec.2-java.4
+gpg --verify SHA256SUMS.asc && sha256sum -c SHA256SUMS
+```
+
 ## v2.3.0-sec.2-java.3
 
 The third release on the same core as `v2.3.0-sec.2-java.1`: a fix in the JNI bridge for

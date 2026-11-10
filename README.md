@@ -16,7 +16,7 @@ ZephyrProtocol team, not here.
 
 ## Status
 
-The current release is `v2.3.0-sec.2-java.3`, built from the zephyr-backports release set of
+The current release is `v2.3.0-sec.2-java.4`, built from the zephyr-backports release set of
 2026-11-07: zephyr `v2.3.0-sec.2` and zephyr-cpp `v2.3.0-sec.1`.
 
 What works:
@@ -58,7 +58,7 @@ dependencyResolutionManagement {
 
 ```kotlin
 dependencies {
-    implementation("io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.3")
+    implementation("io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.4")
 }
 ```
 
@@ -90,7 +90,7 @@ Desktop and server (Maven), the JAR with the Linux natives:
 <dependency>
   <groupId>io.github.loki-notfound</groupId>
   <artifactId>zephyr-java</artifactId>
-  <version>2.3.0-sec.2-java.3</version>
+  <version>2.3.0-sec.2-java.4</version>
 </dependency>
 ```
 
@@ -246,9 +246,9 @@ git submodule update --init external/zephyr-cpp
   debug symbols, `manifest.json` and `SHA256SUMS`.
 
 `manifest.json` records the backports tags and shas, the zephyr-java commit and its
-`SOURCE_DATE_EPOCH`, every depends package with its sha256, the build-layer patches, the
-toolchain versions and the sha256 of every artifact. Chapter 9 of the guide has the details and
-the steps to reproduce a release.
+`SOURCE_DATE_EPOCH`, every depends package with its sha256, the build-layer patches, the shipped
+root certificates, the toolchain versions and the sha256 of every artifact. Chapter 9 of the
+guide has the details and the steps to reproduce a release.
 
 ## Verifying a release
 
@@ -263,7 +263,7 @@ release:
 
 ```sh
 gpg --import KEYS.asc
-git verify-tag v2.3.0-sec.2-java.3
+git verify-tag v2.3.0-sec.2-java.4
 gpg --verify SHA256SUMS.asc && sha256sum -c SHA256SUMS
 ```
 

@@ -28,7 +28,7 @@ android {
 }
 
 dependencies {
-    implementation("io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.3")
+    implementation("io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.4")
 }
 ```
 
@@ -55,7 +55,7 @@ android {
 }
 
 dependencies {
-    implementation 'io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.3'
+    implementation 'io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.4'
 }
 ```
 
@@ -64,7 +64,7 @@ With a version catalog, `gradle/libs.versions.toml` gets the entry and the modul
 
 ```toml
 [versions]
-zephyrJava = "2.3.0-sec.2-java.3"
+zephyrJava = "2.3.0-sec.2-java.4"
 
 [libraries]
 zephyr-java-android = { module = "io.github.loki-notfound:zephyr-java-android", version.ref = "zephyrJava" }
@@ -131,7 +131,10 @@ android {
 API 24 and on API 35 with 16 KB pages, in debug builds (so under ART's CheckJNI): the library
 loads and validates addresses natively, an offline wallet works, a wallet restored from its
 mnemonic syncs against a mainnet node and opens again from its bytes, and `ZephyrDaemonRpc` reads
-the node (on API 24 with desugaring). The `arm64-v8a` and `armeabi-v7a` libraries are built and
+the node (on API 24 with desugaring). `https://` to a mainnet node with a publicly signed
+certificate works there without setup (the shipped root certificates), on API 24 and on API 35
+with 16 KB pages; with the system store alone it works on API 35 and fails on API 24, which lacks
+ISRG Root X1. The `arm64-v8a` and `armeabi-v7a` libraries are built and
 checked the same way (exports, page alignment, packaging) but have **not yet run on hardware**.
 
 ## The RPC classes below API 26
@@ -360,7 +363,9 @@ name. The app's Network Security Configuration does not apply to the native wall
 
 **The port.** A URI without a port gets the scheme's default (443 for `https://`, 80 for
 `http://`); `getDaemonConnection()` then reports the URI with the port. (In `java.1` to `java.3`
-the core connected to port 0 and blocked for minutes.)
+the core connected to port 0 and blocked for minutes.) A scheme written in another case
+(`HTTPS://`) reaches the core in lower case: the core switches TLS on only for a lowercase
+`https`, and in `java.1` to `java.3` such a URI was spoken in clear text.
 
 **When verification fails**, `isConnectedToDaemon()` returns false, and a call that needs the node
 (`sync()`, `getDaemonHeight()` and the like) throws "Wallet is not connected to daemon: the node is
