@@ -68,7 +68,8 @@ import zephyr.wallet.model.ZephyrWalletListener;
  *   <li>{@code zephyr.wallet.rpc.bin}: a zephyr-wallet-rpc binary (test 11);</li>
  *   <li>{@code zephyr.view.address}, {@code zephyr.view.key}, {@code zephyr.view.height}: a view-only
  *       wallet with history (test 10);</li>
- *   <li>{@code zephyr.daemon.uri.tls}: the node's {@code https://} uri, for the TLS tests 13 to 15.
+ *   <li>{@code zephyr.daemon.uri.tls}: the node's {@code https://} uri, for the TLS tests 13 to 15,
+ *       18 and 19.
  *       They change the process environment ({@link ZephyrTls}) and run in a JVM of their own:
  *       {@code -Dtest='TestZephyrIntegration#testTls*'}; in a run where another test has opened
  *       a wallet they skip;</li>
@@ -706,6 +707,41 @@ public class TestZephyrIntegration {
       assertTrue(w.isConnectedToDaemon(), "not connected after setDaemonConnection without a port");
       assertEquals(TLS_URI, w.getDaemonConnection().getUri());
     } finally {
+      w.close();
+      walletClosed();
+    }
+  }
+
+  /**
+   * 19: the https uri with its scheme written "HTTPS://" (the core switches TLS on only for a
+   * lowercase "https"): connected, reported with "https://", and refused with an empty CA file, so
+   * the certificate is verified (TLS is on).
+   */
+  @Test
+  @Order(19)
+  public void testTlsUpperCaseScheme() throws Exception {
+    assumeTls();
+    String upper = "HTTPS://" + TLS_URI.substring("https://".length());
+    ZephyrWalletFull w = ZephyrWalletFull.createWallet(new ZephyrWalletConfig()
+        .setNetworkType(ZephyrNetworkType.MAINNET)
+        .setPassword("tls-test")
+        .setServerUri(upper));
+    walletOpened();
+    File empty = File.createTempFile("zephyr-java-empty", ".pem");
+    empty.deleteOnExit();
+    try {
+      boolean connected = w.isConnectedToDaemon();
+      String reported = w.getDaemonConnection().getUri();
+      log("TLS uri with HTTPS://: isConnectedToDaemon() " + connected + ", reported scheme " + reported.substring(0, reported.indexOf("://")));
+      assertTrue(connected, "not connected with the scheme written HTTPS://");
+      assertTrue(reported.startsWith("https://"), "the connection is not reported with https://");
+      ZephyrTls.setCaFile(empty);
+      w.setDaemonConnection(new ZephyrRpcConnection(upper));
+      boolean withEmpty = w.isConnectedToDaemon();
+      log("TLS uri with HTTPS:// and an empty CA file: isConnectedToDaemon() " + withEmpty);
+      assertFalse(withEmpty, "connected with HTTPS:// and an empty CA file: the certificate was not verified");
+    } finally {
+      ZephyrTls.setCaFile(null);
       w.close();
       walletClosed();
     }

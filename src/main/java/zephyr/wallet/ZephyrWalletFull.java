@@ -292,7 +292,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     if (Boolean.TRUE.equals(config.getSaveCurrent() != null)) throw new ZephyrError("Cannot save current wallet when creating full wallet");
     
     // the native side receives the server URI with the config (createWalletJni)
-    beforeDaemonUri(withDefaultPort(config.getServerUri()));
+    beforeDaemonUri(daemonUriForCore(config.getServerUri()));
     
     // create wallet
     if (config.getMnemonic() != null) {
@@ -345,6 +345,28 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   }
   
   /**
+   * A daemon URI as it is handed to the native core: an http or https scheme in lower case (the
+   * core switches TLS on only for a URI that starts with lowercase "https", so "HTTPS://" would
+   * be spoken in clear text), then the scheme's default port when there is none.
+   */
+  private static String daemonUriForCore(String uri) {
+    return withDefaultPort(withLowerCaseScheme(uri));
+  }
+  
+  /**
+   * An http or https scheme written in any other case, in lower case; nothing else of the URI
+   * changes, and anything else goes through unchanged.
+   */
+  private static String withLowerCaseScheme(String uri) {
+    if (uri == null) return null;
+    int colon = uri.indexOf("://");
+    if (colon != 4 && colon != 5) return uri;
+    String scheme = uri.substring(0, colon);
+    if (!scheme.equalsIgnoreCase("http") && !scheme.equalsIgnoreCase("https")) return uri;
+    return scheme.toLowerCase(java.util.Locale.ROOT) + uri.substring(colon);
+  }
+  
+  /**
    * The scheme's default port (80 for http, 443 for https) for a URI without one: the core
    * connects to port 0 otherwise and blocks for minutes. Everything else (another scheme, a port,
    * no host, a URI that does not parse, null) goes through unchanged; user info, IPv6 literals,
@@ -392,7 +414,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   
   private static String serializeWalletConfig(ZephyrWalletConfig config) {
     Map<String, Object> configMap = JsonUtils.toMap(config);
-    if (config.getServerUri() != null) configMap.put("serverUri", withDefaultPort(config.getServerUri())); // the caller's config is not changed
+    if (config.getServerUri() != null) configMap.put("serverUri", daemonUriForCore(config.getServerUri())); // the caller's config is not changed
     configMap.put("networkType", config.getNetworkType().ordinal());
     return JsonUtils.serialize(configMap);
   }
@@ -521,7 +543,9 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   /**
    * Set the wallet's daemon connection. An {@code http} or {@code https} URI without a port gets
    * the scheme's default port (80 or 443) before it reaches the native core, which would otherwise
-   * connect to port 0; {@link #getDaemonConnection()} then reports the URI with that port. For an
+   * connect to port 0; {@link #getDaemonConnection()} then reports the URI with that port. An
+   * {@code http} or {@code https} scheme in another case ({@code HTTPS://}) reaches the core in
+   * lower case, since the core switches TLS on only for a lowercase {@code https}. For an
    * {@code https} URI, {@link ZephyrTls} applies its root certificates first when they are due.
    *
    * @param daemonConnection the daemon connection, or null to disconnect
@@ -531,7 +555,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     assertNotClosed();
     if (daemonConnection == null) setDaemonConnectionJni("", "", "");
     else {
-      String uri = withDefaultPort(daemonConnection.getUri() == null ? "" : daemonConnection.getUri());
+      String uri = daemonUriForCore(daemonConnection.getUri() == null ? "" : daemonConnection.getUri());
       beforeDaemonUri(uri);
       try {
         setDaemonConnectionJni(uri, daemonConnection.getUsername(), daemonConnection.getPassword());
