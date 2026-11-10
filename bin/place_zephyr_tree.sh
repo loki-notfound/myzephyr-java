@@ -16,15 +16,18 @@
 #    nothing.
 # 2. Applies the build-layer patches under patches/depends/ to the zephyr tree, in name order,
 #    with patch -p1. They touch build tooling under contrib/depends/ only, never zephyr or
-#    zephyr-cpp sources (each patch has a DEP-3 header). Idempotent: a patch that
+#    zephyr-cpp sources (each patch has a DEP-3 header); 0006 adds a patch that the OpenSSL
+#    recipe applies to OpenSSL's source. Idempotent: a patch that
 #    is already applied is skipped; one that neither applies nor is applied stops the script.
 #      0001-android-ndk-python3                     NDK r18b's toolchain script with python3
 #      0002-boost-1.64-b2-engine-declarations       boost's build engine under gcc 14
 #      0003-android-ndk-x86_64                      the x86_64 standalone toolchain
 #      0004-openssl-openssldir                      OPENSSLDIR /etc/ssl
 #      0005-neutral-engines-and-unbound-sysconfdir  no depends-prefix paths in OpenSSL, unbound
-#    On a Linux build 0001 and 0003 are no-ops (android_ndk is not a Linux package); they are
-#    applied all the same, so every build leaves the tree in the same state.
+#      0006-openssl-android-environment             OpenSSL reads the environment on Android
+#    On a Linux build 0001 and 0003 are no-ops (android_ndk is not a Linux package) and 0006
+#    changes no code (its OpenSSL patch removes the Android branch only); they are applied all
+#    the same, so every build leaves the tree in the same state.
 #
 # Usage: bin/place_zephyr_tree.sh
 

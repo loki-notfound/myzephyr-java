@@ -36,10 +36,11 @@ CI job; releases are always built from the backports.
 
 ## Build-layer patches
 
-zephyr-java never patches zephyr or zephyr-cpp source code. It does patch build tooling: five
+zephyr-java never patches zephyr or zephyr-cpp source code. It does patch build tooling: six
 patches under `patches/depends/`, each with a DEP-3 header, which the build scripts apply to
 zephyr's `contrib/depends` (the tree that builds boost, OpenSSL, unbound and the other
-libraries from pinned archives):
+libraries from pinned archives). One of them, `0006`, adds a patch that the OpenSSL recipe
+applies to OpenSSL's own source:
 
 | Patch | What | Why |
 |---|---|---|
@@ -48,6 +49,7 @@ libraries from pinned archives):
 | `0003-android-ndk-x86_64` | pass `--arch x86_64` for the x86_64 standalone toolchain | the x86_64 Android toolchain is not built otherwise |
 | `0004-openssl-openssldir` | build OpenSSL with `OPENSSLDIR /etc/ssl` | the default embedded the build directory, an empty CA store on any other machine |
 | `0005-neutral-engines-and-unbound-sysconfdir` | neutral `ENGINESDIR`, `MODULESDIR` and unbound `sysconfdir` | they embedded the build directory, which breaks reproducibility across paths |
+| `0006-openssl-android-environment` | on Android, OpenSSL's `OPENSSL_issetugid()` compares the user and group ids instead of asking `getauxval(AT_SECURE)` | `AT_SECURE` is set in every Android app process, so OpenSSL ignored `SSL_CERT_FILE` and `SSL_CERT_DIR` there and the native wallet could not verify an `https://` node |
 
 Two more build-layer settings: the JNI library is compiled with `-include map`, because
 zephyr-cpp's model header relies on boost to include `<map>` and newer boost does not; and

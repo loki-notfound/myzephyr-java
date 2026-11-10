@@ -8,7 +8,9 @@
 #    of the pin tag when it is present locally (the same script as bin/build_linux.sh and the CI
 #    package job).
 # 2. The same script applies the build-layer patches under patches/depends/ to the zephyr tree
-#    (build tooling under contrib/depends/ only, never zephyr or zephyr-cpp sources), idempotently.
+#    (build tooling under contrib/depends/ only, never zephyr or zephyr-cpp sources; 0006 makes
+#    the OpenSSL recipe patch OpenSSL's crypto/uid.c, so that OpenSSL reads SSL_CERT_FILE and
+#    SSL_CERT_DIR in an Android app process), idempotently.
 # 3. Builds contrib/depends for the ABI's host triplet into contrib/depends/<triplet>/ (this
 #    downloads the NDK and the package sources; depends checks their sha256). A stalled download
 #    fails after 120 s below 1000 bytes/s, and depends retries it from downloads.getmonero.org.

@@ -22,6 +22,8 @@
 #    1000 bytes/s, and depends retries it from downloads.getmonero.org.
 #      0005-neutral-engines-and-unbound-sysconfdir  needed (no depends-prefix paths in OpenSSL
 #                                                   and unbound)
+#      0006-openssl-android-environment             no code change (OpenSSL is rebuilt; its
+#                                                   patch removes the Android branch only)
 # 4. Builds zephyr's library targets with the depends toolchain in build/<triplet>/release of the
 #    zephyr tree (configured afresh every time; make rebuilds only what changed).
 # 5. Builds the JNI library in build-linux/<arch>/ (CMakeLists.txt of this repo, with
