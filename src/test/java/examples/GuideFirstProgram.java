@@ -9,7 +9,8 @@ import zephyr.wallet.model.ZephyrWalletConfig;
  * The first program of the user guide (docs/guide/01-getting-started.md, section "A first
  * program"), compiled with the tests so that the guide's code keeps matching the API. Plain Java,
  * no Android classes: an app calls it off the main thread (docs/guide/10-android.md, section "A
- * first test on a device"). The tests do not run it.
+ * first test on a device"). On the desktop, main prints the library's version and the address. The
+ * tests do not run it.
  */
 public class GuideFirstProgram {
 
@@ -24,5 +25,10 @@ public class GuideFirstProgram {
     } finally {
       wallet.close();
     }
+  }
+
+  public static void main(String[] args) {
+    System.out.println("zephyr-java " + ZephyrUtils.getVersion());
+    System.out.println("primary address: " + smokeTest());
   }
 }
