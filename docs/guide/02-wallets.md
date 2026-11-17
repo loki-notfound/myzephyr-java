@@ -225,7 +225,7 @@ try {
 
 Never call `close()` while another thread may be inside `sync()`, and end background syncing
 before you close. Observed on 2026-11-17, closing during a sync crashed the JVM
-([Threads and listeners](04-threads-and-listeners.md)).
+([Closing a wallet that syncs](04-threads-and-listeners.md#closing-a-wallet-that-syncs)).
 
 ## Addresses and keys
 

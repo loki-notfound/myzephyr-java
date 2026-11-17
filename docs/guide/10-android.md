@@ -199,7 +199,7 @@ A wallet is expensive to open and must be closed exactly once, so it belongs to 
 outlives an Activity: a ViewModel, a bound service, or an application-wide holder. Close it (after
 storing it) when that owner ends.
 
-**Callbacks arrive on a native thread** ([chapter 4](04-threads-and-listeners.md#threads)). Post to
+**Callbacks arrive on a native thread** ([Callbacks run on threads you did not create](04-threads-and-listeners.md#callbacks-run-on-threads-you-did-not-create)). Post to
 the main thread before you touch views:
 
 ```java
