@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>7. Sending - zephyr-java guide</title>
+<meta name="description" content="In Zephyr, a transfer and a conversion are the same operation. Both are built with createTxs (or sweepUnlocked) and a ZephyrTxConfig. What makes one a transfer and the other a conversion is the curren">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../assets/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon-180.png">
+<link rel="stylesheet" href="../assets/content.css">
+<link rel="stylesheet" href="../assets/print.css">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<a class="lt-skip-link" href="#main">Skip to main content</a>
+<header class="lt-header">
+  <div class="lt-wrap lt-wrap-wide lt-header-inner">
+    <div class="site-title">
+      <a class="lt-brand" href="../index.html">zephyr-java</a>
+      <p class="site-tagline">Java wallet library for Zephyr, a lateo project</p>
+    </div>
+    <nav class="lt-nav" aria-label="Site navigation">
+      <a href="index.html" aria-current="page">Guide</a>
+      <a href="../javadoc/index.html">Javadoc</a>
+      <a href="https://github.com/loki-notfound/myzephyr-java/releases">Releases</a>
+      <a href="https://github.com/loki-notfound/myzephyr-java">Repository</a>
+    </nav>
+  </div>
+</header>
+<main id="main" tabindex="-1">
+<div class="lt-wrap lt-wrap-wide lt-docs-layout">
+<aside class="lt-toc" aria-label="Guide navigation">
+<h2 id="site-nav-guide">Guide</h2>
+<nav aria-labelledby="site-nav-guide">
+<ol>
+<li><a href="index.html">zephyr-java user guide</a></li>
+<li><a href="01-getting-started.html">1. Getting started</a></li>
+<li><a href="02-wallets.html">2. Wallets</a></li>
+<li><a href="03-connecting-to-a-node.html">3. Connecting to a node</a></li>
+<li><a href="04-threads-and-listeners.html">4. Threads and listeners</a></li>
+<li><a href="05-assets-and-balances.html">5. Assets, accounts and balances</a></li>
+<li><a href="06-history.html">6. History</a></li>
+<li><a href="07-sending.html" aria-current="page">7. Sending</a></li>
+<li><a href="08-conversions-and-the-reserve.html">8. Conversions and the reserve</a></li>
+<li><a href="09-errors.html">9. Errors and exceptions</a></li>
+<li><a href="10-android.html">10. Android</a></li>
+<li><a href="11-the-rpc-classes.html">11. The RPC classes</a></li>
+<li><a href="12-coming-from-monero-java.html">12. Coming from monero-java</a></li>
+<li><a href="13-known-limitations.html">13. Known limitations</a></li>
+<li><a href="14-building-and-verifying.html">14. Building and verifying</a></li>
+</ol>
+</nav>
+<h2 id="site-nav-page">On this page</h2>
+<nav aria-labelledby="site-nav-page">
+<ol>
+<li><a href="#the-currency-pair-on-every-send">The currency pair on every send</a></li>
+<li><a href="#create-then-relay">Create, then relay</a></li>
+<li><a href="#what-to-show-before-you-relay">What to show before you relay</a></li>
+<li><a href="#fees-and-priorities">Fees and priorities</a></li>
+<li><a href="#several-destinations">Several destinations</a></li>
+<li><a href="#when-the-core-refuses">When the core refuses</a></li>
+<li><a href="#sweeping">Sweeping</a></li>
+<li><a href="#after-a-send">After a send</a></li>
+</ol>
+</nav>
+</aside>
+<article class="lt-docs-main lt-stack">
+<nav class="lt-breadcrumbs" aria-label="Breadcrumb"><ol><li><a href="../index.html">zephyr-java</a></li><li><a href="index.html">Guide</a></li><li><a href="07-sending.html" aria-current="page">7. Sending</a></li></ol></nav>
+<h1 id="7-sending">7. Sending</h1>
+<p>In Zephyr, a transfer and a conversion are the same operation. Both are built with <code>createTxs</code> (or <code>sweepUnlocked</code>) and a <code>ZephyrTxConfig</code>. What makes one a transfer and the other a conversion is the <strong>currency pair</strong> on the config. There are no separate conversion methods. This chapter covers transfers; <a href="08-conversions-and-the-reserve.html">Conversions and the reserve</a> covers conversions.</p>
+<p>The blocks marked &quot;Java, compiled&quot; in this chapter come from <code>src/test/java/examples/GuideSending.java</code>.</p>
+<h2 id="the-currency-pair-on-every-send">The currency pair on every send<a class="heading-anchor" href="#the-currency-pair-on-every-send" aria-label="Link to this section">#</a></h2>
+<p>Every config names a source currency (the asset you spend) and a destination currency (the asset the recipient gets). Both are required for <strong>every</strong> send, a plain transfer included; without them the core throws &quot;Must specify source currency&quot;. The account to send from is required as well (&quot;Must specify account index to send from&quot;).</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>ZephyrTxWallet tx = wallet.createTx(new ZephyrTxConfig()
+    .setAddress(recipient)
+    .setAmount(new BigDecimal(&quot;2.5&quot;).movePointRight(12).toBigIntegerExact())
+    .setSourceCurrency(ZephyrAssets.ZPH)
+    .setDestinationCurrency(ZephyrAssets.ZPH)
+    .setAccountIndex(0));</code></pre>
+</div>
+<p>The pair holds for the whole transaction and all its destinations. <code>ZephyrDestination</code> and the transfers have an <code>assetType</code> field too, but it only <strong>reports</strong> the asset of a transfer in the history. Setting it on a destination does not select anything: the core ignores it when sending and takes the pair from the config.</p>
+<p>The amount is in atomic units (<a href="05-assets-and-balances.html#amounts">Amounts</a>). Check the recipient's address first (<a href="02-wallets.html#addresses-and-keys">Addresses and keys</a>).</p>
+<h2 id="create-then-relay">Create, then relay<a class="heading-anchor" href="#create-then-relay" aria-label="Link to this section">#</a></h2>
+<p><code>createTxs</code> builds and signs; by default it does <strong>not</strong> broadcast. It returns a list, because the core can split a send into several transactions. Show the user the total fee, then relay all of them:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>List&lt;ZephyrTxWallet&gt; txs = wallet.createTxs(config);      // relay defaults to false; can be several
+BigInteger fee = BigInteger.ZERO;
+for (ZephyrTxWallet tx : txs) fee = fee.add(tx.getFee()); // in the source asset
+System.out.println(&quot;fee &quot; + fee);                         // show it; relay only after the user agrees
+return wallet.relayTxs(txs);                              // now every transaction is sent</code></pre>
+</div>
+<p><code>relayTxs(txs)</code> relays every transaction of the list and returns their hashes. Relaying only the first one of a split send would send part of it. <code>createTx</code> sets <code>setCanSplit(false)</code>: it returns one transaction or throws, and <code>relayTx(tx)</code> then sends it. <code>setRelay(true)</code> on the config builds and relays in one call, without a review.</p>
+<h2 id="what-to-show-before-you-relay">What to show before you relay<a class="heading-anchor" href="#what-to-show-before-you-relay" aria-label="Link to this section">#</a></h2>
+<p>As advice for the review screen: show every amount with all 12 decimals and its asset, the recipient's address and the fee. A send can return several transactions, so add up their fees:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>BigInteger fee = BigInteger.ZERO;
+for (ZephyrTxWallet tx : txs) fee = fee.add(tx.getFee());  // a send can take several transactions
+String asset = config.getSourceCurrency();
+return &quot;Send &quot; + GuideBalances.formatFull(config.getAmount()) + &quot; &quot; + asset
+    + &quot; to &quot; + config.getAddress()
+    + &quot;, network fee &quot; + GuideBalances.formatFull(fee) + &quot; &quot; + asset;</code></pre>
+</div>
+<p>Name the action on the button that relays, for example &quot;Send 2.500000000000 ZPH&quot;, not &quot;OK&quot;. For a conversion, also show the converted amount (<a href="08-conversions-and-the-reserve.html#building-a-conversion">Building a conversion</a>).</p>
+<h2 id="fees-and-priorities">Fees and priorities<a class="heading-anchor" href="#fees-and-priorities" aria-label="Link to this section">#</a></h2>
+<p><strong>Fees are paid in the source asset.</strong> A ZPH transfer pays its fee in ZPH and a ZRS transfer in ZRS. On the mainnet test run a 10 ZPH transfer paid 0.000308 ZPH and a ZRS sweep 0.0004456 ZRS. The fee of a conversion is in <a href="08-conversions-and-the-reserve.html#fees-of-a-conversion">Fees of a conversion</a>.</p>
+<p><code>setPriority</code> takes a <code>ZephyrTxPriority</code>: <code>DEFAULT</code>, <code>UNIMPORTANT</code>, <code>NORMAL</code> or <code>ELEVATED</code>. The mainnet sends of this project used the default. With <code>DEFAULT</code> the core chooses (read in the core's code; not run). It takes the low tier, as <code>UNIMPORTANT</code>, when the pool has no backlog and the recent blocks are not full. Otherwise it takes the normal tier, as <code>NORMAL</code>. So the fee of the same send can differ from one moment to the next; show the fee of the built transaction, not an estimate. The other priorities, and <code>setFee</code>, <code>setUnlockHeight</code>, <code>setPaymentId</code> and <code>setCanSplit</code>, are inherited from monero-java; not tested against Zephyr.</p>
+<h2 id="several-destinations">Several destinations<a class="heading-anchor" href="#several-destinations" aria-label="Link to this section">#</a></h2>
+<p><code>addDestination(address, amount)</code> adds a destination; <code>setDestinations</code> sets them all. The currency pair holds for every destination:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>return wallet.createTxs(new ZephyrTxConfig()
+    .addDestination(first, new BigInteger(&quot;1000000000000&quot;))      // 1 ZPH
+    .addDestination(second, new BigInteger(&quot;2500000000000&quot;))     // 2.5 ZPH
+    .setSourceCurrency(ZephyrAssets.ZPH)
+    .setDestinationCurrency(ZephyrAssets.ZPH)
+    .setAccountIndex(0));</code></pre>
+</div>
+<p><code>setAmount</code> is for a config with one destination: on a config that already has several, it throws &quot;Cannot set amount because ZephyrTxConfig already has multiple destinations&quot;. Several destinations in one transaction are inherited from monero-java; not tested against Zephyr.</p>
+<h2 id="when-the-core-refuses">When the core refuses<a class="heading-anchor" href="#when-the-core-refuses" aria-label="Link to this section">#</a></h2>
+<p><code>createTxs</code> throws a <code>ZephyrError</code> whose <code>getCode()</code> is <code>null</code> when the core refuses to build. Observed on 2026-11-17 with <code>setRelay(false)</code> on a synced mainnet wallet without funds: transfers in ZPH and in ZSD, of one coin and of one atomic unit, threw &quot;not enough money&quot;.</p>
+<p>Not established:</p>
+<ul><li>the message when the amount exceeds the unlocked balance while the total balance would be enough (the core has a separate error for funds that are not unlocked);</li><li>the messages about fees;</li><li>what happens when the node refuses a relayed transaction.</li></ul>
+<p>Treat the message as text to show or log, not as a value to compare (<a href="09-errors.html">Errors and exceptions</a>).</p>
+<h2 id="sweeping">Sweeping<a class="heading-anchor" href="#sweeping" aria-label="Link to this section">#</a></h2>
+<p><code>sweepUnlocked</code> sends everything unlocked from an account (or chosen subaddresses) to one address.</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>return wallet.sweepUnlocked(new ZephyrTxConfig()
+    .setAddress(recipient)
+    .setSourceCurrency(ZephyrAssets.ZRS)
+    .setDestinationCurrency(ZephyrAssets.ZRS)
+    .setAccountIndex(0));  // always set the account index</code></pre>
+</div>
+<p><strong><code>sweepUnlocked</code> without an account index sweeps every account.</strong> Without an account index the core sweeps every account that has an unlocked balance in the source asset, one sweep per account. With an account index and no subaddress list it sweeps the whole account. Always set the account index. <em>Status:</em> core, read in the code. The core's list of subaddresses has an iterator slip (it tests one iterator and uses another), which adds subaddresses without funds. As far as the code shows it has no effect on the amounts, because only unlocked outputs of the source asset are spent.</p>
+<p><strong><code>sweepOutput</code> validates with <code>ZEPH</code>.</strong> Sweeping one output by key image validates the destination with a hard-coded <code>ZEPH</code> asset and builds the transaction without an asset. Since hard fork 11 no <code>ZEPH</code> output is valid, so <code>sweepOutput</code> is most likely unusable on mainnet. The other sweeps take the currency pair from the config and work. <em>Status:</em> found by reading the core; not tested.</p>
+<h2 id="after-a-send">After a send<a class="heading-anchor" href="#after-a-send" aria-label="Link to this section">#</a></h2>
+<p>Save the wallet, or store its bytes again, right after a send: the secret key of the transaction exists only in the cache (<a href="02-wallets.html#when-to-save">When to save</a>). The transaction appears in the history in the pool, and its change unlocks 10 blocks after it is mined (<a href="05-assets-and-balances.html#locked-and-unlocked">Locked and unlocked</a>).</p>
+<nav class="site-pager" aria-label="Previous and next page">
+<a class="site-prev" rel="prev" href="06-history.html">Previous: 6. History</a>
+<a class="site-next" rel="next" href="08-conversions-and-the-reserve.html">Next: 8. Conversions and the reserve</a>
+</nav>
+</article>
+</div>
+</main>
+<footer class="lt-footer">
+<div class="lt-wrap lt-wrap-wide">
+<p>Guide for zephyr-java 2.3.0-sec.2-java.4, built from commit <code>e59843ad</code> (2026-11-17 UTC).</p>
+<p>zephyr-java and this site are a <a href="https://lateo.dev/">lateo</a> project by an independent operator, not affiliated with or endorsed by ZephyrProtocol. Source: <a href="https://github.com/loki-notfound/myzephyr-java">github.com/loki-notfound/myzephyr-java</a>.</p>
+<p>The library and the guide are under the MIT licence of the repository; the stylesheet is BSD 3-Clause; the lateo name, mark and favicons are not covered by either and all rights in them are reserved by their owner (<a href="../assets/NOTICE.txt">notice</a>).</p>
+</div>
+</footer>
+</body>
+</html>

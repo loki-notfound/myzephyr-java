@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>4. Threads and listeners - zephyr-java guide</title>
+<meta name="description" content="Wallet calls block, and listener callbacks come from the core. This chapter covers the threads both run on and the five callbacks. It then covers exceptions in callbacks, closing a wallet that syncs, ">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../assets/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon-180.png">
+<link rel="stylesheet" href="../assets/content.css">
+<link rel="stylesheet" href="../assets/print.css">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<a class="lt-skip-link" href="#main">Skip to main content</a>
+<header class="lt-header">
+  <div class="lt-wrap lt-wrap-wide lt-header-inner">
+    <div class="site-title">
+      <a class="lt-brand" href="../index.html">zephyr-java</a>
+      <p class="site-tagline">Java wallet library for Zephyr, a lateo project</p>
+    </div>
+    <nav class="lt-nav" aria-label="Site navigation">
+      <a href="index.html" aria-current="page">Guide</a>
+      <a href="../javadoc/index.html">Javadoc</a>
+      <a href="https://github.com/loki-notfound/myzephyr-java/releases">Releases</a>
+      <a href="https://github.com/loki-notfound/myzephyr-java">Repository</a>
+    </nav>
+  </div>
+</header>
+<main id="main" tabindex="-1">
+<div class="lt-wrap lt-wrap-wide lt-docs-layout">
+<aside class="lt-toc" aria-label="Guide navigation">
+<h2 id="site-nav-guide">Guide</h2>
+<nav aria-labelledby="site-nav-guide">
+<ol>
+<li><a href="index.html">zephyr-java user guide</a></li>
+<li><a href="01-getting-started.html">1. Getting started</a></li>
+<li><a href="02-wallets.html">2. Wallets</a></li>
+<li><a href="03-connecting-to-a-node.html">3. Connecting to a node</a></li>
+<li><a href="04-threads-and-listeners.html" aria-current="page">4. Threads and listeners</a></li>
+<li><a href="05-assets-and-balances.html">5. Assets, accounts and balances</a></li>
+<li><a href="06-history.html">6. History</a></li>
+<li><a href="07-sending.html">7. Sending</a></li>
+<li><a href="08-conversions-and-the-reserve.html">8. Conversions and the reserve</a></li>
+<li><a href="09-errors.html">9. Errors and exceptions</a></li>
+<li><a href="10-android.html">10. Android</a></li>
+<li><a href="11-the-rpc-classes.html">11. The RPC classes</a></li>
+<li><a href="12-coming-from-monero-java.html">12. Coming from monero-java</a></li>
+<li><a href="13-known-limitations.html">13. Known limitations</a></li>
+<li><a href="14-building-and-verifying.html">14. Building and verifying</a></li>
+</ol>
+</nav>
+<h2 id="site-nav-page">On this page</h2>
+<nav aria-labelledby="site-nav-page">
+<ol>
+<li><a href="#calls-block">Calls block</a></li>
+<li><a href="#callbacks-run-on-threads-you-did-not-create">Callbacks run on threads you did not create</a></li>
+<li><a href="#keep-callbacks-short">Keep callbacks short</a></li>
+<li><a href="#the-five-callbacks">The five callbacks</a></li>
+<li><a href="#outputs-in-the-pool-carry-no-asset">Outputs in the pool carry no asset</a></li>
+<li><a href="#an-exception-thrown-in-a-callback">An exception thrown in a callback</a></li>
+<li><a href="#closing-a-wallet-that-syncs">Closing a wallet that syncs</a></li>
+<li><a href="#calls-from-several-threads">Calls from several threads</a></li>
+<li><a href="#what-is-not-known">What is not known</a></li>
+</ol>
+</nav>
+</aside>
+<article class="lt-docs-main lt-stack">
+<nav class="lt-breadcrumbs" aria-label="Breadcrumb"><ol><li><a href="../index.html">zephyr-java</a></li><li><a href="index.html">Guide</a></li><li><a href="04-threads-and-listeners.html" aria-current="page">4. Threads and listeners</a></li></ol></nav>
+<h1 id="4-threads-and-listeners">4. Threads and listeners</h1>
+<p>Wallet calls block, and listener callbacks come from the core. This chapter covers the threads both run on and the five callbacks. It then covers exceptions in callbacks, closing a wallet that syncs, calls from several threads, and what is not known.</p>
+<p>The blocks marked &quot;Java, compiled&quot; in this chapter come from <code>src/test/java/examples/GuideThreads.java</code>. Statements marked &quot;observed on 2026-11-17&quot; come from runs on Linux <code>x86_64</code>, some with the released JAR, none on Android (<a href="index.html#where-the-statements-come-from">Where the statements come from</a>).</p>
+<h2 id="calls-block">Calls block<a class="heading-anchor" href="#calls-block" aria-label="Link to this section">#</a></h2>
+<p><code>sync()</code>, <code>createTxs()</code>, <code>getTxs()</code> and the other wallet methods do their work on the calling thread and return when the core is done. A first sync of a restored wallet can take minutes, and building a transaction asks the node for decoy outputs. Never call them from a thread that must stay responsive, such as Android's main thread. A sync or a send on the main thread freezes the app. Use an executor or a coroutine dispatcher for I/O.</p>
+<h2 id="callbacks-run-on-threads-you-did-not-create">Callbacks run on threads you did not create<a class="heading-anchor" href="#callbacks-run-on-threads-you-did-not-create" aria-label="Link to this section">#</a></h2>
+<p>The core delivers notifications from a job of its thread pool. When that job runs on a native thread, the JNI bridge attaches the thread to the JVM for the call. Your listener therefore runs on a thread you did not create.</p>
+<p>Observed on 2026-11-17: the callbacks of a foreground <code>sync()</code> ran on the thread that called <code>sync()</code>. The callbacks of background syncing ran on native threads attached to the JVM, named <code>Thread-&lt;n&gt;</code>, with a new name for each callback. Do not rely on either. Hand the event over to your own thread (an executor, Android's main looper) and return quickly.</p>
+<h2 id="keep-callbacks-short">Keep callbacks short<a class="heading-anchor" href="#keep-callbacks-short" aria-label="Link to this section">#</a></h2>
+<p>During a sync, the core hands each new block's notifications to that job and <strong>waits for them to finish</strong> before it goes on. A listener that does slow work, or that calls back into the same wallet and waits, stalls the sync. Keep callbacks short and never call the wallet from inside one; queue the work instead:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>ExecutorService events = Executors.newSingleThreadExecutor();
+wallet.addListener(new ZephyrWalletListener() {
+  @Override
+  public void onBalancesChanged(BigInteger balance, BigInteger unlockedBalance, String assetType) {
+    events.submit(() -&gt; showBalance(assetType, balance, unlockedBalance));  // return at once
+  }
+});</code></pre>
+</div>
+<p><code>removeListener</code> removes a listener that <code>addListener</code> added. A listener given to <code>sync(listener)</code> is used for that sync only. Background syncing (<code>startSyncing()</code>) runs on threads of the core as well; the same rules apply to the callbacks it triggers. <a href="03-connecting-to-a-node.html#syncing">Syncing</a> has the details of syncing.</p>
+<h2 id="the-five-callbacks">The five callbacks<a class="heading-anchor" href="#the-five-callbacks" aria-label="Link to this section">#</a></h2>
+<p><code>ZephyrWalletListener</code> has five callbacks; override the ones you need:</p>
+<div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="the-five-callbacks">
+<table>
+<thead><tr><th scope="col">Callback</th><th scope="col">When</th><th scope="col">What it carries</th></tr></thead>
+<tbody>
+<tr><td><code>onSyncProgress(height, startHeight, endHeight, percentDone, message)</code></td><td>once per fetched block during a sync</td><td>the block, the range, a fraction 0.0 to 1.0</td></tr>
+<tr><td><code>onNewBlock(height)</code></td><td>once per fetched block</td><td>the block's height</td></tr>
+<tr><td><code>onBalancesChanged(balance, unlockedBalance, assetType)</code></td><td>once per asset whose balance changed</td><td>the new balance and unlocked balance of that asset</td></tr>
+<tr><td><code>onOutputReceived(output)</code></td><td>an output for the wallet appeared in the pool, in a block, and again when it unlocked</td><td>amount, account, subaddress, tx hash, height, <code>assetType</code></td></tr>
+<tr><td><code>onOutputSpent(output)</code></td><td>an output of the wallet was spent in a block, and again when that transaction unlocked</td><td>the same fields, with the asset</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>The output callbacks repeat.</strong> By its Javadoc, <code>onOutputReceived</code> comes three times for one output (in the pool, confirmed, unlocked) and <code>onOutputSpent</code> twice (confirmed, unlocked). In the core's code, the spent notification at unlock is one summary input whose amount is the outgoing amount plus the fee, not the real inputs. Count each output once, keyed by transaction hash and output, and do not add up the notifications.</p>
+<p><code>onBalancesChanged</code> names the asset. monero-java's two-argument version still exists but is <code>final</code> and deprecated. A listener ported from monero-java that overrides it fails to compile instead of silently never being called.</p>
+<h2 id="outputs-in-the-pool-carry-no-asset">Outputs in the pool carry no asset<a class="heading-anchor" href="#outputs-in-the-pool-carry-no-asset" aria-label="Link to this section">#</a></h2>
+<p><strong>The asset of an unconfirmed output notification is empty.</strong> <code>onOutputReceived</code> for a payment seen in the pool arrives with <code>getAssetType()</code> equal to <code>&quot;&quot;</code>. <code>wallet2</code>'s callback for pool payments has no asset parameter, and zephyr-cpp passes an empty string. The notification at confirmation goes through a callback that carries the asset (from the core's code; the mainnet test run did not get to observe it).</p>
+<p>Use <code>onBalancesChanged</code> (which names the asset) or <code>getTxs()</code> (which reports the right asset for the same pool transfer). <em>Status:</em> core behaviour, not a security matter, so it stays; documented in the Javadoc of <code>onOutputReceived</code>. Observed on mainnet on 2026-11-07.</p>
+<p>The outputs that <code>getOutputs()</code> returns carry no asset at all; <a href="06-history.html#getoutputs-reports-no-asset">getOutputs() reports no asset</a> shows how to get it.</p>
+<h2 id="an-exception-thrown-in-a-callback">An exception thrown in a callback<a class="heading-anchor" href="#an-exception-thrown-in-a-callback" aria-label="Link to this section">#</a></h2>
+<div class="lt-callout lt-callout-danger" role="note">
+<p class="lt-callout-title">Catch every exception inside a callback.</p>
+<p>Observed on 2026-11-17 with the released JAR, in 3 of 3 runs: an exception that left a callback during background syncing left a native thread attached to the JVM. The JVM then never exited. Wrap the body of every callback in <code>try</code> and <code>catch</code>.</p>
+</div>
+<p>What the runs of 2026-11-17 showed, for a listener that threw a <code>RuntimeException</code> from <code>onSyncProgress</code>, <code>onNewBlock</code> or <code>onBalancesChanged</code> once:</p>
+<ul><li><strong>During a foreground <code>sync()</code></strong> the exception did not reach the caller. <code>sync()</code> returned normally, the scan finished, and later callbacks kept arriving. The exception's stack trace was printed to stderr (&quot;Exception in thread &quot;main&quot; ...&quot;), and the JVM exited normally. These runs used the developer build.</li><li><strong>During background syncing</strong> the sync was not stopped either: it reached the node's height and later callbacks arrived. But the native thread that delivered the failing callback stayed attached to the JVM as a non-daemon thread, through <code>stopSyncing()</code> and <code>close()</code>. The JVM never exited when <code>main</code> returned. That happened in 3 of 3 runs with the released JAR, one per callback type, and in 4 of 4 with the developer build. From the throw on, every later callback came on that same thread.</li><li><strong>The rest of that block's notifications was skipped.</strong> A throw from <code>onNewBlock</code> cost that block's <code>onSyncProgress</code>. A throw from <code>onBalancesChanged</code> left the core's remembered balance unchanged, so the change was reported once more.</li><li>A throw from <code>onBalancesChanged</code> raised during an incoming output also printed &quot;Error processing confirmed output received: &quot; with the message on stdout.</li><li>With <code>-Xcheck:jni</code> (developer build) the JVM printed one warning per run and no fatal error. The warning was &quot;WARNING in native method: JNI call made without checking exceptions when required to from CallObjectMethodV&quot;.</li></ul>
+<p>When the native log is switched on, it records the message after &quot;Exception occurred in Java: &quot; and &quot;Exception in threadpool job: &quot; (<a href="09-errors.html#the-native-log">The native log</a>).</p>
+<p>Not shown by those runs: a listener that throws on every call, two listeners when one throws, and anything on Android. By the JNI rules, a pending Java exception on a thread that keeps calling JNI is undefined behaviour. A JVM that survived once proves nothing. Whether the leaked thread does harm beyond blocking the JVM's exit is not known.</p>
+<p>The rule that follows:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>wallet.addListener(new ZephyrWalletListener() {
+  @Override
+  public void onNewBlock(long height) {
+    try {
+      events.submit(() -&gt; showHeight(height));
+    } catch (Exception e) {  // nothing may leave the callback
+      logError(e);
+    }
+  }
+});</code></pre>
+</div>
+<p>Even the hand-over can throw: <code>submit</code> throws a <code>RejectedExecutionException</code> once the executor is shut down.</p>
+<h2 id="closing-a-wallet-that-syncs">Closing a wallet that syncs<a class="heading-anchor" href="#closing-a-wallet-that-syncs" aria-label="Link to this section">#</a></h2>
+<div class="lt-callout lt-callout-danger" role="note">
+<p class="lt-callout-title">Never close a wallet while it syncs.</p>
+<p>Observed on 2026-11-17 with the released JAR: a <code>close()</code> during a <code>sync()</code> on another thread crashed the process in 4 of 4 runs. Let <code>sync()</code> return, and let background syncing finish its scan, before you call <code>close()</code>.</p>
+</div>
+<p>What the runs of 2026-11-17 with the released JAR showed:</p>
+<ul><li><strong>During a foreground <code>sync()</code></strong>, <code>close()</code> from a second thread returned after a few milliseconds. The process then died with a segmentation fault in the native wallet code (exit status 134). That happened right after the first callback and halfway through a scan alike. The crash point differed in each run. A developer build of the same sources aborted with an assertion instead.</li><li><strong>While background syncing was scanning</strong>, <code>close()</code> returned (after 58 to 142 ms) in 3 of 3 runs. While it waited, the callbacks delivered meanwhile failed in the Java bridge with a <code>ZephyrError</code> &quot;Wallet is closed&quot;. Each failure printed <code>Exception in thread &quot;Thread-&lt;n&gt;&quot; Wallet is closed</code> on stderr, hundreds of times per run. The JVM did not crash, but a native thread stayed attached and the JVM never exited.</li><li><strong><code>stopSyncing()</code> right before <code>close()</code> did not help</strong> during a busy scan (2 of 2 runs hung in the same way). <code>stopSyncing()</code> returns at once, but the batch of blocks in progress is still processed. 401 and 1,980 callbacks arrived in the 3 s after it returned.</li></ul>
+<p>Clean in those runs:</p>
+<ul><li><code>close()</code> after <code>sync()</code> had returned;</li><li><code>close()</code> 3 s after <code>stopSyncing()</code>, in 4 of 4 runs. In the two runs during a busy scan, the scan stopped far below the node's height (at about 904,100 and 903,101, with the node near 909,840).</li></ul>
+<p>The 3 s are what was run, not a safe interval. In one earlier run with the developer build, <code>close()</code> while background syncing was idle at the node's height was clean as well.</p>
+<p>What the code shows (read in the code, not run): <code>stopSyncing()</code> only clears a flag. The core's refresh checks that flag once per batch of blocks, so the batch in progress still runs. A refresh that starts at the same moment can even run in full. Java's <code>close()</code> marks the wallet closed before the core stops and joins its sync thread. So the callbacks of a batch still in progress fail with &quot;Wallet is closed&quot;, as the runs above showed.</p>
+<p>Not shown by those runs: a close that coincides with a background refresh of a synced wallet when a new block arrives. That the crash is always a segmentation fault is not shown either. A crash point that differs per run can also corrupt memory without a crash.</p>
+<p>So, for a foreground sync, let <code>sync()</code> return before <code>close()</code>. One thread per wallet makes that easy: when every call goes through the same single-thread executor, <code>close()</code> cannot run while <code>sync()</code> runs:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>return walletThread.submit(() -&gt; {
+  wallet.save();   // runs after a sync() submitted earlier has returned
+  wallet.close();
+});</code></pre>
+</div>
+<p><strong>For background syncing there is no clean signal.</strong> <code>2.3.0-sec.2-java.4</code> has no call that reports whether a scan is still running, and a stopped scan can end far below the node's height. The most defensible workaround the facts support: call <code>stopSyncing()</code>, wait until no callback has arrived for a while, then save and close. A listener added before <code>startSyncing()</code> notes the time of the last callback:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>wallet.stopSyncing();  // returns at once; the batch in progress goes on
+while (System.currentTimeMillis() - lastCallbackMillis.get() &lt; quietMillis) {
+  Thread.sleep(100);   // no call reports whether a scan still runs, so wait for quiet
+}
+wallet.save();
+wallet.close();</code></pre>
+</div>
+<p>No quiet interval is known to be safe. A scan can pause between batches while it fetches blocks from the node, so a short interval can still meet a running batch. This is a workaround, not a guarantee.</p>
+<h2 id="calls-from-several-threads">Calls from several threads<a class="heading-anchor" href="#calls-from-several-threads" aria-label="Link to this section">#</a></h2>
+<p>In Java, only <code>getData()</code> of <code>ZephyrWalletFull</code> is <code>synchronized</code>, and the core serialises only syncing. So the library makes no promise for two threads that call one wallet at the same time.</p>
+<p>Observed on 2026-11-17: two threads each called <code>getBalance()</code>, <code>getTxs()</code> and <code>getHeight()</code> 1,000 times on one wallet while a third thread called <code>sync()</code> in a loop. There was no exception, no crash and no inconsistent result, in two runs. <strong>This proves nothing about thread safety</strong>: two runs on one machine say nothing about other timings, and writes were not run at the same time.</p>
+<p>The advice is one thread per wallet, as in the closing example above. Every call to the wallet, <code>close()</code> included, goes through one single-thread executor. A read then waits until a running <code>sync()</code> has returned. Background syncing still runs on the core's threads; its callbacks follow the rules above.</p>
+<h2 id="what-is-not-known">What is not known<a class="heading-anchor" href="#what-is-not-known" aria-label="Link to this section">#</a></h2>
+<p>For <code>2.3.0-sec.2-java.4</code>, none of these was established:</p>
+<ul><li>whether calls from several threads at the same time are safe;</li><li>in particular, writes (<code>createTxs</code>, <code>setTxNote</code>, <code>save</code>, <code>moveTo</code>, creating accounts) next to other calls, and <code>close()</code> next to reads;</li><li>what a listener that keeps throwing does, and whether a throw skips other listeners;</li><li>a reliable way to know that a background scan has stopped, and so when a <code>close()</code> after <code>stopSyncing()</code> is safe;</li><li>what a <code>close()</code> during a background refresh of a synced wallet does;</li><li>how any of this behaves on Android (ART, and CheckJNI in debuggable apps).</li></ul>
+<p><a href="13-known-limitations.html">Known limitations</a> lists the crash and the threads that stay attached.</p>
+<nav class="site-pager" aria-label="Previous and next page">
+<a class="site-prev" rel="prev" href="03-connecting-to-a-node.html">Previous: 3. Connecting to a node</a>
+<a class="site-next" rel="next" href="05-assets-and-balances.html">Next: 5. Assets, accounts and balances</a>
+</nav>
+</article>
+</div>
+</main>
+<footer class="lt-footer">
+<div class="lt-wrap lt-wrap-wide">
+<p>Guide for zephyr-java 2.3.0-sec.2-java.4, built from commit <code>e59843ad</code> (2026-11-17 UTC).</p>
+<p>zephyr-java and this site are a <a href="https://lateo.dev/">lateo</a> project by an independent operator, not affiliated with or endorsed by ZephyrProtocol. Source: <a href="https://github.com/loki-notfound/myzephyr-java">github.com/loki-notfound/myzephyr-java</a>.</p>
+<p>The library and the guide are under the MIT licence of the repository; the stylesheet is BSD 3-Clause; the lateo name, mark and favicons are not covered by either and all rights in them are reserved by their owner (<a href="../assets/NOTICE.txt">notice</a>).</p>
+</div>
+</footer>
+</body>
+</html>

@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>2. Wallets - zephyr-java guide</title>
+<meta name="description" content="ZephyrWalletFull is the wallet that runs in your process. Every wallet is created or opened through one of its static methods and ends with close(). This chapter goes through the life of a wallet: cre">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../assets/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon-180.png">
+<link rel="stylesheet" href="../assets/content.css">
+<link rel="stylesheet" href="../assets/print.css">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<a class="lt-skip-link" href="#main">Skip to main content</a>
+<header class="lt-header">
+  <div class="lt-wrap lt-wrap-wide lt-header-inner">
+    <div class="site-title">
+      <a class="lt-brand" href="../index.html">zephyr-java</a>
+      <p class="site-tagline">Java wallet library for Zephyr, a lateo project</p>
+    </div>
+    <nav class="lt-nav" aria-label="Site navigation">
+      <a href="index.html" aria-current="page">Guide</a>
+      <a href="../javadoc/index.html">Javadoc</a>
+      <a href="https://github.com/loki-notfound/myzephyr-java/releases">Releases</a>
+      <a href="https://github.com/loki-notfound/myzephyr-java">Repository</a>
+    </nav>
+  </div>
+</header>
+<main id="main" tabindex="-1">
+<div class="lt-wrap lt-wrap-wide lt-docs-layout">
+<aside class="lt-toc" aria-label="Guide navigation">
+<h2 id="site-nav-guide">Guide</h2>
+<nav aria-labelledby="site-nav-guide">
+<ol>
+<li><a href="index.html">zephyr-java user guide</a></li>
+<li><a href="01-getting-started.html">1. Getting started</a></li>
+<li><a href="02-wallets.html" aria-current="page">2. Wallets</a></li>
+<li><a href="03-connecting-to-a-node.html">3. Connecting to a node</a></li>
+<li><a href="04-threads-and-listeners.html">4. Threads and listeners</a></li>
+<li><a href="05-assets-and-balances.html">5. Assets, accounts and balances</a></li>
+<li><a href="06-history.html">6. History</a></li>
+<li><a href="07-sending.html">7. Sending</a></li>
+<li><a href="08-conversions-and-the-reserve.html">8. Conversions and the reserve</a></li>
+<li><a href="09-errors.html">9. Errors and exceptions</a></li>
+<li><a href="10-android.html">10. Android</a></li>
+<li><a href="11-the-rpc-classes.html">11. The RPC classes</a></li>
+<li><a href="12-coming-from-monero-java.html">12. Coming from monero-java</a></li>
+<li><a href="13-known-limitations.html">13. Known limitations</a></li>
+<li><a href="14-building-and-verifying.html">14. Building and verifying</a></li>
+</ol>
+</nav>
+<h2 id="site-nav-page">On this page</h2>
+<nav aria-labelledby="site-nav-page">
+<ol>
+<li><a href="#network-types">Network types</a></li>
+<li><a href="#creating-a-wallet">Creating a wallet</a></li>
+<li><a href="#restoring-from-a-mnemonic">Restoring from a mnemonic</a></li>
+<li><a href="#view-only-wallets">View-only wallets</a></li>
+<li><a href="#opening-wallet-files">Opening wallet files</a></li>
+<li><a href="#wallet-bytes">Wallet bytes</a></li>
+<li><a href="#the-password">The password</a></li>
+<li><a href="#when-to-save">When to save</a></li>
+<li><a href="#closing">Closing</a></li>
+<li><a href="#addresses-and-keys">Addresses and keys</a></li>
+</ol>
+</nav>
+</aside>
+<article class="lt-docs-main lt-stack">
+<nav class="lt-breadcrumbs" aria-label="Breadcrumb"><ol><li><a href="../index.html">zephyr-java</a></li><li><a href="index.html">Guide</a></li><li><a href="02-wallets.html" aria-current="page">2. Wallets</a></li></ol></nav>
+<h1 id="2-wallets">2. Wallets</h1>
+<p><code>ZephyrWalletFull</code> is the wallet that runs in your process. Every wallet is created or opened through one of its static methods and ends with <code>close()</code>. This chapter goes through the life of a wallet: creating and restoring it, view-only wallets, files and bytes, the password, saving and closing, addresses and keys. Connecting it to a node and syncing are in <a href="03-connecting-to-a-node.html">Connecting to a node</a>.</p>
+<p>The blocks marked &quot;Java, compiled&quot; in this chapter come from <code>src/test/java/examples/GuideWallets.java</code>.</p>
+<h2 id="network-types">Network types<a class="heading-anchor" href="#network-types" aria-label="Link to this section">#</a></h2>
+<p>Every example uses mainnet (<code>ZephyrNetworkType.MAINNET</code>). A config without a network type is refused with &quot;Must specify a network type: 'mainnet', 'testnet' or 'stagenet'&quot;.</p>
+<p><strong>Testnet and stagenet do not reach the V2 rules.</strong> Zephyr's testnet and stagenet exist in the code. In the pinned Zephyr tree their hard-fork tables stop at hard fork 3 (height 100), and the V2 asset names are not allowed before hard fork 8. A wallet on those networks never sees ZPH, ZSD, ZRS or ZYS. Development and tests that need the current rules run on mainnet with small amounts. <em>Status:</em> the state of the core's network tables.</p>
+<h2 id="creating-a-wallet">Creating a wallet<a class="heading-anchor" href="#creating-a-wallet" aria-label="Link to this section">#</a></h2>
+<p>A new random wallet needs a network type and, to be stored as files, a path and a password:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>ZephyrWalletFull wallet = ZephyrWalletFull.createWallet(new ZephyrWalletConfig()
+    .setPath(&quot;wallets/main&quot;)
+    .setPassword(password)
+    .setNetworkType(ZephyrNetworkType.MAINNET)
+    .setServerUri(&quot;http://node.example.invalid:17767&quot;));
+String mnemonic = wallet.getMnemonic();  // 25 words; show it to the user once, then forget it</code></pre>
+</div>
+<p>Replace <code>node.example.invalid</code> with your node's host name; <code>17767</code> is the default RPC port of a mainnet node. Without a path the wallet lives only in memory (<a href="#wallet-bytes">Wallet bytes</a>).</p>
+<p>A random wallet does not take a restore height: <code>createWallet</code> rejects one with &quot;Cannot specify restore height when creating random wallet&quot;. The core does not need one either. When the new wallet is connected to a node, the core sets its restore height to the node's current height. A new wallet cannot have received anything before it existed. <code>createWallet</code> refuses a path where a wallet already exists (&quot;Wallet already exists: &quot; and the path).</p>
+<div class="lt-callout lt-callout-danger" role="note">
+<p class="lt-callout-title">The mnemonic is the wallet.</p>
+<p>Anyone with the 25 words of <code>getMnemonic()</code> can spend every asset of the wallet. Do not log them, store them in plain text or send them anywhere. A screen that shows them can tell the user: &quot;Anyone with these 25 words can spend all funds in this wallet across every asset (ZPH, ZSD, ZRS, ZYS). Write the words down in order on paper and store them offline. Do not save a screenshot, photo, or plain-text file on an internet-connected device.&quot;</p>
+</div>
+<h2 id="restoring-from-a-mnemonic">Restoring from a mnemonic<a class="heading-anchor" href="#restoring-from-a-mnemonic" aria-label="Link to this section">#</a></h2>
+<p>To restore, give the mnemonic and a restore height: the block height from which the wallet scans for its outputs. Without one the restore height is 0 and the first sync scans the whole chain, which takes a long time. A height a little before the wallet's first transaction is the right value. <code>wallet.getHeightByDate(year, month, day)</code> asks the node for the height at a date.</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>ZephyrWalletFull restored = ZephyrWalletFull.createWallet(new ZephyrWalletConfig()
+    .setPath(&quot;wallets/restored&quot;)
+    .setPassword(password)
+    .setNetworkType(ZephyrNetworkType.MAINNET)
+    .setMnemonic(mnemonic)
+    .setRestoreHeight(536000L)
+    .setServerUri(nodeUri));</code></pre>
+</div>
+<p><code>ZephyrWalletFull.getMnemonicLanguages()</code> lists the languages of the core's word lists. Seed offsets (<code>setSeedOffset</code>) and languages (<code>setLanguage</code>) are inherited from monero-java; not tested against Zephyr.</p>
+<h2 id="view-only-wallets">View-only wallets<a class="heading-anchor" href="#view-only-wallets" aria-label="Link to this section">#</a></h2>
+<p>A wallet can also be built from keys. <code>setPrimaryAddress</code> with <code>setPrivateViewKey</code> gives a view-only wallet that sees incoming funds but cannot spend. Adding <code>setPrivateSpendKey</code> gives a full wallet. A mnemonic and keys together are rejected (&quot;Wallet may be initialized with a mnemonic or keys but not both&quot;). <code>wallet.isViewOnly()</code> tells the two kinds apart.</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>ZephyrWalletFull viewOnly = ZephyrWalletFull.createWallet(new ZephyrWalletConfig()
+    .setPassword(password)
+    .setNetworkType(ZephyrNetworkType.MAINNET)
+    .setPrimaryAddress(address)
+    .setPrivateViewKey(privateViewKey)
+    .setRestoreHeight(restoreHeight)
+    .setServerUri(nodeUri));</code></pre>
+</div>
+<p><strong>A view-only wallet's balance is not the real balance once the wallet has spent anything.</strong> A view-only wallet sees every incoming output but none of the spends. Observed on 2026-11-17 with a test wallet that had received five outputs and spent all five:</p>
+<div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="view-only-wallets">
+<table>
+<thead><tr><th scope="col">After a full sync</th><th scope="col">Full wallet</th><th scope="col">View-only wallet</th></tr></thead>
+<tbody>
+<tr><td><code>isViewOnly()</code></td><td>false</td><td>true</td></tr>
+<tr><td><code>getBalance()</code> and <code>getUnlockedBalance()</code></td><td>0 in every asset</td><td>232.9989266 ZPH and 95.792897912645 ZRS</td></tr>
+<tr><td><code>getTxs()</code></td><td>5 (3 incoming, 4 outgoing)</td><td>4 (4 incoming, 0 outgoing)</td></tr>
+<tr><td><code>getOutputs(new ZephyrOutputQuery())</code></td><td>5, all spent</td><td>5, none spent</td></tr>
+<tr><td><code>getTransfers()</code></td><td>7</td><td>4</td></tr>
+<tr><td><code>getPrivateSpendKey()</code>, <code>getMnemonic()</code></td><td>the keys</td><td><code>null</code>, <code>null</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>So the view-only balance is the sum of everything ever received, every output shows as unspent and outgoing transactions are missing. Importing key images, which would let it see the spends, is inherited from monero-java; not tested against Zephyr. An app that shows a view-only wallet can say so on screen, for example: &quot;View-only wallet. This wallet contains only your view key; it can monitor incoming transactions but cannot sign outgoing transfers or conversions, and cannot verify spent outputs without key images.&quot;</p>
+<h2 id="opening-wallet-files">Opening wallet files<a class="heading-anchor" href="#opening-wallet-files" aria-label="Link to this section">#</a></h2>
+<p>A wallet created with a path is stored as two files: <code>&lt;path&gt;.keys</code> (the keys, encrypted with the password) and <code>&lt;path&gt;</code> (the cache: the synced transactions and outputs). Open them with <code>openWallet</code>:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>if (ZephyrWalletFull.walletExists(path)) {
+  try {
+    wallet = ZephyrWalletFull.openWallet(path, password, ZephyrNetworkType.MAINNET, nodeUri);
+  } catch (Exception e) {  // &quot;invalid password&quot; arrives as java.lang.Exception
+    messages.show(&quot;The wallet could not be opened: &quot; + e.getMessage());
+  }
+}</code></pre>
+</div>
+<p>The network type must match the one the wallet was created with. A path without a wallet throws a <code>ZephyrError</code> &quot;Wallet does not exist at path: &quot; with the path.</p>
+<p><strong>A wrong password is not a <code>ZephyrError</code>.</strong> Observed on 2026-11-17, also with the released JAR: <code>openWallet</code> with a wrong password threw <code>java.lang.Exception</code> with the message &quot;invalid password&quot;. A <code>catch (ZephyrError e)</code> does not catch it; catch <code>Exception</code> around <code>openWallet</code> (<a href="09-errors.html">Errors and exceptions</a>).</p>
+<h2 id="wallet-bytes">Wallet bytes<a class="heading-anchor" href="#wallet-bytes" aria-label="Link to this section">#</a></h2>
+<p>Apps that keep their own storage (an encrypted database, Android's private files) need no wallet files at all. <code>getData()</code> returns the keys and the cache as two byte arrays:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>byte[][] data = wallet.getData();        // data[0] = keys, data[1] = cache
+store.put(&quot;keys&quot;, data[0]);
+store.put(&quot;cache&quot;, data[1]);</code></pre>
+</div>
+<p><code>openWalletData</code> opens a wallet from them:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>ZephyrWalletFull wallet = ZephyrWalletFull.openWalletData(password, ZephyrNetworkType.MAINNET,
+    store.get(&quot;keys&quot;), store.get(&quot;cache&quot;), new ZephyrRpcConnection(nodeUri));</code></pre>
+</div>
+<p><code>ZephyrWalletFull.openWallet(ZephyrWalletConfig)</code> does the same when the config carries the arrays:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>ZephyrWalletFull wallet = ZephyrWalletFull.openWallet(new ZephyrWalletConfig()
+    .setPassword(password)
+    .setNetworkType(ZephyrNetworkType.MAINNET)
+    .setKeysData(store.get(&quot;keys&quot;))
+    .setCacheData(store.get(&quot;cache&quot;))
+    .setServerUri(nodeUri));</code></pre>
+</div>
+<p>The keys array is encrypted with the wallet password. The cache array, which holds the synced history, is encrypted with a key derived from it. The files are encrypted the same way.</p>
+<p>A wallet opened this way has no path (<code>getPath()</code> returns <code>null</code>). <code>save()</code> and <code>close(true)</code> then write nothing and report no error (read in the core's code). Call <code>getData()</code> again and store the result whenever you would otherwise save, and before <code>close()</code>. <code>changePassword</code> does not work for such a wallet; <a href="#the-password">The password</a> has the details.</p>
+<p><code>moveTo(path)</code> gives a wallet held in memory its files:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>wallet.moveTo(&quot;wallets/main&quot;);
+wallet.save();  // writes to the new files from now on</code></pre>
+</div>
+<p>Observed on 2026-11-17 with a wallet opened from bytes: <code>moveTo</code> wrote <code>&lt;path&gt;</code> (the cache) and <code>&lt;path&gt;.keys</code>, and no <code>.address.txt</code>. Then <code>getPath()</code> returned the new path, <code>save()</code> worked, and the wallet opened again from that path at the same height. Moving onto an existing file, into a missing directory or onto another file system was not tried.</p>
+<h2 id="the-password">The password<a class="heading-anchor" href="#the-password" aria-label="Link to this section">#</a></h2>
+<p><strong><code>changePassword</code> fails for a wallet opened from bytes.</strong> On a wallet opened with <code>openWalletData</code> (or created without a path), <code>changePassword</code> throws <code>failed to read file &quot;.keys&quot;</code>. The core verifies the old password against the keys file on disk, which such a wallet does not have. The same call on a wallet with files is not affected. No stray file is written. <em>Status:</em> core behaviour (the core took only half of a later monero-cpp fix), confirmed on mainnet. Apps that store bytes can keep the password stable, or restore the wallet from its mnemonic under the new password (which costs a re-sync).</p>
+<p>A wrong old password is refused before the core is asked, with a <code>ZephyrError</code> &quot;Invalid original password.&quot;.</p>
+<h2 id="when-to-save">When to save<a class="heading-anchor" href="#when-to-save" aria-label="Link to this section">#</a></h2>
+<p><code>save()</code> writes the cache (and the keys) to the wallet's files. A cache that was not saved only costs a re-sync of the blocks since the last save. But transaction notes and the secret keys of sent transactions exist only in the cache. Save, or with bytes call <code>getData()</code> and store the arrays again:</p>
+<ul><li>after each sync;</li><li>after each send;</li><li>after <code>setTxNote</code> and other changes the wallet keeps for you;</li><li>before your process can be stopped, on Android when the app goes to the background (<a href="10-android.html#lifecycle-and-threads">Lifecycle and threads</a>).</li></ul>
+<h2 id="closing">Closing<a class="heading-anchor" href="#closing" aria-label="Link to this section">#</a></h2>
+<p><code>close()</code> closes without saving; <code>close(true)</code> saves first. After <code>close</code> the object must not be used again: <code>isClosed()</code> returns <code>true</code>, and most other calls throw a <code>ZephyrError</code> &quot;Wallet is closed&quot;. A few have no such check; <code>changePassword</code> after <code>close()</code> fails with an unrelated error. Closing a closed wallet has no effect.</p>
+<p><code>close(true)</code> saves in native code that does not catch a failure of the save (read in the bridge's code; not run). Call <code>save()</code> first, which reports a failure as an exception, then <code>close()</code>.</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>try {
+  wallet.sync();
+  System.out.println(wallet.getBalance());
+  wallet.save();     // reports a failure; close(true) would not
+} finally {
+  wallet.close();
+}</code></pre>
+</div>
+<p>Never call <code>close()</code> while another thread may be inside <code>sync()</code>. Observed on 2026-11-17 with the released JAR, such a <code>close()</code> crashed the process in 4 of 4 runs. With background syncing, <code>stopSyncing()</code> alone is not enough: let its scan stop before you close (<a href="04-threads-and-listeners.html#closing-a-wallet-that-syncs">Closing a wallet that syncs</a>).</p>
+<h2 id="addresses-and-keys">Addresses and keys<a class="heading-anchor" href="#addresses-and-keys" aria-label="Link to this section">#</a></h2>
+<div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="addresses-and-keys">
+<table>
+<thead><tr><th scope="col">Call</th><th scope="col">Returns</th></tr></thead>
+<tbody>
+<tr><td><code>getPrimaryAddress()</code></td><td>the address of account 0, subaddress 0</td></tr>
+<tr><td><code>getAddress(accountIdx, subaddressIdx)</code></td><td>the address of a subaddress</td></tr>
+<tr><td><code>getAddressIndex(address)</code></td><td>the account and subaddress of one of the wallet's addresses</td></tr>
+<tr><td><code>getMnemonic()</code></td><td>the 25-word seed phrase; <code>null</code> for a view-only wallet (observed on 2026-11-17)</td></tr>
+<tr><td><code>getPrivateViewKey()</code>, <code>getPublicViewKey()</code></td><td>the view keys</td></tr>
+<tr><td><code>getPrivateSpendKey()</code>, <code>getPublicSpendKey()</code></td><td>the spend keys; the private one is <code>null</code> for a view-only wallet (observed on 2026-11-17)</td></tr>
+</tbody>
+</table>
+</div>
+<p>On mainnet, primary addresses start with <code>ZEPHYR</code>, subaddresses with <code>ZEPHs</code> and integrated addresses with <code>ZEPHii</code> (the prefixes of the pinned core). Check an address the user enters with <code>isValidAddress</code>, not by its prefix, before you send to it:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>return ZephyrUtils.isValidAddress(recipient, ZephyrNetworkType.MAINNET);</code></pre>
+</div>
+<p><code>isValidAddress</code> and <code>validateAddress</code> decode the address in Java and need no native library. <code>validateAddress</code> throws a <code>ZephyrError</code> that names the problem, for example &quot;Address has invalid characters&quot;, &quot;Address has invalid encoding&quot;, &quot;Address has invalid length&quot; or &quot;Address has invalid hash&quot;. An address of another network gives &quot;Address network type mismatch&quot;.</p>
+<p>The spend key and the mnemonic give full control over every asset of the wallet. An app that exports them can warn the user: &quot;Your secret spend key grants full control over every asset in this wallet. Export it only when migrating to another offline wallet client that you have verified.&quot;</p>
+<nav class="site-pager" aria-label="Previous and next page">
+<a class="site-prev" rel="prev" href="01-getting-started.html">Previous: 1. Getting started</a>
+<a class="site-next" rel="next" href="03-connecting-to-a-node.html">Next: 3. Connecting to a node</a>
+</nav>
+</article>
+</div>
+</main>
+<footer class="lt-footer">
+<div class="lt-wrap lt-wrap-wide">
+<p>Guide for zephyr-java 2.3.0-sec.2-java.4, built from commit <code>e59843ad</code> (2026-11-17 UTC).</p>
+<p>zephyr-java and this site are a <a href="https://lateo.dev/">lateo</a> project by an independent operator, not affiliated with or endorsed by ZephyrProtocol. Source: <a href="https://github.com/loki-notfound/myzephyr-java">github.com/loki-notfound/myzephyr-java</a>.</p>
+<p>The library and the guide are under the MIT licence of the repository; the stylesheet is BSD 3-Clause; the lateo name, mark and favicons are not covered by either and all rights in them are reserved by their owner (<a href="../assets/NOTICE.txt">notice</a>).</p>
+</div>
+</footer>
+</body>
+</html>

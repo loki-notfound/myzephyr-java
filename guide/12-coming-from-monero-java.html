@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>12. Coming from monero-java - zephyr-java guide</title>
+<meta name="description" content="zephyr-java is derived from monero-java at commit 53a54543 (2023-07-10), the API era that matches the Zephyr core. If you know monero-java, or monero-ts and its documentation, you know most of zephyr-">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../assets/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon-180.png">
+<link rel="stylesheet" href="../assets/content.css">
+<link rel="stylesheet" href="../assets/print.css">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<a class="lt-skip-link" href="#main">Skip to main content</a>
+<header class="lt-header">
+  <div class="lt-wrap lt-wrap-wide lt-header-inner">
+    <div class="site-title">
+      <a class="lt-brand" href="../index.html">zephyr-java</a>
+      <p class="site-tagline">Java wallet library for Zephyr, a lateo project</p>
+    </div>
+    <nav class="lt-nav" aria-label="Site navigation">
+      <a href="index.html" aria-current="page">Guide</a>
+      <a href="../javadoc/index.html">Javadoc</a>
+      <a href="https://github.com/loki-notfound/myzephyr-java/releases">Releases</a>
+      <a href="https://github.com/loki-notfound/myzephyr-java">Repository</a>
+    </nav>
+  </div>
+</header>
+<main id="main" tabindex="-1">
+<div class="lt-wrap lt-wrap-wide lt-docs-layout">
+<aside class="lt-toc" aria-label="Guide navigation">
+<h2 id="site-nav-guide">Guide</h2>
+<nav aria-labelledby="site-nav-guide">
+<ol>
+<li><a href="index.html">zephyr-java user guide</a></li>
+<li><a href="01-getting-started.html">1. Getting started</a></li>
+<li><a href="02-wallets.html">2. Wallets</a></li>
+<li><a href="03-connecting-to-a-node.html">3. Connecting to a node</a></li>
+<li><a href="04-threads-and-listeners.html">4. Threads and listeners</a></li>
+<li><a href="05-assets-and-balances.html">5. Assets, accounts and balances</a></li>
+<li><a href="06-history.html">6. History</a></li>
+<li><a href="07-sending.html">7. Sending</a></li>
+<li><a href="08-conversions-and-the-reserve.html">8. Conversions and the reserve</a></li>
+<li><a href="09-errors.html">9. Errors and exceptions</a></li>
+<li><a href="10-android.html">10. Android</a></li>
+<li><a href="11-the-rpc-classes.html">11. The RPC classes</a></li>
+<li><a href="12-coming-from-monero-java.html" aria-current="page">12. Coming from monero-java</a></li>
+<li><a href="13-known-limitations.html">13. Known limitations</a></li>
+<li><a href="14-building-and-verifying.html">14. Building and verifying</a></li>
+</ol>
+</nav>
+<h2 id="site-nav-page">On this page</h2>
+<nav aria-labelledby="site-nav-page">
+<ol>
+<li><a href="#the-renaming-rules">The renaming rules</a></li>
+<li><a href="#what-is-different">What is different</a></li>
+<li><a href="#both-libraries-in-one-program">Both libraries in one program</a></li>
+</ol>
+</nav>
+</aside>
+<article class="lt-docs-main lt-stack">
+<nav class="lt-breadcrumbs" aria-label="Breadcrumb"><ol><li><a href="../index.html">zephyr-java</a></li><li><a href="index.html">Guide</a></li><li><a href="12-coming-from-monero-java.html" aria-current="page">12. Coming from monero-java</a></li></ol></nav>
+<h1 id="12-coming-from-monero-java">12. Coming from monero-java</h1>
+<p>zephyr-java is derived from <a href="https://github.com/woodser/monero-java">monero-java</a> at commit <code>53a54543</code> (2023-07-10), the API era that matches the Zephyr core. If you know monero-java, or monero-ts and its documentation, you know most of zephyr-java: the classes, the methods and the model are the same, renamed once. This chapter lists the renaming rules, the differences that are not renames, and how to use both libraries in one program.</p>
+<p>Monero additions to monero-java after <code>53a54543</code> are not in zephyr-java: they need parts of the native core that Zephyr's core does not have. The same goes for upstream's &quot;subtract fee from destinations&quot;, which the Zephyr core would ignore without an error.</p>
+<h2 id="the-renaming-rules">The renaming rules<a class="heading-anchor" href="#the-renaming-rules" aria-label="Link to this section">#</a></h2>
+<p>The rename was done once, mechanically, over the whole source tree:</p>
+<div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="the-renaming-rules">
+<table>
+<thead><tr><th scope="col">monero-java</th><th scope="col">zephyr-java</th></tr></thead>
+<tbody>
+<tr><td>package <code>monero.*</code></td><td>package <code>zephyr.*</code></td></tr>
+<tr><td>package <code>common.*</code></td><td>package <code>zephyr.lib.*</code></td></tr>
+<tr><td>class <code>Monero*</code></td><td>class <code>Zephyr*</code></td></tr>
+<tr><td><code>MoneroUtils.xmrToAtomicUnits(double)</code></td><td><code>ZephyrUtils.toAtomicUnits(double)</code></td></tr>
+<tr><td><code>MoneroUtils.atomicUnitsToXmr(BigInteger)</code></td><td><code>ZephyrUtils.fromAtomicUnits(BigInteger)</code></td></tr>
+<tr><td>native library <code>monero-java</code></td><td>native library <code>zephyr-java</code></td></tr>
+<tr><td>Maven <code>io.github.monero-ecosystem:monero-java</code> (now <code>io.github.woodser:monero-java</code>)</td><td>Maven <code>io.github.loki-notfound:zephyr-java</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>Everything else keeps its name: method names, parameters, the model's fields and the query classes. So a monero-ts example ports by renaming its types.</p>
+<p>The twenty classes you meet first:</p>
+<div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="the-renaming-rules">
+<table>
+<thead><tr><th scope="col">monero-java</th><th scope="col">zephyr-java</th></tr></thead>
+<tbody>
+<tr><td><code>monero.wallet.MoneroWalletFull</code></td><td><code>zephyr.wallet.ZephyrWalletFull</code></td></tr>
+<tr><td><code>monero.wallet.MoneroWallet</code></td><td><code>zephyr.wallet.ZephyrWallet</code></td></tr>
+<tr><td><code>monero.wallet.MoneroWalletRpc</code></td><td><code>zephyr.wallet.ZephyrWalletRpc</code></td></tr>
+<tr><td><code>monero.daemon.MoneroDaemonRpc</code></td><td><code>zephyr.daemon.ZephyrDaemonRpc</code></td></tr>
+<tr><td><code>monero.common.MoneroUtils</code></td><td><code>zephyr.common.ZephyrUtils</code></td></tr>
+<tr><td><code>monero.common.MoneroRpcConnection</code></td><td><code>zephyr.common.ZephyrRpcConnection</code></td></tr>
+<tr><td><code>monero.common.MoneroConnectionManager</code></td><td><code>zephyr.common.ZephyrConnectionManager</code></td></tr>
+<tr><td><code>monero.common.MoneroError</code></td><td><code>zephyr.common.ZephyrError</code></td></tr>
+<tr><td><code>monero.daemon.model.MoneroNetworkType</code></td><td><code>zephyr.daemon.model.ZephyrNetworkType</code></td></tr>
+<tr><td><code>monero.wallet.model.MoneroWalletConfig</code></td><td><code>zephyr.wallet.model.ZephyrWalletConfig</code></td></tr>
+<tr><td><code>monero.wallet.model.MoneroWalletListener</code></td><td><code>zephyr.wallet.model.ZephyrWalletListener</code></td></tr>
+<tr><td><code>monero.wallet.model.MoneroTxConfig</code></td><td><code>zephyr.wallet.model.ZephyrTxConfig</code></td></tr>
+<tr><td><code>monero.wallet.model.MoneroTxWallet</code></td><td><code>zephyr.wallet.model.ZephyrTxWallet</code></td></tr>
+<tr><td><code>monero.wallet.model.MoneroTxQuery</code></td><td><code>zephyr.wallet.model.ZephyrTxQuery</code></td></tr>
+<tr><td><code>monero.wallet.model.MoneroTransfer</code></td><td><code>zephyr.wallet.model.ZephyrTransfer</code></td></tr>
+<tr><td><code>monero.wallet.model.MoneroIncomingTransfer</code></td><td><code>zephyr.wallet.model.ZephyrIncomingTransfer</code></td></tr>
+<tr><td><code>monero.wallet.model.MoneroOutgoingTransfer</code></td><td><code>zephyr.wallet.model.ZephyrOutgoingTransfer</code></td></tr>
+<tr><td><code>monero.wallet.model.MoneroOutputWallet</code></td><td><code>zephyr.wallet.model.ZephyrOutputWallet</code></td></tr>
+<tr><td><code>monero.wallet.model.MoneroAccount</code></td><td><code>zephyr.wallet.model.ZephyrAccount</code></td></tr>
+<tr><td><code>monero.wallet.model.MoneroDestination</code></td><td><code>zephyr.wallet.model.ZephyrDestination</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>A helper from <code>common.utils</code>, such as <code>common.utils.GenUtils</code>, is now <code>zephyr.lib.utils.GenUtils</code>.</p>
+<h2 id="what-is-different">What is different<a class="heading-anchor" href="#what-is-different" aria-label="Link to this section">#</a></h2>
+<p>These are the changes a port has to make by hand. The compiler finds all of them except the currency pair and the two results that differ.</p>
+<p><strong>Balances are per asset.</strong> monero-java's six balance methods return a <code>BigInteger</code>. In zephyr-java:</p>
+<div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="what-is-different">
+<table>
+<thead><tr><th scope="col">monero-java</th><th scope="col">zephyr-java</th></tr></thead>
+<tbody>
+<tr><td><code>BigInteger getBalance()</code></td><td><code>ZephyrBalance getBalance()</code></td></tr>
+<tr><td><code>BigInteger getBalance(Integer accountIdx)</code></td><td><code>Map&lt;Integer, ZephyrBalance&gt; getBalance(Integer accountIdx)</code>, keyed by subaddress</td></tr>
+<tr><td><code>BigInteger getBalance(Integer accountIdx, Integer subaddressIdx)</code></td><td><code>BigInteger getBalance(String assetType, Integer accountIdx, Integer subaddressIdx)</code></td></tr>
+<tr><td>—</td><td><code>BigInteger getBalance(String assetType, Integer accountIdx)</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>The unlocked balance has the same four shapes, and <code>ZephyrAccount</code> and <code>ZephyrSubaddress</code> hold a <code>ZephyrBalance</code> instead of a <code>BigInteger</code>. <a href="05-assets-and-balances.html">Assets, accounts and balances</a> explains them.</p>
+<p><strong>The listener names the asset.</strong> <code>onBalancesChanged(BigInteger, BigInteger)</code> became <code>onBalancesChanged(BigInteger, BigInteger, String assetType)</code>. The old method still exists in <code>ZephyrWalletListener</code> but is <code>final</code> and deprecated, so a ported listener that overrides it does not compile, rather than compiling and never being called. The listener's outputs carry the asset in <code>getAssetType()</code>, which is empty for unconfirmed outputs (<a href="04-threads-and-listeners.html#outputs-in-the-pool-carry-no-asset">Outputs in the pool carry no asset</a>).</p>
+<p><strong>Every send names a currency pair.</strong> A <code>ZephyrTxConfig</code> without <code>setSourceCurrency</code> and <code>setDestinationCurrency</code> fails with &quot;Must specify source currency&quot;, a plain transfer included. The compiler does not find this one; <a href="08-conversions-and-the-reserve.html#the-ten-pairs">The ten pairs</a> lists the pairs.</p>
+<p><strong>New calls.</strong> <code>getReserveInfo()</code> and <code>getCirculatingSupply()</code> on the wallet (<a href="08-conversions-and-the-reserve.html#reserve-info">Reserve info</a>), <code>ZephyrAssets</code> with the asset names, <code>getOutputAssetType</code> for the asset of an output, and the pricing record on daemon block headers.</p>
+<p><strong>Two results differ without a compile error.</strong> Code that works in monero-java compiles and runs, but reads something the Zephyr core does not deliver:</p>
+<ul><li><code>checkTxKey</code> (and <code>checkTxProof</code>): monero-java returns the received amount. In zephyr-java's full wallet the amount is 0, and the amount comes from the transaction in <code>getTxs(hash)</code> (<a href="06-history.html#checktxkey-returns-amount-0">checkTxKey returns amount 0</a>).</li><li><code>getOutputs()</code>: monero-java's outputs have no asset concept. zephyr-java's outputs have an <code>assetType</code> field, but <code>getOutputs()</code> leaves it <code>null</code>. The asset comes from the output's transaction, through <code>getOutputAssetType(output)</code> (<a href="06-history.html#getoutputs-reports-no-asset">getOutputs() reports no asset</a>).</li></ul>
+<p><strong>Addresses and constants.</strong> Address decoding stays pure Java (no native library needed) but knows Zephyr's prefixes, which are multi-byte varints: on mainnet, primary addresses start with <code>ZEPHYR</code>, subaddresses with <code>ZEPHs</code> and integrated addresses with <code>ZEPHii</code>. <code>ZephyrNetworkType</code> carries Zephyr's codes. <code>ZephyrUtils.RING_SIZE</code> is 16, the network rule of the Zephyr core, not Monero's 12. Keccak-256 and hex are the library's own code (<code>Keccak256</code>, <code>GenUtils</code>), so there is no dependency on Bouncy Castle or Apache commons-codec.</p>
+<p><strong>Amounts.</strong> <code>ZephyrUtils.toAtomicUnits(double)</code> converts through a <code>double</code> and fails or truncates for some values; use <code>BigDecimal</code> (<a href="05-assets-and-balances.html#amounts">Amounts</a>).</p>
+<p><strong>The RPC classes are a first pass</strong>, for the base coin only (<a href="11-the-rpc-classes.html">The RPC classes</a>).</p>
+<h2 id="both-libraries-in-one-program">Both libraries in one program<a class="heading-anchor" href="#both-libraries-in-one-program" aria-label="Link to this section">#</a></h2>
+<p>zephyr-java was built so that it can sit next to monero-java in one JVM or one app: a wallet that supports both coins needs both.</p>
+<ul><li><strong>No class clashes.</strong> The packages differ (<code>zephyr.*</code> against <code>monero.*</code> and <code>common.*</code>).</li><li><strong>No native clashes.</strong> Each library is its own shared object (<code>libzephyr-java.so</code>, <code>libmonero-java.so</code>), and zephyr-java's exports only JNI symbols. The one name both libraries export is <code>JNI_OnLoad</code>, which the JVM looks up per library, so it is no conflict.</li><li><strong>Tested.</strong> The coexistence test loads monero-java 0.8.65 from Maven Central and zephyr-java in one JVM. It validates a Zephyr address in Java and natively and a Monero address with monero-java. It checks that the two dynamic symbol sets share exactly <code>{JNI_OnLoad}</code> and no <code>Java_*</code> name.</li></ul>
+<p><strong>Jackson decides the versions.</strong> monero-java 0.8.65 needs Jackson 2.15 or newer (it uses <code>StreamReadConstraints</code>); zephyr-java declares 2.13.5. A build tool resolves one Jackson for the whole program, normally the highest; with Maven's nearest-wins rule you may have to pin it yourself. The coexistence test runs both libraries on Jackson 2.21.7, which shows that zephyr-java works on the 2.21 line. On Android, Jackson 2.14 and newer need minSdk 26 (<a href="10-android.html#jackson-on-api-24-and-25">Jackson on API 24 and 25</a>).</p>
+<p>The coexistence test lives in <code>src/test/java/test/TestCoexistence.java</code> and runs with <code>mvn -Pcoexistence test</code>; the default build does not compile it, because it needs monero-java on the class path.</p>
+<nav class="site-pager" aria-label="Previous and next page">
+<a class="site-prev" rel="prev" href="11-the-rpc-classes.html">Previous: 11. The RPC classes</a>
+<a class="site-next" rel="next" href="13-known-limitations.html">Next: 13. Known limitations</a>
+</nav>
+</article>
+</div>
+</main>
+<footer class="lt-footer">
+<div class="lt-wrap lt-wrap-wide">
+<p>Guide for zephyr-java 2.3.0-sec.2-java.4, built from commit <code>e59843ad</code> (2026-11-17 UTC).</p>
+<p>zephyr-java and this site are a <a href="https://lateo.dev/">lateo</a> project by an independent operator, not affiliated with or endorsed by ZephyrProtocol. Source: <a href="https://github.com/loki-notfound/myzephyr-java">github.com/loki-notfound/myzephyr-java</a>.</p>
+<p>The library and the guide are under the MIT licence of the repository; the stylesheet is BSD 3-Clause; the lateo name, mark and favicons are not covered by either and all rights in them are reserved by their owner (<a href="../assets/NOTICE.txt">notice</a>).</p>
+</div>
+</footer>
+</body>
+</html>

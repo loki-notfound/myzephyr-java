@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>8. Conversions and the reserve - zephyr-java guide</title>
+<meta name="description" content="A conversion is a send whose source and destination currencies differ. It is built with the same createTxs or sweepUnlocked as a transfer (Sending). This chapter covers which conversions exist and the">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../assets/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon-180.png">
+<link rel="stylesheet" href="../assets/content.css">
+<link rel="stylesheet" href="../assets/print.css">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<a class="lt-skip-link" href="#main">Skip to main content</a>
+<header class="lt-header">
+  <div class="lt-wrap lt-wrap-wide lt-header-inner">
+    <div class="site-title">
+      <a class="lt-brand" href="../index.html">zephyr-java</a>
+      <p class="site-tagline">Java wallet library for Zephyr, a lateo project</p>
+    </div>
+    <nav class="lt-nav" aria-label="Site navigation">
+      <a href="index.html" aria-current="page">Guide</a>
+      <a href="../javadoc/index.html">Javadoc</a>
+      <a href="https://github.com/loki-notfound/myzephyr-java/releases">Releases</a>
+      <a href="https://github.com/loki-notfound/myzephyr-java">Repository</a>
+    </nav>
+  </div>
+</header>
+<main id="main" tabindex="-1">
+<div class="lt-wrap lt-wrap-wide lt-docs-layout">
+<aside class="lt-toc" aria-label="Guide navigation">
+<h2 id="site-nav-guide">Guide</h2>
+<nav aria-labelledby="site-nav-guide">
+<ol>
+<li><a href="index.html">zephyr-java user guide</a></li>
+<li><a href="01-getting-started.html">1. Getting started</a></li>
+<li><a href="02-wallets.html">2. Wallets</a></li>
+<li><a href="03-connecting-to-a-node.html">3. Connecting to a node</a></li>
+<li><a href="04-threads-and-listeners.html">4. Threads and listeners</a></li>
+<li><a href="05-assets-and-balances.html">5. Assets, accounts and balances</a></li>
+<li><a href="06-history.html">6. History</a></li>
+<li><a href="07-sending.html">7. Sending</a></li>
+<li><a href="08-conversions-and-the-reserve.html" aria-current="page">8. Conversions and the reserve</a></li>
+<li><a href="09-errors.html">9. Errors and exceptions</a></li>
+<li><a href="10-android.html">10. Android</a></li>
+<li><a href="11-the-rpc-classes.html">11. The RPC classes</a></li>
+<li><a href="12-coming-from-monero-java.html">12. Coming from monero-java</a></li>
+<li><a href="13-known-limitations.html">13. Known limitations</a></li>
+<li><a href="14-building-and-verifying.html">14. Building and verifying</a></li>
+</ol>
+</nav>
+<h2 id="site-nav-page">On this page</h2>
+<nav aria-labelledby="site-nav-page">
+<ol>
+<li><a href="#the-ten-pairs">The ten pairs</a></li>
+<li><a href="#the-reserve-ratio">The reserve ratio</a></li>
+<li><a href="#reserve-info">Reserve info</a></li>
+<li><a href="#getreserveinfo">getReserveInfo()</a></li>
+<li><a href="#getcirculatingsupply">getCirculatingSupply()</a></li>
+<li><a href="#building-a-conversion">Building a conversion</a></li>
+<li><a href="#fees-of-a-conversion">Fees of a conversion</a></li>
+<li><a href="#converting-everything-at-once">Converting everything at once</a></li>
+<li><a href="#what-was-tested">What was tested</a></li>
+</ol>
+</nav>
+</aside>
+<article class="lt-docs-main lt-stack">
+<nav class="lt-breadcrumbs" aria-label="Breadcrumb"><ol><li><a href="../index.html">zephyr-java</a></li><li><a href="index.html">Guide</a></li><li><a href="08-conversions-and-the-reserve.html" aria-current="page">8. Conversions and the reserve</a></li></ol></nav>
+<h1 id="8-conversions-and-the-reserve">8. Conversions and the reserve</h1>
+<p>A conversion is a send whose source and destination currencies differ. It is built with the same <code>createTxs</code> or <code>sweepUnlocked</code> as a transfer (<a href="07-sending.html">Sending</a>). This chapter covers which conversions exist and the reserve whose state decides which of them the chain accepts.</p>
+<p>The blocks marked &quot;Java, compiled&quot; in this chapter come from <code>src/test/java/examples/GuideConversions.java</code>.</p>
+<h2 id="the-ten-pairs">The ten pairs<a class="heading-anchor" href="#the-ten-pairs" aria-label="Link to this section">#</a></h2>
+<p>The core maps the pair to a transaction type and rejects every other pair with &quot;not a valid tx type&quot;:</p>
+<div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="the-ten-pairs">
+<table>
+<thead><tr><th scope="col">Source → destination</th><th scope="col">Transaction type</th><th scope="col">Ratio rule (checked by the chain after the conversion)</th></tr></thead>
+<tbody>
+<tr><td>ZPH → ZPH</td><td><code>TRANSFER</code></td><td>none</td></tr>
+<tr><td>ZSD → ZSD</td><td><code>STABLE_TRANSFER</code></td><td>none</td></tr>
+<tr><td>ZRS → ZRS</td><td><code>RESERVE_TRANSFER</code></td><td>none</td></tr>
+<tr><td>ZYS → ZYS</td><td><code>YIELD_TRANSFER</code></td><td>none</td></tr>
+<tr><td>ZPH → ZSD</td><td><code>MINT_STABLE</code></td><td>spot <strong>and</strong> moving-average ratio at or above 4.0</td></tr>
+<tr><td>ZSD → ZPH</td><td><code>REDEEM_STABLE</code></td><td>the reserve's assets above zero</td></tr>
+<tr><td>ZPH → ZRS</td><td><code>MINT_RESERVE</code></td><td>spot and moving-average ratio below 8.0 (no limit while fewer than 100 ZSD circulate)</td></tr>
+<tr><td>ZRS → ZPH</td><td><code>REDEEM_RESERVE</code></td><td>spot and moving-average ratio at or above 4.0</td></tr>
+<tr><td>ZSD → ZYS</td><td><code>MINT_YIELD</code></td><td>none</td></tr>
+<tr><td>ZYS → ZSD</td><td><code>REDEEM_YIELD</code></td><td>none</td></tr>
+</tbody>
+</table>
+</div>
+<p>The audit pairs (V1 → V2) and the V1 names exist in the code. Since hard fork 11 the chain accepts neither, so on mainnet only the ten pairs above work.</p>
+<h2 id="the-reserve-ratio">The reserve ratio<a class="heading-anchor" href="#the-reserve-ratio" aria-label="Link to this section">#</a></h2>
+<p>The ratio rules depend on the state of the reserve, which changes with the price. A reserve ratio of 4.0 (400.00%) is the floor for <code>MINT_STABLE</code> and <code>REDEEM_RESERVE</code>, and 8.0 (800.00%) the ceiling for <code>MINT_RESERVE</code>. On 2026-11-06 the reserve ratio was 2.64, so <code>MINT_STABLE</code> and <code>REDEEM_RESERVE</code> were refused; <code>MINT_RESERVE</code>, <code>REDEEM_STABLE</code> and the yield pairs were allowed by the ratio rules. On 2026-11-17 it was 1.849 (moving average 1.986), and the core refused the same two pairs by their ratio.</p>
+<p>The chain checks the ratio <strong>after</strong> the conversion, with the conversion's own amounts added. A ratio slightly above 4.0 can therefore still refuse a large <code>MINT_STABLE</code>. An app should check <code>getReserveInfo()</code> (<a href="#reserve-info">Reserve info</a>) before it offers a conversion, and expect <code>createTxs</code> to throw a <code>ZephyrError</code> anyway. The core's message names the ratio the conversion would produce, and it is the authoritative answer. Observed on 2026-11-17 with <code>setRelay(false)</code>:</p>
+<div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="the-reserve-ratio">
+<table>
+<thead><tr><th scope="col">Pair</th><th scope="col">Message</th></tr></thead>
+<tbody>
+<tr><td>ZPH → ZSD</td><td><code>Spot reserve ratio not satisfied. New reserve ratio would be 1.848989555682 which is less than minimum 4.0</code></td></tr>
+<tr><td>ZRS → ZPH</td><td><code>Reserve ratio not satisfied. New reserve ratio would be 1.848989637479 which is less than the minimum 4.0</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>The two messages differ in their wording (&quot;Spot reserve ratio not satisfied&quot; against &quot;Reserve ratio not satisfied&quot;). Both arrive as the same <code>ZephyrError</code> with a <code>null</code> code, like &quot;not enough money&quot;. Only the text tells them apart, and it can change with the core (<a href="09-errors.html#the-messages-a-wallet-meets">The messages a wallet meets</a>). For a conversion the core checked the decimal places first, then the ratio, then the funds. An amount of one atomic unit gave the decimal-places message for every conversion pair (<a href="#building-a-conversion">Building a conversion</a>).</p>
+<h2 id="reserve-info">Reserve info<a class="heading-anchor" href="#reserve-info" aria-label="Link to this section">#</a></h2>
+<p>Zephyr's stable asset has a reserve of ZPH behind it. Whether a conversion is allowed depends on the state of that reserve (<a href="#the-ten-pairs">The ten pairs</a>), and a wallet app usually shows it. Two wallet calls report it: <code>getReserveInfo()</code> and <code>getCirculatingSupply()</code>. Both ask the node; they are not computed from the wallet's own outputs. Both need a connected full wallet; <code>ZephyrWalletRpc</code> does not support them (<a href="11-the-rpc-classes.html#zephyrwalletrpc">ZephyrWalletRpc</a>).</p>
+<h2 id="getreserveinfo">getReserveInfo()<a class="heading-anchor" href="#getreserveinfo" aria-label="Link to this section">#</a></h2>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>ZephyrReserveInfo info = wallet.getReserveInfo();
+BigDecimal ratio = info.getReserveRatio();       // 2.33 means 233%</code></pre>
+</div>
+<p>The core computes the values from the circulating supply and the pricing record of the block below the node's current height. Amounts are <code>BigInteger</code> atomic units (10^12 per unit) and can exceed 2^64, because the core computes them as 128-bit integers. The two ratios are <code>BigDecimal</code> with the full precision of the core's <code>double</code>.</p>
+<div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="getreserveinfo">
+<table>
+<thead><tr><th scope="col">Getter</th><th scope="col">JSON key</th><th scope="col">Meaning</th><th scope="col">Unit</th></tr></thead>
+<tbody>
+<tr><td><code>getZephReserve()</code></td><td><code>zeph_reserve</code></td><td>ZPH held in the reserve</td><td>atomic ZPH</td></tr>
+<tr><td><code>getNumStables()</code></td><td><code>num_stables</code></td><td>ZSD in circulation</td><td>atomic ZSD</td></tr>
+<tr><td><code>getNumReserves()</code></td><td><code>num_reserves</code></td><td>ZRS in circulation</td><td>atomic ZRS</td></tr>
+<tr><td><code>getAssets()</code></td><td><code>assets</code></td><td>the reserve's ZPH valued at the oracle's spot price</td><td>atomic units of the stable's unit (as ZSD)</td></tr>
+<tr><td><code>getAssetsMa()</code></td><td><code>assets_ma</code></td><td>the same at the moving-average price; <strong>0 on the current hard fork</strong></td><td>as <code>assets</code></td></tr>
+<tr><td><code>getLiabilities()</code></td><td><code>liabilities</code></td><td>the stable asset outstanding, equal to <code>num_stables</code></td><td>as <code>assets</code></td></tr>
+<tr><td><code>getEquity()</code></td><td><code>equity</code></td><td><code>assets − liabilities</code>, or 0 when negative</td><td>as <code>assets</code></td></tr>
+<tr><td><code>getEquityMa()</code></td><td><code>equity_ma</code></td><td>the moving-average equity; <strong>0 on the current hard fork</strong></td><td>as <code>assets</code></td></tr>
+<tr><td><code>getReserveRatio()</code></td><td><code>reserve_ratio</code></td><td><code>assets / liabilities</code> at the spot price</td><td>ratio</td></tr>
+<tr><td><code>getReserveRatioMa()</code></td><td><code>reserve_ratio_ma</code></td><td>the moving average of that ratio over the pricing-record history</td><td>ratio</td></tr>
+<tr><td><code>getHfVersion()</code></td><td><code>hf_version</code></td><td>the hard-fork version the node is on</td><td>number</td></tr>
+<tr><td><code>getZyieldCirc()</code></td><td><code>zyield_circ</code></td><td>ZYS in circulation</td><td>atomic ZYS</td></tr>
+<tr><td><code>getZyieldRsv()</code></td><td><code>zyield_rsv</code></td><td>the yield reserve (the supply's <code>YIELD</code> entry)</td><td>atomic units</td></tr>
+</tbody>
+</table>
+</div>
+<div class="lt-callout lt-callout-warning" role="note">
+<p class="lt-callout-title">Do not divide by <code>assetsMa</code> or <code>equityMa</code>.</p>
+<p>In the core's code path for every hard fork after version 4 they are set to 0, and the mainnet test runs (hard fork 11) reported 0 every time. The moving average that matters for the conversion rules is <code>reserveRatioMa</code>, which is populated.</p>
+</div>
+<p>Two more edge cases come from the same code. When no ZSD circulates, both ratios and the two yield values are 0 (not infinite). When the core cannot get the pricing record of the tip, it returns before computing, and every value except <code>hfVersion</code> stays 0. Without a node that happens without an exception. Treat a ratio of 0 as unknown, not as a ratio.</p>
+<p>An example from the mainnet test run, at wallet height 902,123, hard fork 11 (amounts shown in whole units here):</p>
+<div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="getreserveinfo">
+<table>
+<thead><tr><th scope="col">Field</th><th scope="col">Value</th></tr></thead>
+<tbody>
+<tr><td>ZPH reserve</td><td>4,926,112.04 ZPH</td></tr>
+<tr><td>Stables in circulation (liabilities)</td><td>362,406.29 ZSD</td></tr>
+<tr><td>Reserves in circulation</td><td>3,229,813.95 ZRS</td></tr>
+<tr><td>Assets</td><td>845,297.43</td></tr>
+<tr><td>Equity</td><td>482,891.14</td></tr>
+<tr><td>Reserve ratio</td><td>2.3325</td></tr>
+<tr><td>Reserve ratio MA</td><td>2.6213</td></tr>
+<tr><td>ZYS in circulation</td><td>157,437.68 ZYS</td></tr>
+<tr><td>Yield reserve</td><td>313,963.17</td></tr>
+</tbody>
+</table>
+</div>
+<p>The spot ratio was 2.33 (233.25%) and the moving average 2.62 (262.13%), both below 4.0. So <code>MINT_STABLE</code> and <code>REDEEM_RESERVE</code> were refused at height 902,123, and <code>MINT_RESERVE</code> (below 8.0) was allowed.</p>
+<p>The values come from the oracle's pricing record, which every block header carries; <a href="11-the-rpc-classes.html#zephyrdaemonrpc-and-the-pricing-record">ZephyrDaemonRpc and the pricing record</a> shows how to read it.</p>
+<h2 id="getcirculatingsupply">getCirculatingSupply()<a class="heading-anchor" href="#getcirculatingsupply" aria-label="Link to this section">#</a></h2>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>Map&lt;String, BigInteger&gt; supply = wallet.getCirculatingSupply();</code></pre>
+</div>
+<p>The map comes from the node unchanged. On mainnet it has <strong>six</strong> keys, not four:</p>
+<div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="getcirculatingsupply">
+<table>
+<thead><tr><th scope="col">Key</th><th scope="col">Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>ZPH</code>, <code>ZSD</code>, <code>ZRS</code>, <code>ZYS</code></td><td>the circulating supply of the four assets</td></tr>
+<tr><td><code>DJED</code></td><td>the ZPH held in the reserve; equal to <code>getZephReserve()</code></td></tr>
+<tr><td><code>YIELD</code></td><td>the yield reserve; equal to <code>getZyieldRsv()</code></td></tr>
+</tbody>
+</table>
+</div>
+<p><code>DJED</code> and <code>YIELD</code> are not assets a wallet can hold. A user interface that lists &quot;the supply of every asset&quot; should take the four V2 keys (<code>ZephyrAssets.V2</code>) and treat the other two as properties of the reserve. Older names may appear on other networks or heights. The core itself accepts both eras when it reads the map (<code>ZEPH</code> or <code>DJED</code> for the reserve, <code>ZEPHUSD</code> or <code>ZSD</code> and so on).</p>
+<p>On the mainnet test run at height 902,123 the six values were, in whole units: ZPH 12,356,073.23, ZSD 362,406.29, ZRS 3,229,813.95, ZYS 157,437.68, DJED 4,926,112.04 and YIELD 313,963.17.</p>
+<h2 id="building-a-conversion">Building a conversion<a class="heading-anchor" href="#building-a-conversion" aria-label="Link to this section">#</a></h2>
+<p>A conversion is a send with two different currencies, usually to your own address:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>List&lt;ZephyrTxWallet&gt; txs = wallet.createTxs(new ZephyrTxConfig()
+    .setAddress(wallet.getPrimaryAddress())
+    .setAmount(new BigDecimal(&quot;50&quot;).movePointRight(12).toBigIntegerExact())   // in ZPH
+    .setSourceCurrency(ZephyrAssets.ZPH)
+    .setDestinationCurrency(ZephyrAssets.ZRS)
+    .setAccountIndex(0));</code></pre>
+</div>
+<p>Four rules come from the core:</p>
+<ol><li><strong>The amount is the source amount</strong> (here: 50 ZPH). The destination amount follows from the price.</li><li><strong>It must be a multiple of 10^8 atomic units</strong>, that is, at most four decimal places. Otherwise the core throws &quot;Mint/redeem TX amounts permit at most 4 decimal places&quot;. Round down before you build. <code>sweepUnlocked</code> is the exception: it rounds each converted amount down itself and adds the remainder to the fee.</li><li><strong>The price comes from the wallet's tip.</strong> The core uses the pricing record of the block below the wallet's current height when it builds the transaction, so sync right before you convert.</li><li><strong>The minted amount is known before you relay.</strong> The returned transaction carries an incoming transfer in the destination currency whose amount is the converted amount; show it to the user as the quote. Until the transaction is confirmed that transfer has no subaddress index.</li></ol>
+<p>Rounding down to four decimal places:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>static BigInteger roundDownForConversion(BigInteger amount) {
+  BigInteger step = BigInteger.TEN.pow(8);
+  return amount.subtract(amount.mod(step));
+}</code></pre>
+</div>
+<p><strong>A conversion's pricing record must be recent</strong> (read in the code; not run). The chain accepts a conversion only while its pricing record is at most 10 blocks below the current height, about 20 min at the two-minute block target. The node checks it when the transaction enters the pool, when a block is assembled and when a block is validated. The pool also drops a waiting conversion once its record has become too old. For an app: build a conversion right after a sync, relay it promptly, and rebuild a quote the user has not confirmed within a few minutes. A wallet that is more than about 10 blocks behind builds conversions the node refuses.</p>
+<h2 id="fees-of-a-conversion">Fees of a conversion<a class="heading-anchor" href="#fees-of-a-conversion" aria-label="Link to this section">#</a></h2>
+<p>A conversion pays its fee in the source asset, like a transfer: a ZPH → ZRS mint pays in ZPH. On the mainnet test run a 50 ZPH mint with <code>createTxs</code> paid 0.0004574 ZPH. A mint with <code>sweepUnlocked</code> paid 0.0005346 ZPH, because the unconvertible residue went into the fee (<a href="#converting-everything-at-once">Converting everything at once</a>).</p>
+<p>For a conversion from another asset the wallet computes the fee in ZPH and converts it into the source asset (read in the core's code; not run). It uses a moving-average price of the pricing record: ZSD at <code>stable_ma</code>, ZRS at <code>reserve_ma</code>, and ZYS through ZSD and <code>yield_price</code>. The node checks it back the same way.</p>
+<h3 id="how-the-mint-amount-is-computed-zph--zrs">How the mint amount is computed (ZPH → ZRS)<a class="heading-anchor" href="#how-the-mint-amount-is-computed-zph--zrs" aria-label="Link to this section">#</a></h3>
+<p>The chain's formula for <code>MINT_RESERVE</code> takes the reserve coin price <code>P = max(reserve, reserve_ma)</code> from the pricing record (the price of one ZRS in ZPH, times 10^12) and computes, in integers:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Text</span></div>
+<pre><code>rate     = 10^24 / P                       (ZRS per ZPH, times 10^12)
+rate     = rate - rate / 100               (the 1% conversion fee)
+rate     = rate - rate mod 10^4
+minted   = amount * rate / 10^12</code></pre>
+</div>
+<p>Both mints of the mainnet test run match it exactly. The pricing record was the one at the wallet's tip, height h0 − 1, where h0 was the node's height when the transaction was built. <code>reserve_ma</code> was the larger price both times:</p>
+<div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="how-the-mint-amount-is-computed-zph--zrs">
+<table>
+<thead><tr><th scope="col">Mint</th><th scope="col">Pricing record</th><th scope="col"><code>reserve_ma</code></th><th scope="col">Rate after fee</th><th scope="col">Minted</th></tr></thead>
+<tbody>
+<tr><td>50 ZPH with <code>createTxs</code></td><td>902,152</td><td><code>940987350000</code></td><td>1.0520864 ZRS per ZPH</td><td>52.60432 ZRS</td></tr>
+<tr><td>40.9987 ZPH with <code>sweepUnlocked</code></td><td>902,163</td><td><code>939802020000</code></td><td>1.05341335 ZRS per ZPH</td><td>43.188577912645 ZRS</td></tr>
+</tbody>
+</table>
+</div>
+<p>The other conversions use their own functions next to this one in the same file. They were not exercised on mainnet in this project, because the reserve ratio did not allow them or no ZSD was at hand.</p>
+<h2 id="converting-everything-at-once">Converting everything at once<a class="heading-anchor" href="#converting-everything-at-once" aria-label="Link to this section">#</a></h2>
+<p><code>sweepUnlocked</code> takes the same currency pair as <code>createTxs</code>, so it can also convert everything at once. Build without relaying, show the total fee and the quote, then relay every transaction. The returned transactions carry the converted amount in an incoming transfer, as for <code>createTxs</code> (read in the core's code):</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>List&lt;ZephyrTxWallet&gt; txs = wallet.sweepUnlocked(new ZephyrTxConfig()
+    .setAddress(wallet.getPrimaryAddress())
+    .setSourceCurrency(ZephyrAssets.ZPH)
+    .setDestinationCurrency(ZephyrAssets.ZRS)
+    .setAccountIndex(0));                 // relay defaults to false: nothing is sent yet
+BigInteger fee = BigInteger.ZERO;
+BigInteger minted = BigInteger.ZERO;
+for (ZephyrTxWallet tx : txs) {
+  fee = fee.add(tx.getFee());             // in ZPH
+  if (tx.getIncomingTransfers() == null) continue;
+  for (ZephyrIncomingTransfer transfer : tx.getIncomingTransfers()) minted = minted.add(transfer.getAmount());  // in ZRS
+}
+System.out.println(&quot;fee &quot; + GuideBalances.formatFull(fee) + &quot; ZPH, quote &quot; + GuideBalances.formatFull(minted) + &quot; ZRS&quot;);
+return wallet.relayTxs(txs);              // only after the user has agreed to fee and quote</code></pre>
+</div>
+<p>The mainnet test run used <code>setRelay(true)</code> instead, which builds and relays in one call without a review. That run left exactly 0 ZPH. 40.9987 ZPH was converted, and the unconvertible residue went into the fee (0.0005346 ZPH, against 0.0004574 for the 50 ZPH <code>createTxs</code> mint).</p>
+<h2 id="what-was-tested">What was tested<a class="heading-anchor" href="#what-was-tested" aria-label="Link to this section">#</a></h2>
+<p><strong>Conversions other than ZPH → ZRS are not tested on mainnet.</strong> ZPH transfers, a ZPH sweep, a ZRS sweep and ZPH → ZRS mints with <code>createTxs</code> and with <code>sweepUnlocked</code> ran on mainnet with real funds. <code>MINT_STABLE</code> and <code>REDEEM_RESERVE</code> were refused by the reserve ratio at the time, and no ZSD or ZYS was at hand for the other pairs. They use the same code path in zephyr-java (only the pair differs), but they have not been seen working.</p>
+<p>On 2026-11-17 the six conversion pairs reached the core's checks on a wallet without funds (<a href="#the-reserve-ratio">The reserve ratio</a>). None of those conversions was built, and nothing was relayed.</p>
+<nav class="site-pager" aria-label="Previous and next page">
+<a class="site-prev" rel="prev" href="07-sending.html">Previous: 7. Sending</a>
+<a class="site-next" rel="next" href="09-errors.html">Next: 9. Errors and exceptions</a>
+</nav>
+</article>
+</div>
+</main>
+<footer class="lt-footer">
+<div class="lt-wrap lt-wrap-wide">
+<p>Guide for zephyr-java 2.3.0-sec.2-java.4, built from commit <code>e59843ad</code> (2026-11-17 UTC).</p>
+<p>zephyr-java and this site are a <a href="https://lateo.dev/">lateo</a> project by an independent operator, not affiliated with or endorsed by ZephyrProtocol. Source: <a href="https://github.com/loki-notfound/myzephyr-java">github.com/loki-notfound/myzephyr-java</a>.</p>
+<p>The library and the guide are under the MIT licence of the repository; the stylesheet is BSD 3-Clause; the lateo name, mark and favicons are not covered by either and all rights in them are reserved by their owner (<a href="../assets/NOTICE.txt">notice</a>).</p>
+</div>
+</footer>
+</body>
+</html>

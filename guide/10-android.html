@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>10. Android - zephyr-java guide</title>
+<meta name="description" content="The AAR is the same library as the JAR, packaged for Android. It holds the Java classes, the native library for three ABIs and the R8 rules an app needs. This chapter covers what is different on Andro">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../assets/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon-180.png">
+<link rel="stylesheet" href="../assets/content.css">
+<link rel="stylesheet" href="../assets/print.css">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<a class="lt-skip-link" href="#main">Skip to main content</a>
+<header class="lt-header">
+  <div class="lt-wrap lt-wrap-wide lt-header-inner">
+    <div class="site-title">
+      <a class="lt-brand" href="../index.html">zephyr-java</a>
+      <p class="site-tagline">Java wallet library for Zephyr, a lateo project</p>
+    </div>
+    <nav class="lt-nav" aria-label="Site navigation">
+      <a href="index.html" aria-current="page">Guide</a>
+      <a href="../javadoc/index.html">Javadoc</a>
+      <a href="https://github.com/loki-notfound/myzephyr-java/releases">Releases</a>
+      <a href="https://github.com/loki-notfound/myzephyr-java">Repository</a>
+    </nav>
+  </div>
+</header>
+<main id="main" tabindex="-1">
+<div class="lt-wrap lt-wrap-wide lt-docs-layout">
+<aside class="lt-toc" aria-label="Guide navigation">
+<h2 id="site-nav-guide">Guide</h2>
+<nav aria-labelledby="site-nav-guide">
+<ol>
+<li><a href="index.html">zephyr-java user guide</a></li>
+<li><a href="01-getting-started.html">1. Getting started</a></li>
+<li><a href="02-wallets.html">2. Wallets</a></li>
+<li><a href="03-connecting-to-a-node.html">3. Connecting to a node</a></li>
+<li><a href="04-threads-and-listeners.html">4. Threads and listeners</a></li>
+<li><a href="05-assets-and-balances.html">5. Assets, accounts and balances</a></li>
+<li><a href="06-history.html">6. History</a></li>
+<li><a href="07-sending.html">7. Sending</a></li>
+<li><a href="08-conversions-and-the-reserve.html">8. Conversions and the reserve</a></li>
+<li><a href="09-errors.html">9. Errors and exceptions</a></li>
+<li><a href="10-android.html" aria-current="page">10. Android</a></li>
+<li><a href="11-the-rpc-classes.html">11. The RPC classes</a></li>
+<li><a href="12-coming-from-monero-java.html">12. Coming from monero-java</a></li>
+<li><a href="13-known-limitations.html">13. Known limitations</a></li>
+<li><a href="14-building-and-verifying.html">14. Building and verifying</a></li>
+</ol>
+</nav>
+<h2 id="site-nav-page">On this page</h2>
+<nav aria-labelledby="site-nav-page">
+<ol>
+<li><a href="#the-dependency">The dependency</a></li>
+<li><a href="#devices">Devices</a></li>
+<li><a href="#the-rpc-classes-below-api-26">The RPC classes below API 26</a></li>
+<li><a href="#the-network">The network</a></li>
+<li><a href="#storage">Storage</a></li>
+<li><a href="#backup">Backup</a></li>
+<li><a href="#lifecycle-and-threads">Lifecycle and threads</a></li>
+<li><a href="#logs">Logs</a></li>
+<li><a href="#a-first-test-on-a-device">A first test on a device</a></li>
+<li><a href="#the-shipped-r8-rules">The shipped R8 rules</a></li>
+</ol>
+</nav>
+</aside>
+<article class="lt-docs-main lt-stack">
+<nav class="lt-breadcrumbs" aria-label="Breadcrumb"><ol><li><a href="../index.html">zephyr-java</a></li><li><a href="index.html">Guide</a></li><li><a href="10-android.html" aria-current="page">10. Android</a></li></ol></nav>
+<h1 id="10-android">10. Android</h1>
+<p>The AAR is the same library as the JAR, packaged for Android. It holds the Java classes, the native library for three ABIs and the R8 rules an app needs. This chapter covers what is different on Android: the dependency, devices, the RPC classes below API 26 and the network. It then covers storage, backup, lifecycle, logs, a first test and the R8 rules. TLS to a node, with Android's default trust, is in <a href="03-connecting-to-a-node.html#tls-to-a-node">TLS to a node</a>.</p>
+<h2 id="the-dependency">The dependency<a class="heading-anchor" href="#the-dependency" aria-label="Link to this section">#</a></h2>
+<p>The repository goes where the project declares its repositories, which in a project created by Android Studio is <code>settings.gradle.kts</code>:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Kotlin</span></div>
+<pre><code>dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url = uri(&quot;https://loki-notfound.github.io/myzephyr-java/maven&quot;) }
+    }
+}</code></pre>
+</div>
+<p>The dependency and the packaging line go into the app module's <code>build.gradle.kts</code>:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Kotlin</span></div>
+<pre><code>android {
+    packaging { resources.excludes += &quot;/META-INF/DEPENDENCIES&quot; }
+}
+
+dependencies {
+    implementation(&quot;io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.4&quot;)
+}</code></pre>
+</div>
+<div class="lt-callout lt-callout-warning" role="note">
+<p class="lt-callout-title">The packaging line is required.</p>
+<p><code>httpclient5</code>, <code>httpcore5</code> and <code>httpcore5-h2</code> each carry a file <code>META-INF/DEPENDENCIES</code>. Without the exclude the app's build stops in <code>mergeDebugJavaResource</code> with &quot;3 files found with path 'META-INF/DEPENDENCIES'&quot;. The file is Maven metadata; nothing reads it at run time.</p>
+</div>
+<p>Android Studio's project template also sets <code>repositoriesMode</code> to <code>FAIL_ON_PROJECT_REPOS</code> in that block. A <code>repositories { }</code> block in the module's build file then stops the build:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Text</span></div>
+<pre><code>Build was configured to prefer settings repositories over project repositories but repository '…' was added by build file '…'</code></pre>
+</div>
+<p>So put the repository line in the settings file.</p>
+<p>The same in the Groovy DSL (<code>settings.gradle</code> and <code>app/build.gradle</code>):</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Groovy</span></div>
+<pre><code>dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url = 'https://loki-notfound.github.io/myzephyr-java/maven' }
+    }
+}</code></pre>
+</div>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Groovy</span></div>
+<pre><code>android {
+    packaging { resources.excludes += '/META-INF/DEPENDENCIES' }
+}
+
+dependencies {
+    implementation 'io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.4'
+}</code></pre>
+</div>
+<p>With a version catalog, <code>gradle/libs.versions.toml</code> gets the entry and the module uses <code>implementation(libs.zephyr.java.android)</code> (Groovy: <code>implementation libs.zephyr.java.android</code>):</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>TOML</span></div>
+<pre><code>[versions]
+zephyrJava = &quot;2.3.0-sec.2-java.4&quot;
+
+[libraries]
+zephyr-java-android = { module = &quot;io.github.loki-notfound:zephyr-java-android&quot;, version.ref = &quot;zephyrJava&quot; }</code></pre>
+</div>
+<p>The AAR is published as <code>zephyr-java-android</code> (the JAR for the JVM is <code>zephyr-java</code>). It brings three dependencies: Jackson (<code>jackson-core</code>, <code>jackson-databind</code>, 2.13.5) and the Apache HTTP client 5 (<code>httpclient5</code> 5.2.1, used by the RPC classes). It brings no Kotlin standard library, no Bouncy Castle and no Apache commons-codec. jeromq is compile-only (<a href="11-the-rpc-classes.html#dependencies">Dependencies</a>).</p>
+<h3 id="jackson-on-api-24-and-25">Jackson on API 24 and 25<a class="heading-anchor" href="#jackson-on-api-24-and-25" aria-label="Link to this section">#</a></h3>
+<div class="lt-callout lt-callout-warning" role="note">
+<p class="lt-callout-title">A newer Jackson breaks API 24 and 25.</p>
+<p>The library pins Jackson 2.13.5, the last Jackson line that runs on Android below API 26. Gradle does not report a conflict when your app or another library asks for Jackson 2.14 or newer. The app then fails at run time on API 24 and 25.</p>
+</div>
+<p>Within the 2.13 line, releases before 2.13.5 call <code>Method.getParameterCount()</code>, which Android has only from API 26. Gradle resolves the highest version for the whole app, zephyr-java included, and the build succeeds. On API 26 and newer that is fine: zephyr-java was tested on Jackson 2.21.7 on the JVM, in the coexistence test. Check what the app really gets:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Shell</span></div>
+<pre><code>./gradlew :app:dependencies --configuration releaseRuntimeClasspath | grep jackson</code></pre>
+</div>
+<p>A line such as <code>jackson-databind:2.13.5 -&gt; 2.21.7</code> means that another dependency lifted Jackson. Then minSdk 24 and that dependency do not go together. Raise minSdk to 26, or use a version of the other library that stays on Jackson 2.13. On Android zephyr-java has run with 2.13.5 only.</p>
+<h2 id="devices">Devices<a class="heading-anchor" href="#devices" aria-label="Link to this section">#</a></h2>
+<ul><li><strong>minSdk 24</strong> (Android 7.0). The native wallet, <code>ZephyrWalletFull</code>, runs from API 24. The RPC classes need API 26 or core library desugaring in the app (<a href="#the-rpc-classes-below-api-26">The RPC classes below API 26</a>).</li><li><strong>ABIs:</strong> <code>arm64-v8a</code>, <code>armeabi-v7a</code> and <code>x86_64</code>. There is no 32-bit <code>x86</code> library. The <code>armeabi-v7a</code> library is built with zephyr's own <code>-mfpu=vfpv4</code>, so it needs a CPU with VFPv4. Cortex-A8 and A9 cores lack it; every Android 7 device supports it.</li><li><strong>16 KB pages (16 KiB):</strong> the libraries are linked for 16 KB page alignment. Google Play requires it for apps that target Android 15 and later. Keep them uncompressed in the APK (<code>packaging { jniLibs.useLegacyPackaging = false }</code>, the default from minSdk 23). An app built against the AAR with AGP 9.5.0 passes <code>zipalign -c -P 16</code>, with the libraries stored.</li></ul>
+<p><strong>Size.</strong> The libraries are stored uncompressed, so each ABI adds its library's full size to the APK. The libraries in the <code>2.3.0-sec.2-java.4</code> AAR:</p>
+<div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="devices">
+<table>
+<thead><tr><th scope="col">ABI</th><th scope="col">Bytes</th><th scope="col">MB</th><th scope="col">MiB</th><th scope="col">Compressed inside the AAR</th></tr></thead>
+<tbody>
+<tr><td><code>arm64-v8a</code></td><td>20,141,000</td><td>20.14</td><td>19.21</td><td>7,484,104 bytes</td></tr>
+<tr><td><code>armeabi-v7a</code></td><td>18,019,980</td><td>18.02</td><td>17.19</td><td>7,165,617 bytes</td></tr>
+<tr><td><code>x86_64</code></td><td>23,897,880</td><td>23.90</td><td>22.79</td><td>8,590,609 bytes</td></tr>
+</tbody>
+</table>
+</div>
+<p>So each ABI adds about 20 MB for <code>arm64-v8a</code>, 18 MB for <code>armeabi-v7a</code> and 24 MB for <code>x86_64</code>. The size of a finished APK or of a Play delivery was not measured.</p>
+<p>An app built as an Android App Bundle reaches each device from Google Play with the library of that device's ABI only. The Android documentation, &quot;About Android App Bundles&quot;, describes it. An APK you distribute yourself carries every ABI unless you filter them; <code>x86_64</code> is mostly needed for the emulator:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Kotlin</span></div>
+<pre><code>android {
+    defaultConfig {
+        ndk { abiFilters += listOf(&quot;arm64-v8a&quot;, &quot;armeabi-v7a&quot;) }
+    }
+}</code></pre>
+</div>
+<p>The <code>x86_64</code> library ran on the Android emulator; the ARM libraries had not run on hardware by release <code>2.3.0-sec.2-java.4</code> (<a href="13-known-limitations.html#what-was-tested">What was tested</a>).</p>
+<h2 id="the-rpc-classes-below-api-26">The RPC classes below API 26<a class="heading-anchor" href="#the-rpc-classes-below-api-26" aria-label="Link to this section">#</a></h2>
+<p><code>ZephyrDaemonRpc</code> and <code>ZephyrWalletRpc</code> send their requests through the Apache HTTP client, which needs <code>java.time</code>; Android has it from API 26 (8.0). On API 24 and 25 every request throws a <code>ZephyrError</code> with the <code>NoClassDefFoundError</code> in its causes:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Text</span></div>
+<pre><code>The RPC classes need java.time: Android 8.0 (API 26) or newer, or core library desugaring in the app (user guide, chapter 6)</code></pre>
+</div>
+<p>Releases up to <code>2.3.0-sec.2-java.4</code> print &quot;chapter 6&quot; in that message; the section it means is this one. Later releases name this section instead.</p>
+<p>An app with minSdk 24 or 25 that uses the RPC classes enables core library desugaring in the app module:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Kotlin</span></div>
+<pre><code>android {
+    compileOptions { isCoreLibraryDesugaringEnabled = true }
+}
+
+dependencies {
+    coreLibraryDesugaring(&quot;com.android.tools:desugar_jdk_libs:2.1.5&quot;)
+}</code></pre>
+</div>
+<p>(Groovy: <code>coreLibraryDesugaringEnabled = true</code> and <code>coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'</code>.) With these two lines <code>ZephyrDaemonRpc</code> runs on API 24. The native wallet, <code>ZephyrWalletFull</code>, does not use the HTTP client and needs neither. <a href="11-the-rpc-classes.html">The RPC classes</a> covers what they do.</p>
+<h2 id="the-network">The network<a class="heading-anchor" href="#the-network" aria-label="Link to this section">#</a></h2>
+<p><strong>Permission.</strong> The AAR declares no permission. An app that connects to a node declares <code>&lt;uses-permission android:name=&quot;android.permission.INTERNET&quot; /&gt;</code> in its manifest.</p>
+<p><strong>Clear text.</strong> The native wallet and the RPC classes open their own sockets. They do not read the app's Network Security Configuration. On API 35, an app with targetSdk 36 reached an <code>http://</code> node without any <code>usesCleartextTraffic</code> setting. Android refuses clear text by default for apps that target API 28 and later (Android documentation, &quot;Network security configuration&quot;). But the documentation of <code>android:usesCleartextTraffic</code> notes that the socket API does not honour that flag.</p>
+<p>So the configuration neither blocks nor protects these connections. <code>cleartextTrafficPermitted=&quot;false&quot;</code> does not stop an <code>http://</code> node. The configuration's trust anchors and pins do not apply to an <code>https://</code> node either. The native wallet's root certificates are set with <code>ZephyrTls</code> (<a href="03-connecting-to-a-node.html#tls-to-a-node">TLS to a node</a>).</p>
+<h2 id="storage">Storage<a class="heading-anchor" href="#storage" aria-label="Link to this section">#</a></h2>
+<p>Android apps usually keep their data in the app's private storage or in their own database. Both work:</p>
+<ul><li><strong>Files:</strong> give <code>createWallet</code> a path inside <code>context.getFilesDir()</code>. The wallet writes <code>&lt;name&gt;.keys</code> and <code>&lt;name&gt;</code> there on <code>save()</code>.</li><li><strong>Bytes:</strong> create the wallet without a path, take <code>wallet.getData()</code> (keys and cache) and store the two arrays yourself; open later with <code>ZephyrWalletFull.openWalletData(...)</code>. This suits an encrypted database (<a href="02-wallets.html#wallet-bytes">Wallet bytes</a>).</li></ul>
+<h2 id="backup">Backup<a class="heading-anchor" href="#backup" aria-label="Link to this section">#</a></h2>
+<p><strong>What Auto Backup does.</strong> Android's Auto Backup includes an app's files by default for apps that target API 23 or newer. The files directory and databases go to the user's Google Drive, at most 25 MB per app. A device-to-device transfer copies them too (Android documentation, &quot;Back up user data with Auto Backup&quot;).</p>
+<p><strong>What ends up in it.</strong> Wallet files in <code>getFilesDir()</code>, or the bytes of <code>getData()</code> in a database, are in the backup unless the app excludes them.</p>
+<p><strong>What protects it.</strong> Both the keys and the cache are encrypted with keys derived from the wallet password, so a backup is as strong as that password. With an empty password anyone who has the backup can open the wallet.</p>
+<p><strong>How to keep wallet data out.</strong> Whether wallet data belongs in a backup is the app's choice:</p>
+<ul><li><code>android:allowBackup=&quot;false&quot;</code> in the manifest turns the cloud backup off. For an app that targets Android 12 or newer, on devices of some manufacturers, it does not stop a device-to-device transfer;</li><li><code>android:dataExtractionRules</code> (Android 12 and newer, for apps that target it) includes or excludes single files and directories, for the cloud backup and the device-to-device transfer separately;</li><li><code>android:fullBackupContent</code> (Android 11 and lower) includes or excludes them with one set of rules; a rule can require a device-to-device transfer or client-side encryption;</li><li>files in <code>context.getNoBackupFilesDir()</code> are never backed up.</li></ul>
+<h2 id="lifecycle-and-threads">Lifecycle and threads<a class="heading-anchor" href="#lifecycle-and-threads" aria-label="Link to this section">#</a></h2>
+<p>A wallet is expensive to open and must be closed exactly once. It belongs to something that outlives an Activity: a ViewModel, a bound service, or an application-wide holder. Close it (after storing it) when that owner ends.</p>
+<p><strong>Callbacks arrive on a thread you did not choose</strong> (<a href="04-threads-and-listeners.html#callbacks-run-on-threads-you-did-not-create">Callbacks run on threads you did not create</a>). Post to the main thread before you touch views, and catch every exception inside the callback (<a href="04-threads-and-listeners.html#an-exception-thrown-in-a-callback">An exception thrown in a callback</a>):</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java</span></div>
+<pre><code>Handler main = new Handler(Looper.getMainLooper());
+wallet.addListener(new ZephyrWalletListener() {
+  @Override
+  public void onBalancesChanged(BigInteger balance, BigInteger unlocked, String assetType) {
+    main.post(() -&gt; viewModel.setBalance(assetType, balance, unlocked));
+  }
+});</code></pre>
+</div>
+<p>This block uses Android classes, so it is not compiled with the tests.</p>
+<p>While the app is in the background, Android may stop it at any time. Store the wallet when the app goes to the background (<code>onStop</code>), and stop background syncing (<code>stopSyncing()</code>) if you do not need it there. Do not close the wallet while a sync may still run (<a href="04-threads-and-listeners.html#closing-a-wallet-that-syncs">Closing a wallet that syncs</a>). None of the observations of that section were made on Android.</p>
+<h2 id="logs">Logs<a class="heading-anchor" href="#logs" aria-label="Link to this section">#</a></h2>
+<p>The core has no Android log output: nothing it logs appears in logcat (seen on the emulator, API 24 and API 35). <code>ZephyrUtils.configureNativeLogging(path, false)</code> with a path in <code>context.getFilesDir()</code> would send it to a file; on Android this has not been tried (<a href="09-errors.html#the-native-log">The native log</a>).</p>
+<p>zephyr-java's own messages (<code>ZephyrUtils.setLogLevel(...)</code>) are printed with <code>System.out</code>, and Android shows <code>System.out</code> and <code>System.err</code> in logcat under those tags. Creating the first <code>ZephyrRpcConnection</code> (an RPC class, or a wallet given a server URI) prints three SLF4J lines to <code>System.err</code>. Among them are &quot;Failed to load class org.slf4j.impl.StaticLoggerBinder&quot; and &quot;Defaulting to no-operation (NOP) logger implementation&quot;. The Apache HTTP client finds no logging backend and logs nothing. The lines are harmless.</p>
+<h2 id="a-first-test-on-a-device">A first test on a device<a class="heading-anchor" href="#a-first-test-on-a-device" aria-label="Link to this section">#</a></h2>
+<p>Call <code>GuideFirstProgram.smokeTest()</code> (<a href="01-getting-started.html#a-first-program">A first program</a>) off the main thread and log the result:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java</span></div>
+<pre><code>new Thread(() -&gt; Log.i(&quot;zephyr&quot;, &quot;smoke test: &quot; + GuideFirstProgram.smokeTest())).start();</code></pre>
+</div>
+<p>A mainnet primary address (it starts with <code>ZEPHYR</code>) in logcat means that the device loaded the library of its ABI and the core created a wallet.</p>
+<h2 id="the-shipped-r8-rules">The shipped R8 rules<a class="heading-anchor" href="#the-shipped-r8-rules" aria-label="Link to this section">#</a></h2>
+<p>The AAR's <code>proguard.txt</code> is applied to every app that uses it. It keeps:</p>
+<ul><li>every class with <code>native</code> methods and those methods' names, because the native library binds its exports by class and method name;</li><li><code>ZephyrWalletFull$WalletJniListener</code> with all members, because the native side looks it up by name and calls its five callbacks by name and signature;</li><li>the model packages <code>zephyr.wallet.model</code>, <code>zephyr.daemon.model</code> and <code>zephyr.common</code>, because Jackson maps the native JSON onto them by reflection;</li><li>annotations and generic signatures, which Jackson reads at run time.</li></ul>
+<p>Your own listener classes need no rule: the native side calls the library's listener, which calls yours through ordinary Java.</p>
+<nav class="site-pager" aria-label="Previous and next page">
+<a class="site-prev" rel="prev" href="09-errors.html">Previous: 9. Errors and exceptions</a>
+<a class="site-next" rel="next" href="11-the-rpc-classes.html">Next: 11. The RPC classes</a>
+</nav>
+</article>
+</div>
+</main>
+<footer class="lt-footer">
+<div class="lt-wrap lt-wrap-wide">
+<p>Guide for zephyr-java 2.3.0-sec.2-java.4, built from commit <code>e59843ad</code> (2026-11-17 UTC).</p>
+<p>zephyr-java and this site are a <a href="https://lateo.dev/">lateo</a> project by an independent operator, not affiliated with or endorsed by ZephyrProtocol. Source: <a href="https://github.com/loki-notfound/myzephyr-java">github.com/loki-notfound/myzephyr-java</a>.</p>
+<p>The library and the guide are under the MIT licence of the repository; the stylesheet is BSD 3-Clause; the lateo name, mark and favicons are not covered by either and all rights in them are reserved by their owner (<a href="../assets/NOTICE.txt">notice</a>).</p>
+</div>
+</footer>
+</body>
+</html>

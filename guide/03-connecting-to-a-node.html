@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>3. Connecting to a node - zephyr-java guide</title>
+<meta name="description" content="A wallet needs a Zephyr node (zephyrd) to sync and to send. This chapter covers the connection and its URI, http and https, and TLS to a node with ZephyrTls. It then covers the trade-off of a remote n">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../assets/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon-180.png">
+<link rel="stylesheet" href="../assets/content.css">
+<link rel="stylesheet" href="../assets/print.css">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<a class="lt-skip-link" href="#main">Skip to main content</a>
+<header class="lt-header">
+  <div class="lt-wrap lt-wrap-wide lt-header-inner">
+    <div class="site-title">
+      <a class="lt-brand" href="../index.html">zephyr-java</a>
+      <p class="site-tagline">Java wallet library for Zephyr, a lateo project</p>
+    </div>
+    <nav class="lt-nav" aria-label="Site navigation">
+      <a href="index.html" aria-current="page">Guide</a>
+      <a href="../javadoc/index.html">Javadoc</a>
+      <a href="https://github.com/loki-notfound/myzephyr-java/releases">Releases</a>
+      <a href="https://github.com/loki-notfound/myzephyr-java">Repository</a>
+    </nav>
+  </div>
+</header>
+<main id="main" tabindex="-1">
+<div class="lt-wrap lt-wrap-wide lt-docs-layout">
+<aside class="lt-toc" aria-label="Guide navigation">
+<h2 id="site-nav-guide">Guide</h2>
+<nav aria-labelledby="site-nav-guide">
+<ol>
+<li><a href="index.html">zephyr-java user guide</a></li>
+<li><a href="01-getting-started.html">1. Getting started</a></li>
+<li><a href="02-wallets.html">2. Wallets</a></li>
+<li><a href="03-connecting-to-a-node.html" aria-current="page">3. Connecting to a node</a></li>
+<li><a href="04-threads-and-listeners.html">4. Threads and listeners</a></li>
+<li><a href="05-assets-and-balances.html">5. Assets, accounts and balances</a></li>
+<li><a href="06-history.html">6. History</a></li>
+<li><a href="07-sending.html">7. Sending</a></li>
+<li><a href="08-conversions-and-the-reserve.html">8. Conversions and the reserve</a></li>
+<li><a href="09-errors.html">9. Errors and exceptions</a></li>
+<li><a href="10-android.html">10. Android</a></li>
+<li><a href="11-the-rpc-classes.html">11. The RPC classes</a></li>
+<li><a href="12-coming-from-monero-java.html">12. Coming from monero-java</a></li>
+<li><a href="13-known-limitations.html">13. Known limitations</a></li>
+<li><a href="14-building-and-verifying.html">14. Building and verifying</a></li>
+</ol>
+</nav>
+<h2 id="site-nav-page">On this page</h2>
+<nav aria-labelledby="site-nav-page">
+<ol>
+<li><a href="#setting-the-node">Setting the node</a></li>
+<li><a href="#http-and-https">http and https</a></li>
+<li><a href="#tls-to-a-node">TLS to a node</a></li>
+<li><a href="#a-remote-node">A remote node</a></li>
+<li><a href="#syncing">Syncing</a></li>
+<li><a href="#background-sync">Background sync</a></li>
+<li><a href="#heights">Heights</a></li>
+<li><a href="#when-the-node-cannot-be-reached">When the node cannot be reached</a></li>
+</ol>
+</nav>
+</aside>
+<article class="lt-docs-main lt-stack">
+<nav class="lt-breadcrumbs" aria-label="Breadcrumb"><ol><li><a href="../index.html">zephyr-java</a></li><li><a href="index.html">Guide</a></li><li><a href="03-connecting-to-a-node.html" aria-current="page">3. Connecting to a node</a></li></ol></nav>
+<h1 id="3-connecting-to-a-node">3. Connecting to a node</h1>
+<p>A wallet needs a Zephyr node (<code>zephyrd</code>) to sync and to send. This chapter covers the connection and its URI, http and https, and TLS to a node with <code>ZephyrTls</code>. It then covers the trade-off of a remote node, syncing, the heights a wallet reports, and a node that cannot be reached.</p>
+<p>The blocks marked &quot;Java, compiled&quot; in this chapter come from <code>src/test/java/examples/GuideNode.java</code> and <code>src/test/java/examples/GuideTls.java</code>.</p>
+<h2 id="setting-the-node">Setting the node<a class="heading-anchor" href="#setting-the-node" aria-label="Link to this section">#</a></h2>
+<p>The core talks to the node over the node's RPC port. Set the connection when you create or open the wallet (<code>setServerUri</code>, <code>setServerUsername</code> and <code>setServerPassword</code> on <code>ZephyrWalletConfig</code>, or a <code>ZephyrRpcConnection</code> for <code>openWallet</code> and <code>openWalletData</code>), or later:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>wallet.setDaemonConnection(new ZephyrRpcConnection(&quot;http://node.example.invalid:17767&quot;, user, pass));
+boolean connected = wallet.isConnectedToDaemon();</code></pre>
+</div>
+<p>Replace <code>node.example.invalid</code> with your node's host name. The user name and password are only for nodes that require RPC login. <code>17767</code> is the default RPC port of a mainnet node. <code>getDaemonConnection()</code> returns the connection in use.</p>
+<p>A wallet without a connection still opens: it shows the state of its last sync, but cannot sync or send. <code>setProxyUri</code> routes the core's connection through a proxy (inherited from monero-java, meant for Tor); it has not been tested with Zephyr.</p>
+<p><strong>The port.</strong> A URI without a port gets the scheme's default: 443 for <code>https://</code>, 80 for <code>http://</code>. <code>getDaemonConnection()</code> then reports the URI with the port. A scheme written in another case (<code>HTTPS://</code>) reaches the core in lower case; the core switches TLS on only for a lowercase <code>https</code>. Releases <code>java.1</code> to <code>java.3</code> behaved differently. For a URI without a port the core connected to port 0 and blocked for minutes, and an <code>HTTPS://</code> URI was spoken in clear text.</p>
+<h2 id="http-and-https">http and https<a class="heading-anchor" href="#http-and-https" aria-label="Link to this section">#</a></h2>
+<p>An <code>http://</code> URI sends everything in clear text. That is fine for a node you run yourself on a network you trust, which needs no certificates at all. An <code>https://</code> URI makes the core verify the node's certificate and its host name.</p>
+<h2 id="tls-to-a-node">TLS to a node<a class="heading-anchor" href="#tls-to-a-node" aria-label="Link to this section">#</a></h2>
+<p>The native wallet makes its own connections to the node, with the OpenSSL inside the native library. Which root certificates it trusts is decided by <code>zephyr.common.ZephyrTls</code>. The Java RPC classes are not affected: they use the trust store of the Java runtime.</p>
+<h3 id="the-default-trust">The default trust<a class="heading-anchor" href="#the-default-trust" aria-label="Link to this section">#</a></h3>
+<p><strong><code>https://</code> works without setup on Android.</strong> By default the native wallet trusts the root certificates shipped in the library and nothing else. They are Mozilla's list of root certificates as curl publishes it, the same on every device and renewed with each release. <code>ZephyrTls.getShippedCertificatesDate()</code> returns their date: <code>2026-11-05</code> in this release, with 118 certificates.</p>
+<p>Before the first <code>https://</code> connection of a <code>ZephyrWalletFull</code> on Android, the library writes them to <code>zephyr-java-tls/ca-bundle.pem</code> in the app's cache directory (<code>java.io.tmpdir</code>). It names that file in <code>SSL_CERT_FILE</code>, with an empty directory in <code>SSL_CERT_DIR</code>, so that exactly the bundle is trusted. When the process environment already names <code>SSL_CERT_FILE</code> or <code>SSL_CERT_DIR</code> and the app has not called <code>ZephyrTls</code>, the library leaves it alone: the app has chosen.</p>
+<p><strong>On the desktop JVM nothing changes unless the application calls <code>ZephyrTls</code> itself.</strong> The Linux library uses OpenSSL's default store (<code>/etc/ssl</code>), and <code>SSL_CERT_FILE</code> or <code>SSL_CERT_DIR</code> in the environment override it. Once the app calls a configuration method of <code>ZephyrTls</code>, its configuration applies on the desktop as on Android.</p>
+<p>Releases <code>java.1</code> to <code>java.3</code> told apps to set <code>SSL_CERT_FILE</code> or <code>SSL_CERT_DIR</code> themselves. On the Android images this was measured on (the emulator, API 24 and API 35) that setting had no effect, so an <code>https://</code> node could not be verified there; other devices were not measured. <code>java.4</code> fixes this in the build (patch <code>0006</code> of <a href="14-building-and-verifying.html#build-layer-patches">Build-layer patches</a>) and adds <code>ZephyrTls</code>. The release notes have the details.</p>
+<h3 id="trusting-other-certificates">Trusting other certificates<a class="heading-anchor" href="#trusting-other-certificates" aria-label="Link to this section">#</a></h3>
+<p><strong>A node whose certificate comes from a private CA, or from a CA only the device knows</strong>, needs <code>addTrustedCertificates</code> or <code>setUseSystemCertificates(true)</code>. The options:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>ZephyrTls.addTrustedCertificates(caPem);    // your own CA, or a self-signed node certificate
+                                            // whose name matches the node's host name
+ZephyrTls.setUseSystemCertificates(true);   // the device's system store as well
+ZephyrTls.setUseUserCertificates(true);     // the certificates the user installed
+ZephyrTls.setUseShippedCertificates(false); // without the shipped root certificates
+ZephyrTls.setCaFile(pem);                   // exactly this file and nothing else (null: back)</code></pre>
+</div>
+<p>Configure <code>ZephyrTls</code> before the wallet is created or its connection is set. The core reads the bundle whenever a wallet sets up its connection. A changed configuration is applied before the next <code>https://</code> connection of a wallet; <code>ZephyrTls.apply()</code> applies it at once and returns the file in use. The environment belongs to the whole process, so the configuration holds for every wallet of the app.</p>
+<p>Android 7.0's system store has no ISRG Root X1, the root of Let's Encrypt. With the system store alone a Let's Encrypt node fails there; the shipped certificates cover it.</p>
+<h3 id="newer-root-certificates">Newer root certificates<a class="heading-anchor" href="#newer-root-certificates" aria-label="Link to this section">#</a></h3>
+<p><strong>Newer root certificates before the next release</strong> are opt-in; the library never downloads by itself. <code>ZephyrTls.downloadCertificates(file)</code> fetches the current list from curl (<code>https://curl.se/ca/cacert.pem</code>) over a connection that trusts the certificates of the current configuration. It checks the list, writes the file and returns the number of certificates; it does not change the configuration. The app adds the file at start:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>// TLS: at start, the root certificates downloaded earlier, when there are any
+public static void addDownloadedRoots(File filesDir) {
+  File roots = new File(filesDir, &quot;cacert.pem&quot;);
+  if (roots.isFile()) ZephyrTls.addTrustedCertificates(roots);
+}
+
+// TLS: the download of the current root certificates (curl.se), on a background thread, at most
+// once a day; the next start adds them with addDownloadedRoots
+public static int downloadRoots(File filesDir) {
+  return ZephyrTls.downloadCertificates(new File(filesDir, &quot;cacert.pem&quot;));
+}</code></pre>
+</div>
+<p>The trade-off of the download:</p>
+<ul><li><strong>What it does:</strong> it brings root certificates newer than the release's.</li><li><strong>What the third party sees:</strong> curl.se, unless the app names another source with <code>downloadCertificates(url, file, sha256)</code>, sees the device's address. Call it from a background thread and not more than once a day.</li><li><strong>What it cannot protect against:</strong> the file is trusted because the <code>https</code> connection is. Whoever could forge a certificate under the current roots could add a root.</li><li><strong>How to avoid it:</strong> an app that can get the checksum from a source of its own should pass it. Apps that do not download get new roots with each zephyr-java release.</li></ul>
+<h3 id="what-tls-cannot-do">What TLS cannot do<a class="heading-anchor" href="#what-tls-cannot-do" aria-label="Link to this section">#</a></h3>
+<p>There is no certificate pinning. A certificate whose host name does not match the URI is refused (the core checks the name and passes no SSL options through), so a self-signed certificate needs the right name. The app's Network Security Configuration does not apply to the native wallet. <em>Status:</em> pinning and own SSL options need the core.</p>
+<h2 id="a-remote-node">A remote node<a class="heading-anchor" href="#a-remote-node" aria-label="Link to this section">#</a></h2>
+<div class="lt-callout lt-callout-warning" role="note">
+<p class="lt-callout-title">A remote node is a trust trade-off.</p>
+<p>A node run by someone else lets the wallet sync and send without your own copy of the chain. Its operator sees the address your connections come from, when the wallet syncs, the decoy outputs it asks for to build a transaction, and every transaction it sends. The wallet gets every block from the node, so a node that is behind or holds data back shows the wallet an old state. The wallet runs in your process and keeps its keys there. Run your own node to remove the trade-off.</p>
+</div>
+<p><strong>The core treats every node as trusted</strong> (monero's trusted-daemon mode; read in the core's code). It sets the node as trusted for every connection, so wallet2's precautions for an untrusted node are off. For example, the node's own error text is passed into exception messages instead of a neutral &quot;daemon error&quot;. For an app this means that a node you do not run gets more trust than monero's wallet would give it. Prefer your own node, and treat text in error messages as text from the node. What else a node can learn from the core's requests has not been established for zephyr-java.</p>
+<h2 id="syncing">Syncing<a class="heading-anchor" href="#syncing" aria-label="Link to this section">#</a></h2>
+<p><code>sync()</code> fetches the blocks since the wallet's height, scans them for the wallet's outputs and returns when the wallet is at the tip. It blocks, so call it on a worker thread.</p>
+<p><strong>A node that is itself still syncing gives an empty sync.</strong> The core syncs only when the node reports that it is synced, that is when <code>getDaemonHeight()</code> is at least <code>getDaemonMaxPeerHeight()</code>. Otherwise <code>sync()</code> returns at once with 0 blocks fetched and no error, and the wallet stays where it was (read in the core's code; not run). Check <code>isDaemonSynced()</code> before you trust a sync, and show the user that the node is behind. <code>sync(listener)</code> adds a listener for that sync only:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>ZephyrSyncResult result = wallet.sync(new ZephyrWalletListener() {
+  @Override
+  public void onSyncProgress(long height, long startHeight, long endHeight, double percentDone, String message) {
+    progress.post(percentDone);   // 0.0 to 1.0
+  }
+});
+long fetched = result.getNumBlocksFetched();</code></pre>
+</div>
+<p><code>sync(startHeight)</code> starts at another height instead of the last synced block. A start below the restore height also lowers the restore height (read in the core's code).</p>
+<p>Progress is reported once per block fetched. A wallet that is already at the tip fetches nothing and gets <strong>no</strong> progress call; do not wait for one. The same holds for a new random wallet, which starts at the node's height.</p>
+<p>The first sync of a restored wallet scans from its restore height to the tip (<a href="02-wallets.html#restoring-from-a-mnemonic">Restoring from a mnemonic</a>). How long that takes over the internet from an old restore height has not been measured for zephyr-java. Save after the first sync (<a href="02-wallets.html#when-to-save">When to save</a>).</p>
+<h2 id="background-sync">Background sync<a class="heading-anchor" href="#background-sync" aria-label="Link to this section">#</a></h2>
+<p><code>startSyncing()</code> keeps the wallet in sync in the background, every 10 s by default. <code>startSyncing(periodInMs)</code> sets another period; <code>stopSyncing()</code> ends it. Listeners added with <code>addListener</code> receive the events of background syncs too.</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>wallet.startSyncing(30000L);</code></pre>
+</div>
+<p>Background syncing runs on threads of the core. Its callbacks, and closing a wallet while it syncs, follow the rules of <a href="04-threads-and-listeners.html">Threads and listeners</a>.</p>
+<p><strong>Background syncing reports no errors to the app.</strong> In the core's code, a refresh that fails is printed on the process's standard output, and the next period tries again. The line starts with &quot;monero_wallet_full failed to background synchronize: &quot;. A node that is down or not synced makes the background sync do nothing, silently. Compare <code>getHeight()</code> with <code>getDaemonHeight()</code>, or call <code>isConnectedToDaemon()</code>, to notice a sync that has stalled.</p>
+<h2 id="heights">Heights<a class="heading-anchor" href="#heights" aria-label="Link to this section">#</a></h2>
+<p>Several calls report heights. Observed on 2026-11-17 with a test wallet (restore height 902,102, its cache at height 904,719) and a node at height 909,823, then with a new random wallet:</p>
+<div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="heights">
+<table>
+<thead><tr><th scope="col">Call</th><th scope="col">No node, or node unreachable</th><th scope="col">Connected, before sync</th><th scope="col">After sync</th><th scope="col">Node removed after sync</th><th scope="col">New random wallet, before / after its first sync</th></tr></thead>
+<tbody>
+<tr><td><code>getHeight()</code></td><td>904,719</td><td>904,719</td><td>909,823</td><td>909,823</td><td>1 / 909,823</td></tr>
+<tr><td><code>getDaemonHeight()</code></td><td>throws</td><td>909,823</td><td>909,823</td><td>throws</td><td>909,823 / 909,823</td></tr>
+<tr><td><code>getDaemonMaxPeerHeight()</code></td><td>throws</td><td>909,823</td><td>909,823</td><td>throws</td><td>909,823 / 909,823</td></tr>
+<tr><td><code>isDaemonSynced()</code></td><td>throws</td><td>true</td><td>true</td><td>throws</td><td>true / true</td></tr>
+<tr><td><code>isSynced()</code></td><td>false</td><td>false</td><td>true</td><td>true</td><td>false / true</td></tr>
+<tr><td><code>getRestoreHeight()</code></td><td>902,102</td><td>902,102</td><td>902,102</td><td>902,102</td><td>909,823 / 909,823</td></tr>
+<tr><td><code>getHeightByDate(2026, 11, 1)</code></td><td>throws</td><td>897,383</td><td>897,383</td><td>throws</td><td>897,383</td></tr>
+<tr><td><code>isConnectedToDaemon()</code></td><td>false</td><td>true</td><td>true</td><td>false</td><td>true / true</td></tr>
+</tbody>
+</table>
+</div>
+<p>What the table shows:</p>
+<ul><li><code>getHeight()</code> is the wallet's own height. After a sync it equals <code>getDaemonHeight()</code>.</li><li>A new random wallet reports <code>getHeight()</code> 1 until its first sync, not its restore height. Its restore height is the node's height when it was created.</li><li>The calls about the node throw a <code>ZephyrError</code> &quot;Wallet is not connected to daemon&quot; when no node was reachable at the last connection check; they return no default value. <code>getHeightByDate</code> needs the node as well and throws &quot;failed to connect to daemon: &quot; followed by the URI.</li><li><code>isSynced()</code> keeps its last value when the node goes away.</li></ul>
+<p>During the first sync of a restored wallet, <code>getHeight()</code> can be far below the restore height while the core fetches block hashes. Observed on 2026-11-17: 79,979 for a restore height of 902,102. A node that is itself still syncing was not available in the runs; what the core's code does then is in <a href="#syncing">Syncing</a>. <code>setRestoreHeight(height)</code> changes the restore height of an open wallet.</p>
+<h2 id="when-the-node-cannot-be-reached">When the node cannot be reached<a class="heading-anchor" href="#when-the-node-cannot-be-reached" aria-label="Link to this section">#</a></h2>
+<p><code>isConnectedToDaemon()</code> returns false, and a call that needs the node (<code>sync()</code>, <code>getDaemonHeight()</code> and the like) throws a <code>ZephyrError</code> &quot;Wallet is not connected to daemon&quot;. The balance methods still work: they read the wallet's local state.</p>
+<p>That message comes from the result of the last connection check (read in the core's code). The core makes that check when the connection is set and on each <code>isConnectedToDaemon()</code>. A node that goes away after that check gives other messages, such as &quot;Failed to connect to daemon&quot; from <code>getDaemonHeight()</code>. Call <code>isConnectedToDaemon()</code> to refresh the state.</p>
+<p><strong>For an <code>https://</code> node</strong> the message gets a hint at TLS. The library adds it to every &quot;Wallet is not connected to daemon&quot; of an <code>https://</code> URI, whatever the cause. The cause can be an untrusted certificate, but also a node that is down or a wrong port:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Text</span></div>
+<pre><code>Wallet is not connected to daemon: the node is an https node; its certificate may not be trusted (see ZephyrTls and the user guide, chapter 6)</code></pre>
+</div>
+<p>Releases up to <code>2.3.0-sec.2-java.4</code> print &quot;chapter 6&quot; in that message. The section it means is <a href="#tls-to-a-node">TLS to a node</a> in this chapter, and later releases name that section instead. When the certificate is the cause, the native log says &quot;SSL certificate is not in the allowed list, connection dropped&quot; (<a href="09-errors.html#the-native-log">The native log</a>).</p>
+<nav class="site-pager" aria-label="Previous and next page">
+<a class="site-prev" rel="prev" href="02-wallets.html">Previous: 2. Wallets</a>
+<a class="site-next" rel="next" href="04-threads-and-listeners.html">Next: 4. Threads and listeners</a>
+</nav>
+</article>
+</div>
+</main>
+<footer class="lt-footer">
+<div class="lt-wrap lt-wrap-wide">
+<p>Guide for zephyr-java 2.3.0-sec.2-java.4, built from commit <code>e59843ad</code> (2026-11-17 UTC).</p>
+<p>zephyr-java and this site are a <a href="https://lateo.dev/">lateo</a> project by an independent operator, not affiliated with or endorsed by ZephyrProtocol. Source: <a href="https://github.com/loki-notfound/myzephyr-java">github.com/loki-notfound/myzephyr-java</a>.</p>
+<p>The library and the guide are under the MIT licence of the repository; the stylesheet is BSD 3-Clause; the lateo name, mark and favicons are not covered by either and all rights in them are reserved by their owner (<a href="../assets/NOTICE.txt">notice</a>).</p>
+</div>
+</footer>
+</body>
+</html>

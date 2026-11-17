@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>6. History - zephyr-java guide</title>
+<meta name="description" content="The wallet's history is what its syncs found: transactions, the transfers in them, and the outputs. Every transfer carries its asset. This chapter covers reading the history and its queries, the pool,">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../assets/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon-180.png">
+<link rel="stylesheet" href="../assets/content.css">
+<link rel="stylesheet" href="../assets/print.css">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<a class="lt-skip-link" href="#main">Skip to main content</a>
+<header class="lt-header">
+  <div class="lt-wrap lt-wrap-wide lt-header-inner">
+    <div class="site-title">
+      <a class="lt-brand" href="../index.html">zephyr-java</a>
+      <p class="site-tagline">Java wallet library for Zephyr, a lateo project</p>
+    </div>
+    <nav class="lt-nav" aria-label="Site navigation">
+      <a href="index.html" aria-current="page">Guide</a>
+      <a href="../javadoc/index.html">Javadoc</a>
+      <a href="https://github.com/loki-notfound/myzephyr-java/releases">Releases</a>
+      <a href="https://github.com/loki-notfound/myzephyr-java">Repository</a>
+    </nav>
+  </div>
+</header>
+<main id="main" tabindex="-1">
+<div class="lt-wrap lt-wrap-wide lt-docs-layout">
+<aside class="lt-toc" aria-label="Guide navigation">
+<h2 id="site-nav-guide">Guide</h2>
+<nav aria-labelledby="site-nav-guide">
+<ol>
+<li><a href="index.html">zephyr-java user guide</a></li>
+<li><a href="01-getting-started.html">1. Getting started</a></li>
+<li><a href="02-wallets.html">2. Wallets</a></li>
+<li><a href="03-connecting-to-a-node.html">3. Connecting to a node</a></li>
+<li><a href="04-threads-and-listeners.html">4. Threads and listeners</a></li>
+<li><a href="05-assets-and-balances.html">5. Assets, accounts and balances</a></li>
+<li><a href="06-history.html" aria-current="page">6. History</a></li>
+<li><a href="07-sending.html">7. Sending</a></li>
+<li><a href="08-conversions-and-the-reserve.html">8. Conversions and the reserve</a></li>
+<li><a href="09-errors.html">9. Errors and exceptions</a></li>
+<li><a href="10-android.html">10. Android</a></li>
+<li><a href="11-the-rpc-classes.html">11. The RPC classes</a></li>
+<li><a href="12-coming-from-monero-java.html">12. Coming from monero-java</a></li>
+<li><a href="13-known-limitations.html">13. Known limitations</a></li>
+<li><a href="14-building-and-verifying.html">14. Building and verifying</a></li>
+</ol>
+</nav>
+<h2 id="site-nav-page">On this page</h2>
+<nav aria-labelledby="site-nav-page">
+<ol>
+<li><a href="#transactions-and-transfers">Transactions and transfers</a></li>
+<li><a href="#queries">Queries</a></li>
+<li><a href="#the-pool">The pool</a></li>
+<li><a href="#conversions-in-the-history">Conversions in the history</a></li>
+<li><a href="#notes-and-transaction-keys">Notes and transaction keys</a></li>
+<li><a href="#checktxkey-returns-amount-0">checkTxKey returns amount 0</a></li>
+<li><a href="#getoutputs-reports-no-asset">getOutputs() reports no asset</a></li>
+</ol>
+</nav>
+</aside>
+<article class="lt-docs-main lt-stack">
+<nav class="lt-breadcrumbs" aria-label="Breadcrumb"><ol><li><a href="../index.html">zephyr-java</a></li><li><a href="index.html">Guide</a></li><li><a href="06-history.html" aria-current="page">6. History</a></li></ol></nav>
+<h1 id="6-history">6. History</h1>
+<p>The wallet's history is what its syncs found: transactions, the transfers in them, and the outputs. Every transfer carries its asset. This chapter covers reading the history and its queries, the pool, conversions, notes and keys. It ends with two results the core gets wrong: the amount of a checked payment and the asset of an output.</p>
+<p>The blocks marked &quot;Java, compiled&quot; in this chapter come from <code>src/test/java/examples/GuideHistory.java</code>.</p>
+<h2 id="transactions-and-transfers">Transactions and transfers<a class="heading-anchor" href="#transactions-and-transfers" aria-label="Link to this section">#</a></h2>
+<p>The history holds what the wallet's syncs found, so sync first to see new transactions.</p>
+<div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="transactions-and-transfers">
+<table>
+<thead><tr><th scope="col">Call</th><th scope="col">Returns</th></tr></thead>
+<tbody>
+<tr><td><code>getTxs()</code></td><td>every transaction of the wallet, as <code>ZephyrTxWallet</code></td></tr>
+<tr><td><code>getTxs(hash, ...)</code>, <code>getTxs(hashes)</code></td><td>the transactions with these hashes; throws for a hash the wallet does not know</td></tr>
+<tr><td><code>getTxs(hashes, missing)</code></td><td>the same, and collects unknown hashes in <code>missing</code> instead of throwing</td></tr>
+<tr><td><code>getTxs(query)</code></td><td>the transactions that match a <code>ZephyrTxQuery</code></td></tr>
+<tr><td><code>getTransfers()</code>, <code>getTransfers(accountIdx)</code>, <code>getTransfers(accountIdx, subaddressIdx)</code></td><td>the transfers, as <code>ZephyrTransfer</code></td></tr>
+<tr><td><code>getTransfers(query)</code></td><td>the transfers that match a <code>ZephyrTransferQuery</code></td></tr>
+<tr><td><code>getIncomingTransfers()</code>, <code>getOutgoingTransfers()</code></td><td>the transfers of one direction</td></tr>
+</tbody>
+</table>
+</div>
+<p>A <code>ZephyrTxWallet</code> has at most one outgoing transfer (<code>getOutgoingTransfer()</code>) and a list of incoming transfers (<code>getIncomingTransfers()</code>), each <code>null</code> when there is none. It also reports its hash, height, fee, confirmations and state (<code>isConfirmed()</code>, <code>inTxPool()</code>, <code>isFailed()</code>, <code>isLocked()</code>). The outgoing transfer lists its destinations (<code>getDestinations()</code>).</p>
+<p><strong>The asset is on each transfer.</strong> <code>ZephyrTransfer.getAssetType()</code> and <code>ZephyrDestination.getAssetType()</code> name the asset of an amount. <code>ZephyrTxWallet.getIncomingAmount()</code> adds the amounts of all incoming transfers and names no asset; read the transfers instead.</p>
+<p><code>getTxs(hash)</code> throws a <code>ZephyrError</code> &quot;Wallet missing requested tx hashes: &quot; with the hashes when the wallet does not know a transaction. <code>getTransfers</code> and <code>getOutputs</code> with hashes in their query throw a plain <code>RuntimeException</code> with the same message. To get the known ones and the unknown hashes:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>List&lt;String&gt; missing = new ArrayList&lt;&gt;();
+List&lt;ZephyrTxWallet&gt; txs = wallet.getTxs(hashes, missing);  // getTxs(hash) alone throws for a missing hash</code></pre>
+</div>
+<p>How the history calls perform with a large history, and whether they need paging, has not been measured for zephyr-java.</p>
+<h2 id="queries">Queries<a class="heading-anchor" href="#queries" aria-label="Link to this section">#</a></h2>
+<p>The query classes select transactions, transfers and outputs. The setters return the query, so they chain:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>return wallet.getTxs(new ZephyrTxQuery()
+    .setIsOutgoing(true)
+    .setIsConfirmed(true)
+    .setMinHeight(fromHeight)
+    .setMaxHeight(toHeight));</code></pre>
+</div>
+<div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="queries">
+<table>
+<thead><tr><th scope="col">Query</th><th scope="col">Main setters</th></tr></thead>
+<tbody>
+<tr><td><code>ZephyrTxQuery</code></td><td><code>setIsIncoming</code>, <code>setIsOutgoing</code>, <code>setHash</code>, <code>setHashes</code>, <code>setMinHeight</code>, <code>setMaxHeight</code>, <code>setIsConfirmed</code>, <code>setInTxPool</code>, <code>setIsFailed</code>, <code>setIsLocked</code>, <code>setTransferQuery</code></td></tr>
+<tr><td><code>ZephyrTransferQuery</code></td><td><code>setIsIncoming</code>, <code>setIsOutgoing</code>, <code>setAccountIndex</code>, <code>setSubaddressIndex</code>, <code>setSubaddressIndices</code>, <code>setAddress</code>, <code>setTxQuery</code></td></tr>
+<tr><td><code>ZephyrOutputQuery</code></td><td><code>setIsSpent</code>, <code>setAccountIndex</code>, <code>setSubaddressIndex</code>, <code>setIsFrozen</code>, <code>setMinAmount</code>, <code>setMaxAmount</code>, <code>setTxQuery</code></td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>No query filters by asset.</strong> Filter on <code>getAssetType()</code> in the app:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>for (ZephyrTransfer transfer : wallet.getTransfers(new ZephyrTransferQuery().setIsIncoming(true))) {
+  if (asset.equals(transfer.getAssetType())) total = total.add(transfer.getAmount());
+}</code></pre>
+</div>
+<h2 id="the-pool">The pool<a class="heading-anchor" href="#the-pool" aria-label="Link to this section">#</a></h2>
+<p>A transaction in the pool, sent but not in a block, is part of the history with <code>inTxPool()</code> true; <code>setInTxPool(true)</code> selects such transactions. <code>getTxs()</code> reports the right asset for a pool transfer (observed on mainnet on 2026-11-07). <code>onOutputReceived</code> for the same payment has an empty asset (<a href="04-threads-and-listeners.html#outputs-in-the-pool-carry-no-asset">Outputs in the pool carry no asset</a>). Pool funds count in the balance, not in the unlocked balance (<a href="05-assets-and-balances.html#locked-and-unlocked">Locked and unlocked</a>).</p>
+<h2 id="conversions-in-the-history">Conversions in the history<a class="heading-anchor" href="#conversions-in-the-history" aria-label="Link to this section">#</a></h2>
+<p>After a conversion is confirmed, <code>getTxs()</code> and <code>getTransfers()</code> show it as follows:</p>
+<ul><li>The <strong>outgoing transfer's</strong> amount is the source amount (50 ZPH), in the source asset.</li><li>The outgoing <strong>destination</strong> shows the <strong>destination amount</strong> in the destination currency (52.60432 ZRS). On the transaction that <code>createTxs</code> returned, the same destination still shows the source amount (50 ZPH). Code that compares the two must expect that.</li><li>An <strong>incoming transfer</strong> in the destination currency carries the minted amount, with account and subaddress set once confirmed.</li></ul>
+<p>The converted funds unlock like received funds, 10 blocks after the conversion is mined (<a href="05-assets-and-balances.html#locked-and-unlocked">Locked and unlocked</a>).</p>
+<h2 id="notes-and-transaction-keys">Notes and transaction keys<a class="heading-anchor" href="#notes-and-transaction-keys" aria-label="Link to this section">#</a></h2>
+<p><code>setTxNote(hash, note)</code> stores a note for a transaction; <code>getTxNote(hash)</code> and <code>getTxNotes(hashes)</code> read notes back. <code>getTxKey(hash)</code> returns the secret key of a transaction the wallet sent; the receiver checks a payment with it (<a href="#checktxkey-returns-amount-0">checkTxKey returns amount 0</a>).</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>wallet.setTxNote(txHash, &quot;rent, November&quot;);
+String note = wallet.getTxNote(txHash);
+String txKey = wallet.getTxKey(txHash);  // the secret key of a transaction this wallet sent</code></pre>
+</div>
+<p>Notes and transaction keys exist only in the wallet's cache. Save the wallet after a send and after a note (<a href="02-wallets.html#when-to-save">When to save</a>); a wallet restored from its mnemonic has neither.</p>
+<h2 id="checktxkey-returns-amount-0">checkTxKey returns amount 0<a class="heading-anchor" href="#checktxkey-returns-amount-0" aria-label="Link to this section">#</a></h2>
+<p><strong>What you see.</strong> In the full wallet (<code>ZephyrWalletFull</code>), <code>checkTxKey</code> and <code>checkTxProof</code> return <code>receivedAmount = 0</code> for every current transaction. On mainnet on 2026-11-07, <code>checkTxKey</code> on a confirmed 10 ZPH transfer returned <code>good = true</code>, the right number of confirmations and amount 0.</p>
+<p><strong>Why.</strong> The core reads the received amount of the asset <code>ZEPH</code> only, from a map that holds the amount per asset. Since hard fork 11 (height 536,000) no new output can be <code>ZEPH</code>, so the entry is always empty.</p>
+<p><strong>Workaround.</strong> Trust the check for <code>isGood()</code> and the confirmations, and read the amount from the wallet's own history, where every transfer carries its asset. The receiver checks the key it got from the sender and sums, per asset, the incoming transfers to the checked address. A transaction can pay several addresses of the same wallet, so the filter on the address matters:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>static Map&lt;String, BigInteger&gt; receivedPerAsset(ZephyrWallet wallet, String txHash, String txKey, String address, long minConfirmations) {
+  ZephyrCheckTx check = wallet.checkTxKey(txHash, txKey, address);
+  if (!check.isGood()) throw new IllegalStateException(&quot;the transaction does not pay &quot; + address);
+  if (check.getNumConfirmations() &lt; minConfirmations) throw new IllegalStateException(&quot;only &quot; + check.getNumConfirmations() + &quot; confirmations&quot;);
+  // check.getReceivedAmount() is 0 for every current transaction: do not use it
+  Map&lt;String, BigInteger&gt; received = new HashMap&lt;&gt;();
+  for (ZephyrTxWallet tx : wallet.getTxs(txHash)) {
+    if (tx.getIncomingTransfers() == null) continue;
+    for (ZephyrIncomingTransfer transfer : tx.getIncomingTransfers()) {
+      if (!address.equals(transfer.getAddress())) continue;  // only what this address received
+      received.merge(transfer.getAssetType(), transfer.getAmount(), BigInteger::add);
+    }
+  }
+  return received;
+}</code></pre>
+</div>
+<p>The sender has the amount in the destinations of its outgoing transfer:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>static Map&lt;String, BigInteger&gt; sentPerAsset(ZephyrWallet wallet, String txHash, String address) {
+  Map&lt;String, BigInteger&gt; sent = new HashMap&lt;&gt;();
+  for (ZephyrTxWallet tx : wallet.getTxs(txHash)) {
+    ZephyrOutgoingTransfer outgoing = tx.getOutgoingTransfer();
+    if (outgoing == null || outgoing.getDestinations() == null) continue;
+    for (ZephyrDestination destination : outgoing.getDestinations()) {
+      if (address.equals(destination.getAddress())) sent.merge(destination.getAssetType(), destination.getAmount(), BigInteger::add);
+    }
+  }
+  return sent;
+}</code></pre>
+</div>
+<p><code>getTxs(hash)</code> throws when the transaction is not in the wallet, so the receiver's wallet must be synced past it. The destinations are local data of the sending wallet: a wallet restored from its mnemonic does not have them. For a conversion, the destination shows the destination amount only once the transaction is confirmed (<a href="#conversions-in-the-history">Conversions in the history</a>).</p>
+<p><strong>Not possible.</strong> A third party without the receiving or sending wallet cannot learn the amount from the key or the proof. It learns that the transaction paid the address and how many confirmations it has. <em>Status:</em> core behaviour, confirmed on mainnet on 2026-11-07; <code>checkTxProof</code> uses the same code (read in the code, not tested). A core fix would read the destination asset's entry; it is not a security fix, so the backports leave it. Through <code>ZephyrWalletRpc</code> the amount comes back <code>null</code> for a different reason (<a href="11-the-rpc-classes.html#zephyrwalletrpc">ZephyrWalletRpc</a>).</p>
+<h2 id="getoutputs-reports-no-asset">getOutputs() reports no asset<a class="heading-anchor" href="#getoutputs-reports-no-asset" aria-label="Link to this section">#</a></h2>
+<p><strong>What you see.</strong> In the full wallet, every <code>ZephyrOutputWallet</code> that <code>getOutputs()</code> returns has <code>getAssetType() == null</code>. On mainnet on 2026-11-08, all five outputs of a test wallet that had held ZPH and ZRS came back without an asset.</p>
+<p><strong>Why.</strong> The core keeps an output's asset but does not serialize it in the output query. Balances, transfers and the listener's confirmed-output callbacks carry the asset; only the output query lacks it.</p>
+<p><strong>Workaround.</strong> <code>ZephyrWallet.getOutputAssetType(output)</code>, from release <code>2.3.0-sec.2-java.2</code> on, takes the asset from the output's transaction. Coin control per asset filters the outputs through it:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>static List&lt;ZephyrOutputWallet&gt; unspentOutputs(ZephyrWallet wallet, String asset) {
+  List&lt;ZephyrOutputWallet&gt; outputs = new ArrayList&lt;&gt;();
+  for (ZephyrOutputWallet output : wallet.getOutputs(new ZephyrOutputQuery().setIsSpent(false))) {
+    if (asset.equals(wallet.getOutputAssetType(output))) outputs.add(output);  // one getTxs call per output
+  }
+  return outputs;
+}</code></pre>
+</div>
+<p>The rule it follows:</p>
+<ul><li>For a transaction the wallet received, the incoming transfer at the output's account and subaddress names the asset (a received transaction credits one asset per subaddress).</li><li>For a transaction the wallet sent from the output's account, the core lists no incoming transfer for the change. An output without a matching transfer in another asset is therefore in the source asset, which the outgoing transfer carries.</li><li>It returns <code>null</code> when the output's transaction is not in the wallet or no transfer matches.</li></ul>
+<p>It costs one <code>getTxs</code> call per output; cache by transaction hash for many outputs. On the mainnet test wallet it named all five outputs right. Among them was a 50 ZPH → ZRS conversion to the wallet's own address, whose ZRS output and ZPH change sit at the same subaddress. The method's Javadoc describes the rule step by step; an app on a release before <code>java.2</code> can follow it.</p>
+<p>The alternative is the listener. <code>onOutputReceived</code> carries the asset for every output once it is in a block, change included (read in the core's code). An app that follows all syncs with a listener can record the asset per key image itself. The notification for an output seen in the pool has an empty asset (<a href="04-threads-and-listeners.html#outputs-in-the-pool-carry-no-asset">Outputs in the pool carry no asset</a>).</p>
+<p><strong>Not possible.</strong> One case reads wrong: a conversion to one's own account whose converted amount is split over several outputs at one subaddress, or whose change equals the converted amount, reads as the source asset. <em>Status:</em> core behaviour, open.</p>
+<nav class="site-pager" aria-label="Previous and next page">
+<a class="site-prev" rel="prev" href="05-assets-and-balances.html">Previous: 5. Assets, accounts and balances</a>
+<a class="site-next" rel="next" href="07-sending.html">Next: 7. Sending</a>
+</nav>
+</article>
+</div>
+</main>
+<footer class="lt-footer">
+<div class="lt-wrap lt-wrap-wide">
+<p>Guide for zephyr-java 2.3.0-sec.2-java.4, built from commit <code>e59843ad</code> (2026-11-17 UTC).</p>
+<p>zephyr-java and this site are a <a href="https://lateo.dev/">lateo</a> project by an independent operator, not affiliated with or endorsed by ZephyrProtocol. Source: <a href="https://github.com/loki-notfound/myzephyr-java">github.com/loki-notfound/myzephyr-java</a>.</p>
+<p>The library and the guide are under the MIT licence of the repository; the stylesheet is BSD 3-Clause; the lateo name, mark and favicons are not covered by either and all rights in them are reserved by their owner (<a href="../assets/NOTICE.txt">notice</a>).</p>
+</div>
+</footer>
+</body>
+</html>

@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>13. Known limitations - zephyr-java guide</title>
+<meta name="description" content="These are the limits a wallet app runs into with 2.3.0-sec.2-java.4. Most come from the Zephyr core (zephyr-cpp and wallet2), which zephyr-java builds unchanged. The backports change the core only for">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../assets/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon-180.png">
+<link rel="stylesheet" href="../assets/content.css">
+<link rel="stylesheet" href="../assets/print.css">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<a class="lt-skip-link" href="#main">Skip to main content</a>
+<header class="lt-header">
+  <div class="lt-wrap lt-wrap-wide lt-header-inner">
+    <div class="site-title">
+      <a class="lt-brand" href="../index.html">zephyr-java</a>
+      <p class="site-tagline">Java wallet library for Zephyr, a lateo project</p>
+    </div>
+    <nav class="lt-nav" aria-label="Site navigation">
+      <a href="index.html" aria-current="page">Guide</a>
+      <a href="../javadoc/index.html">Javadoc</a>
+      <a href="https://github.com/loki-notfound/myzephyr-java/releases">Releases</a>
+      <a href="https://github.com/loki-notfound/myzephyr-java">Repository</a>
+    </nav>
+  </div>
+</header>
+<main id="main" tabindex="-1">
+<div class="lt-wrap lt-wrap-wide lt-docs-layout">
+<aside class="lt-toc" aria-label="Guide navigation">
+<h2 id="site-nav-guide">Guide</h2>
+<nav aria-labelledby="site-nav-guide">
+<ol>
+<li><a href="index.html">zephyr-java user guide</a></li>
+<li><a href="01-getting-started.html">1. Getting started</a></li>
+<li><a href="02-wallets.html">2. Wallets</a></li>
+<li><a href="03-connecting-to-a-node.html">3. Connecting to a node</a></li>
+<li><a href="04-threads-and-listeners.html">4. Threads and listeners</a></li>
+<li><a href="05-assets-and-balances.html">5. Assets, accounts and balances</a></li>
+<li><a href="06-history.html">6. History</a></li>
+<li><a href="07-sending.html">7. Sending</a></li>
+<li><a href="08-conversions-and-the-reserve.html">8. Conversions and the reserve</a></li>
+<li><a href="09-errors.html">9. Errors and exceptions</a></li>
+<li><a href="10-android.html">10. Android</a></li>
+<li><a href="11-the-rpc-classes.html">11. The RPC classes</a></li>
+<li><a href="12-coming-from-monero-java.html">12. Coming from monero-java</a></li>
+<li><a href="13-known-limitations.html" aria-current="page">13. Known limitations</a></li>
+<li><a href="14-building-and-verifying.html">14. Building and verifying</a></li>
+</ol>
+</nav>
+<h2 id="site-nav-page">On this page</h2>
+<nav aria-labelledby="site-nav-page">
+<ol>
+<li><a href="#the-core">The core</a></li>
+<li><a href="#zephyr-java">zephyr-java</a></li>
+<li><a href="#wallets-and-their-data">Wallets and their data</a></li>
+<li><a href="#platforms-building-and-packaging">Platforms, building and packaging</a></li>
+<li><a href="#what-was-tested">What was tested</a></li>
+<li><a href="#what-was-not-tested">What was not tested</a></li>
+</ol>
+</nav>
+</aside>
+<article class="lt-docs-main lt-stack">
+<nav class="lt-breadcrumbs" aria-label="Breadcrumb"><ol><li><a href="../index.html">zephyr-java</a></li><li><a href="index.html">Guide</a></li><li><a href="13-known-limitations.html" aria-current="page">13. Known limitations</a></li></ol></nav>
+<h1 id="13-known-limitations">13. Known limitations</h1>
+<p>These are the limits a wallet app runs into with <code>2.3.0-sec.2-java.4</code>. Most come from the Zephyr core (zephyr-cpp and <code>wallet2</code>), which zephyr-java builds unchanged. The backports change the core only for security fixes, so functional gaps stay until the core itself changes. Each row says what happens, its status, and where the details are. The rest of the guide explains each one where its topic is.</p>
+<p>Status words:</p>
+<ul><li><em>core</em>: behaviour of the Zephyr core;</li><li><em>open</em>: not fixed;</li><li><em>observed</em>: the run that showed it, with its date;</li><li><em>not tested</em>: nobody ran it against Zephyr.</li></ul>
+<h2 id="the-core">The core<a class="heading-anchor" href="#the-core" aria-label="Link to this section">#</a></h2>
+<div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="the-core">
+<table>
+<thead><tr><th scope="col">Limitation</th><th scope="col">Status</th><th scope="col">Details</th></tr></thead>
+<tbody>
+<tr><td><code>checkTxKey</code> and <code>checkTxProof</code> return amount 0 for every current transaction</td><td>core, open; confirmed on mainnet on 2026-11-07</td><td><a href="06-history.html#checktxkey-returns-amount-0">checkTxKey returns amount 0</a></td></tr>
+<tr><td><code>getOutputs()</code> reports no asset</td><td>core, open; <code>getOutputAssetType</code> from <code>java.2</code> takes it from the transaction</td><td><a href="06-history.html#getoutputs-reports-no-asset">getOutputs() reports no asset</a></td></tr>
+<tr><td><code>getOutputAssetType</code> reads a split conversion to one's own account as the source asset</td><td>core, open</td><td><a href="06-history.html#getoutputs-reports-no-asset">getOutputs() reports no asset</a></td></tr>
+<tr><td>the asset of an output notification in the pool is empty</td><td>core, stays; observed on mainnet on 2026-11-07</td><td><a href="04-threads-and-listeners.html#outputs-in-the-pool-carry-no-asset">Outputs in the pool carry no asset</a></td></tr>
+<tr><td><code>changePassword</code> fails for a wallet opened from bytes</td><td>core; confirmed on mainnet</td><td><a href="02-wallets.html#the-password">The password</a></td></tr>
+<tr><td><code>save()</code> and <code>close(true)</code> write nothing for a wallet without a path, and report no error</td><td>core, read in the code</td><td><a href="02-wallets.html#wallet-bytes">Wallet bytes</a></td></tr>
+<tr><td><code>sweepOutput</code> validates with <code>ZEPH</code> and is most likely unusable</td><td>core, read in the code; not tested</td><td><a href="07-sending.html#sweeping">Sweeping</a></td></tr>
+<tr><td><code>sweepUnlocked</code> without an account index sweeps every account with an unlocked balance in the source asset</td><td>core, read in the code</td><td><a href="07-sending.html#sweeping">Sweeping</a></td></tr>
+<tr><td>every node is treated as trusted (monero's trusted-daemon mode), and its error text can reach exception messages</td><td>core, read in the code</td><td><a href="03-connecting-to-a-node.html#a-remote-node">A remote node</a></td></tr>
+<tr><td><code>sync()</code> against a node that is still syncing returns 0 blocks without an error</td><td>core, read in the code; not run</td><td><a href="03-connecting-to-a-node.html#syncing">Syncing</a></td></tr>
+<tr><td>background syncing reports no errors to the app</td><td>core, read in the code</td><td><a href="03-connecting-to-a-node.html#background-sync">Background sync</a></td></tr>
+<tr><td>a conversion's pricing record must be at most 10 blocks old when the chain includes it</td><td>network rule, read in the code</td><td><a href="08-conversions-and-the-reserve.html#building-a-conversion">Building a conversion</a></td></tr>
+<tr><td>testnet and stagenet never reach the V2 rules</td><td>core network tables</td><td><a href="02-wallets.html#network-types">Network types</a></td></tr>
+<tr><td>no certificate pinning; the host name must match; the Network Security Configuration does not apply</td><td>needs the core</td><td><a href="03-connecting-to-a-node.html#what-tls-cannot-do">What TLS cannot do</a></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="zephyr-java">zephyr-java<a class="heading-anchor" href="#zephyr-java" aria-label="Link to this section">#</a></h2>
+<div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="zephyr-java">
+<table>
+<thead><tr><th scope="col">Limitation</th><th scope="col">Status</th><th scope="col">Details</th></tr></thead>
+<tbody>
+<tr><td><code>close()</code> from another thread during <code>sync()</code> crashes the process</td><td>observed on 2026-11-17 with the released JAR, 4 of 4 runs; open</td><td><a href="04-threads-and-listeners.html#closing-a-wallet-that-syncs">Closing a wallet that syncs</a></td></tr>
+<tr><td><code>close()</code> while background syncing scans leaves a native thread attached; the JVM does not exit, also with <code>stopSyncing()</code> right before</td><td>observed on 2026-11-17 with the released JAR, 3 of 3 and 2 of 2 runs; open</td><td><a href="04-threads-and-listeners.html#closing-a-wallet-that-syncs">Closing a wallet that syncs</a></td></tr>
+<tr><td>no call reports whether a background scan is still running; <code>stopSyncing()</code> lets the batch in progress finish</td><td>read in the code; open</td><td><a href="04-threads-and-listeners.html#closing-a-wallet-that-syncs">Closing a wallet that syncs</a></td></tr>
+<tr><td><code>onOutputReceived</code> and <code>onOutputSpent</code> repeat at confirmation and unlock; the spent notification at unlock is a summary</td><td>by design, in the Javadoc and the core's code</td><td><a href="04-threads-and-listeners.html#the-five-callbacks">The five callbacks</a></td></tr>
+<tr><td>an exception from a callback during background syncing leaves a native thread attached; the JVM does not exit</td><td>observed on 2026-11-17 with the released JAR, 3 of 3 runs; open</td><td><a href="04-threads-and-listeners.html#an-exception-thrown-in-a-callback">An exception thrown in a callback</a></td></tr>
+<tr><td>an exception from a callback during <code>sync()</code> is printed and swallowed, and skips the rest of that block's notifications</td><td>observed on 2026-11-17</td><td><a href="04-threads-and-listeners.html#an-exception-thrown-in-a-callback">An exception thrown in a callback</a></td></tr>
+<tr><td>calls from several threads on one wallet are not known to be safe</td><td>not established</td><td><a href="04-threads-and-listeners.html#calls-from-several-threads">Calls from several threads</a></td></tr>
+<tr><td>a wrong password in <code>openWallet</code> throws <code>java.lang.Exception</code>, not <code>ZephyrError</code></td><td>observed on 2026-11-17, also with the released JAR; open</td><td><a href="09-errors.html#where-messages-come-from">Where messages come from</a></td></tr>
+<tr><td>many wallet calls, among them the balance calls, <code>save</code> and the account calls, let the core's <code>java.lang.Exception</code> through</td><td>read in the source; open</td><td><a href="09-errors.html#calls-that-let-the-cores-exception-through">Calls that let the core's exception through</a></td></tr>
+<tr><td>an invalid account or subaddress index may end the process: some native calls do not catch the core's failure</td><td>read in the code; not run</td><td><a href="09-errors.html#calls-that-let-the-cores-exception-through">Calls that let the core's exception through</a></td></tr>
+<tr><td><code>close(true)</code> does not catch a failing save in native code</td><td>read in the code; not run</td><td><a href="02-wallets.html#closing">Closing</a></td></tr>
+<tr><td>at <code>FINE</code> and from <code>setLogLevel(2)</code> the library logs transaction keys, passwords and mnemonics</td><td>read in the source</td><td><a href="09-errors.html#logging-safely">Logging safely</a></td></tr>
+<tr><td><code>ZephyrUtils.toAtomicUnits(double)</code> throws below 0.001 and from 10^7, and truncates silently</td><td>specified Java behaviour; run on 2026-11-17</td><td><a href="05-assets-and-balances.html#amounts">Amounts</a></td></tr>
+<tr><td><code>ZephyrRpcError.toString()</code> prints the request parameters, which can hold passwords</td><td>open in <code>2.3.0-sec.2-java.4</code>; later releases redact them</td><td><a href="09-errors.html#logging-safely">Logging safely</a></td></tr>
+<tr><td>the RPC classes are a first pass: <code>ZephyrWalletRpc</code> serves the base coin only</td><td>planned work</td><td><a href="11-the-rpc-classes.html#zephyrwalletrpc">ZephyrWalletRpc</a></td></tr>
+<tr><td>the RPC classes need API 26, or core library desugaring on API 24 and 25</td><td>by design of the HTTP client</td><td><a href="10-android.html#the-rpc-classes-below-api-26">The RPC classes below API 26</a></td></tr>
+<tr><td>the areas inherited from monero-java listed in chapter 1</td><td>not tested</td><td><a href="01-getting-started.html#what-zephyr-java-does-and-does-not-do">What zephyr-java does and does not do</a></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="wallets-and-their-data">Wallets and their data<a class="heading-anchor" href="#wallets-and-their-data" aria-label="Link to this section">#</a></h2>
+<div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="wallets-and-their-data">
+<table>
+<thead><tr><th scope="col">Limitation</th><th scope="col">Status</th><th scope="col">Details</th></tr></thead>
+<tbody>
+<tr><td>a view-only wallet's balance counts everything ever received once the wallet has spent</td><td>observed on 2026-11-17</td><td><a href="02-wallets.html#view-only-wallets">View-only wallets</a></td></tr>
+<tr><td>the native log, when switched on, records the primary address, the wallet path, amounts and transaction hashes, and grows by a line per block with a listener</td><td>observed on 2026-11-17 on the desktop, the content also with the released JAR</td><td><a href="09-errors.html#the-native-log">The native log</a></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="platforms-building-and-packaging">Platforms, building and packaging<a class="heading-anchor" href="#platforms-building-and-packaging" aria-label="Link to this section">#</a></h2>
+<div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="platforms-building-and-packaging">
+<table>
+<thead><tr><th scope="col">Limitation</th><th scope="col">Status</th><th scope="col">Details</th></tr></thead>
+<tbody>
+<tr><td>no packaged native libraries for macOS and Windows</td><td>not packaged in <code>2.3.0-sec.2-java.4</code></td><td><a href="01-getting-started.html#the-native-library">The native library</a></td></tr>
+<tr><td>the Linux JAR needs glibc 2.36 or newer</td><td>release natives built on Debian 12</td><td><a href="01-getting-started.html#linux-the-glibc-floor">Linux: the glibc floor</a></td></tr>
+<tr><td>the <code>armeabi-v7a</code> library needs a CPU with VFPv4; there is no 32-bit <code>x86</code> library</td><td>build choice</td><td><a href="10-android.html#devices">Devices</a></td></tr>
+<tr><td>the Android natives are reproducible at the same build path only</td><td>NDK r18b</td><td><a href="14-building-and-verifying.html#reproducibility">Reproducibility</a></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="what-was-tested">What was tested<a class="heading-anchor" href="#what-was-tested" aria-label="Link to this section">#</a></h2>
+<ul><li><strong>On mainnet with real funds, on the desktop:</strong> create, open, sync, balances per asset, transfers, a ZPH → ZRS conversion and sweeps. Five transactions were verified on the node. Conversions other than ZPH → ZRS were not run (<a href="08-conversions-and-the-reserve.html#what-was-tested">What was tested</a>).</li><li><strong>On the Android emulator:</strong> see below.</li><li><strong>On Linux <code>x86_64</code> on 2026-11-17</strong>, with a developer build of the <code>2.3.0-sec.2-java.4</code> sources: listener exceptions, closing during a sync and reads from several threads. Also the messages of <code>createTxs</code>, the native log, a view-only wallet, <code>moveTo</code>, the heights and the amount helpers. The closing runs, the listener exceptions under background syncing, the wrong password and the native log's content were repeated that day with the released JAR.</li><li><strong>The coexistence with monero-java</strong> in one JVM (<a href="12-coming-from-monero-java.html#both-libraries-in-one-program">Both libraries in one program</a>).</li></ul>
+<p><strong>Where it has run.</strong> The <code>x86_64</code> library ran on the Android emulator as a release check. It ran on API 24 and on API 35 with 16 KB pages, in debug builds (so under ART's CheckJNI). There:</p>
+<ul><li>the native library loads, and an offline wallet works;</li><li>a wallet restored from its mnemonic syncs against a mainnet node and opens again from its bytes;</li><li><code>ZephyrDaemonRpc</code> reads the node (on API 24 with desugaring);</li><li><code>https://</code> to a mainnet node with a publicly signed certificate works without setup (the shipped root certificates), on API 24 and on API 35 with 16 KB pages;</li><li>with the system store alone it works on API 35 and fails on API 24, which lacks ISRG Root X1.</li></ul>
+<p>The <code>arm64-v8a</code> and <code>armeabi-v7a</code> libraries are built and checked the same way (exports, page alignment, packaging). They had not run on hardware by release <code>2.3.0-sec.2-java.4</code> (2026-11-10).</p>
+<h2 id="what-was-not-tested">What was not tested<a class="heading-anchor" href="#what-was-not-tested" aria-label="Link to this section">#</a></h2>
+<ul><li>the conversions other than ZPH → ZRS on mainnet;</li><li>the ARM libraries for Android on hardware;</li><li>the Linux <code>arm64</code> library, which is built and checked but has not been run;</li><li>any of the observations of 2026-11-17 on Android, and <code>configureNativeLogging</code> on Android;</li><li>the areas inherited from monero-java listed in <a href="01-getting-started.html#what-zephyr-java-does-and-does-not-do">What zephyr-java does and does not do</a>;</li><li>a node that refuses a relayed transaction, and the message for funds that are not unlocked;</li><li>a large history, and a first sync over the internet from an old restore height.</li></ul>
+<nav class="site-pager" aria-label="Previous and next page">
+<a class="site-prev" rel="prev" href="12-coming-from-monero-java.html">Previous: 12. Coming from monero-java</a>
+<a class="site-next" rel="next" href="14-building-and-verifying.html">Next: 14. Building and verifying</a>
+</nav>
+</article>
+</div>
+</main>
+<footer class="lt-footer">
+<div class="lt-wrap lt-wrap-wide">
+<p>Guide for zephyr-java 2.3.0-sec.2-java.4, built from commit <code>e59843ad</code> (2026-11-17 UTC).</p>
+<p>zephyr-java and this site are a <a href="https://lateo.dev/">lateo</a> project by an independent operator, not affiliated with or endorsed by ZephyrProtocol. Source: <a href="https://github.com/loki-notfound/myzephyr-java">github.com/loki-notfound/myzephyr-java</a>.</p>
+<p>The library and the guide are under the MIT licence of the repository; the stylesheet is BSD 3-Clause; the lateo name, mark and favicons are not covered by either and all rights in them are reserved by their owner (<a href="../assets/NOTICE.txt">notice</a>).</p>
+</div>
+</footer>
+</body>
+</html>

@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>9. Errors and exceptions - zephyr-java guide</title>
+<meta name="description" content="This chapter covers what a wallet app sees when something goes wrong. It names the exception types and where their messages come from, lists the messages a wallet meets, and shows how to log them safe">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../assets/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon-180.png">
+<link rel="stylesheet" href="../assets/content.css">
+<link rel="stylesheet" href="../assets/print.css">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<a class="lt-skip-link" href="#main">Skip to main content</a>
+<header class="lt-header">
+  <div class="lt-wrap lt-wrap-wide lt-header-inner">
+    <div class="site-title">
+      <a class="lt-brand" href="../index.html">zephyr-java</a>
+      <p class="site-tagline">Java wallet library for Zephyr, a lateo project</p>
+    </div>
+    <nav class="lt-nav" aria-label="Site navigation">
+      <a href="index.html" aria-current="page">Guide</a>
+      <a href="../javadoc/index.html">Javadoc</a>
+      <a href="https://github.com/loki-notfound/myzephyr-java/releases">Releases</a>
+      <a href="https://github.com/loki-notfound/myzephyr-java">Repository</a>
+    </nav>
+  </div>
+</header>
+<main id="main" tabindex="-1">
+<div class="lt-wrap lt-wrap-wide lt-docs-layout">
+<aside class="lt-toc" aria-label="Guide navigation">
+<h2 id="site-nav-guide">Guide</h2>
+<nav aria-labelledby="site-nav-guide">
+<ol>
+<li><a href="index.html">zephyr-java user guide</a></li>
+<li><a href="01-getting-started.html">1. Getting started</a></li>
+<li><a href="02-wallets.html">2. Wallets</a></li>
+<li><a href="03-connecting-to-a-node.html">3. Connecting to a node</a></li>
+<li><a href="04-threads-and-listeners.html">4. Threads and listeners</a></li>
+<li><a href="05-assets-and-balances.html">5. Assets, accounts and balances</a></li>
+<li><a href="06-history.html">6. History</a></li>
+<li><a href="07-sending.html">7. Sending</a></li>
+<li><a href="08-conversions-and-the-reserve.html">8. Conversions and the reserve</a></li>
+<li><a href="09-errors.html" aria-current="page">9. Errors and exceptions</a></li>
+<li><a href="10-android.html">10. Android</a></li>
+<li><a href="11-the-rpc-classes.html">11. The RPC classes</a></li>
+<li><a href="12-coming-from-monero-java.html">12. Coming from monero-java</a></li>
+<li><a href="13-known-limitations.html">13. Known limitations</a></li>
+<li><a href="14-building-and-verifying.html">14. Building and verifying</a></li>
+</ol>
+</nav>
+<h2 id="site-nav-page">On this page</h2>
+<nav aria-labelledby="site-nav-page">
+<ol>
+<li><a href="#zephyrerror">ZephyrError</a></li>
+<li><a href="#where-messages-come-from">Where messages come from</a></li>
+<li><a href="#the-messages-a-wallet-meets">The messages a wallet meets</a></li>
+<li><a href="#showing-an-error">Showing an error</a></li>
+<li><a href="#logging-safely">Logging safely</a></li>
+<li><a href="#the-native-log">The native log</a></li>
+</ol>
+</nav>
+</aside>
+<article class="lt-docs-main lt-stack">
+<nav class="lt-breadcrumbs" aria-label="Breadcrumb"><ol><li><a href="../index.html">zephyr-java</a></li><li><a href="index.html">Guide</a></li><li><a href="09-errors.html" aria-current="page">9. Errors and exceptions</a></li></ol></nav>
+<h1 id="9-errors-and-exceptions">9. Errors and exceptions</h1>
+<p>This chapter covers what a wallet app sees when something goes wrong. It names the exception types and where their messages come from, lists the messages a wallet meets, and shows how to log them safely. It ends with the core's own log.</p>
+<h2 id="zephyrerror">ZephyrError<a class="heading-anchor" href="#zephyrerror" aria-label="Link to this section">#</a></h2>
+<p><code>zephyr.common.ZephyrError</code> is the exception the library's own checks and most wallet calls throw. It is not the only one: <a href="#calls-that-let-the-cores-exception-through">Calls that let the core's exception through</a> names the others. It extends <code>RuntimeException</code>, so the compiler does not ask you to catch it. It carries a message and an optional <code>Integer</code> code:</p>
+<ul><li><code>getMessage()</code> is the text;</li><li><code>getCode()</code> is the code, or <code>null</code>;</li><li><code>toString()</code> is the message, or &quot;code: message&quot; when there is a code.</li></ul>
+<p>Many wallet calls catch the native failure and throw a <code>ZephyrError</code> with the core's message and no code. Two calls set the code -1: <code>getReserveProofAccount</code> and <code>checkReserveProof</code>. Checks in the Java code, such as a missing network type or a closed wallet, throw a <code>ZephyrError</code> as well.</p>
+<h2 id="where-messages-come-from">Where messages come from<a class="heading-anchor" href="#where-messages-come-from" aria-label="Link to this section">#</a></h2>
+<div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="where-messages-come-from">
+<table>
+<thead><tr><th scope="col">Source</th><th scope="col">What arrives</th><th scope="col">Example</th></tr></thead>
+<tbody>
+<tr><td>a check in the Java code</td><td><code>ZephyrError</code> with the library's text</td><td>&quot;Wallet is closed&quot;</td></tr>
+<tr><td>the core, through a wallet call that wraps it</td><td><code>ZephyrError</code> with the core's text, code <code>null</code></td><td>&quot;not enough money&quot;</td></tr>
+<tr><td>the core, through a call that does not wrap it</td><td><code>java.lang.Exception</code> with the core's text</td><td>&quot;invalid password&quot;</td></tr>
+<tr><td>the core, out of memory</td><td><code>OutOfMemoryError</code>, not wrapped</td><td>—</td></tr>
+<tr><td>an argument check</td><td><code>AssertionError</code></td><td>&quot;Log level must be an integer &gt;= 0&quot;</td></tr>
+<tr><td>an unknown hash in a transfer or output query</td><td><code>RuntimeException</code></td><td>&quot;Wallet missing requested tx hashes: &quot; and the hashes</td></tr>
+<tr><td>an inherited method that zephyr-java does not implement</td><td><code>RuntimeException</code></td><td>&quot;ZephyrWalletFull.tagAccounts() not implemented&quot;</td></tr>
+<tr><td>the RPC classes, an RPC or HTTP error</td><td><code>ZephyrRpcError</code>, a <code>ZephyrError</code> with the RPC code or HTTP status</td><td><a href="11-the-rpc-classes.html#zephyrrpcerror">ZephyrRpcError</a></td></tr>
+<tr><td>the RPC classes, no connection</td><td>a plain <code>ZephyrError</code> whose message is the cause's text</td><td>—</td></tr>
+</tbody>
+</table>
+</div>
+<p>The JNI bridge turns a C++ exception into a <code>java.lang.Exception</code> (an <code>IOException</code> for an I/O failure, an <code>OutOfMemoryError</code> when memory runs out). A wallet call that wraps it catches the <code>Exception</code> and rethrows it as a <code>ZephyrError</code>; an <code>OutOfMemoryError</code> passes through unchanged.</p>
+<h3 id="calls-that-let-the-cores-exception-through">Calls that let the core's exception through<a class="heading-anchor" href="#calls-that-let-the-cores-exception-through" aria-label="Link to this section">#</a></h3>
+<p>Not every call of <code>ZephyrWalletFull</code> wraps the core's failure. In <code>2.3.0-sec.2-java.4</code> these pass it on as <code>java.lang.Exception</code> (or <code>IOException</code>), as read in the source:</p>
+<ul><li><code>openWallet</code> from a path, <code>openWalletData</code>, and <code>createWallet</code> for a random wallet or one from a mnemonic;</li><li><code>save</code>, <code>moveTo</code> and <code>getData</code>;</li><li>the six balance calls (<code>getBalance</code>, <code>getUnlockedBalance</code>), <code>getReserveInfo</code> and <code>getCirculatingSupply</code>: they catch only <code>ZephyrError</code>, which the bridge never throws;</li><li><code>getOutputs</code>, <code>getHeight</code>, <code>getRestoreHeight</code> and <code>setRestoreHeight</code>;</li><li>the account and subaddress calls (<code>getAccounts</code>, <code>getAccount</code>, <code>createAccount</code>, <code>getSubaddresses</code>, <code>createSubaddress</code>, <code>setSubaddressLabel</code>, <code>getAddress</code>);</li><li><code>getTxNotes</code>, <code>setTxNotes</code>, the export and import of outputs and key images, <code>signMessage</code>, the address book and the attributes;</li><li>the getters of the keys, the mnemonic, the path and the network type.</li></ul>
+<p>Observed on 2026-11-17, also with the released JAR: <code>openWallet</code> with a wrong password threw <code>java.lang.Exception</code> with the message &quot;invalid password&quot;, not a <code>ZephyrError</code>. In the core's code, <code>getCirculatingSupply</code> without a node throws &quot;failed to get circulating supply. Make sure you are connected to a daemon.&quot; the same way. The rule that follows: <strong>catch <code>Exception</code> around wallet calls, not only <code>ZephyrError</code></strong> (<a href="02-wallets.html#opening-wallet-files">Opening wallet files</a>).</p>
+<p>Some of these calls do not catch the core's failure in the native code either. Among them are the account and subaddress calls and <code>getAddress</code> (read in the bridge's code). An exception that leaves native code uncaught can end the process. An invalid account or subaddress index is the likely trigger, so pass only indexes the wallet reported. This was not run.</p>
+<p>A few calls have no check for a closed wallet, among them <code>changePassword</code>. After <code>close()</code> it fails with an unrelated error instead of &quot;Wallet is closed&quot; (read in the source).</p>
+<p><code>ZephyrUtils.validateAddress</code> turns its <code>AssertionError</code> into a <code>ZephyrError</code>; <code>isValidAddress</code> returns <code>false</code> instead of throwing.</p>
+<h2 id="the-messages-a-wallet-meets">The messages a wallet meets<a class="heading-anchor" href="#the-messages-a-wallet-meets" aria-label="Link to this section">#</a></h2>
+<p>The messages below appear in this guide, in the library's source or in the runs of 2026-11-17. The core's messages are its own text and can change with the core.</p>
+<div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="the-messages-a-wallet-meets">
+<table>
+<thead><tr><th scope="col">Message</th><th scope="col">Thrown by</th><th scope="col">What the app can do</th></tr></thead>
+<tbody>
+<tr><td>&quot;Wallet does not exist at path: &quot; and the path</td><td><code>openWallet</code></td><td>offer to create or restore a wallet</td></tr>
+<tr><td>&quot;invalid password&quot; (<code>java.lang.Exception</code>)</td><td><code>openWallet</code></td><td>ask for the password again</td></tr>
+<tr><td>&quot;Wallet already exists: &quot; and the path</td><td><code>createWallet</code></td><td>choose another path</td></tr>
+<tr><td>&quot;Cannot specify restore height when creating random wallet&quot;</td><td><code>createWallet</code></td><td>leave the restore height out</td></tr>
+<tr><td>&quot;Wallet may be initialized with a mnemonic or keys but not both&quot;</td><td><code>createWallet</code></td><td>give one of the two</td></tr>
+<tr><td>&quot;Must specify a network type: 'mainnet', 'testnet' or 'stagenet'&quot;</td><td><code>createWallet</code>, <code>openWallet</code> with a config</td><td>set <code>MAINNET</code></td></tr>
+<tr><td>&quot;Wallet is closed&quot;</td><td>most calls after <code>close()</code></td><td>open the wallet again</td></tr>
+<tr><td>&quot;Wallet is not connected to daemon&quot;</td><td><code>sync()</code>, <code>getDaemonHeight()</code> and other calls that need the node, when the last connection check failed</td><td>check the node; for <code>https://</code> the message adds a hint at TLS (<a href="03-connecting-to-a-node.html#when-the-node-cannot-be-reached">When the node cannot be reached</a>)</td></tr>
+<tr><td>&quot;Failed to connect to daemon&quot;</td><td><code>getDaemonHeight()</code> and the like, when the node went away after the last connection check</td><td>check the node</td></tr>
+<tr><td>&quot;failed to get circulating supply. Make sure you are connected to a daemon.&quot; (<code>java.lang.Exception</code>)</td><td><code>getCirculatingSupply</code></td><td>connect the wallet to a node</td></tr>
+<tr><td>&quot;failed to connect to daemon: &quot; and the URI</td><td><code>getHeightByDate</code></td><td>check the node</td></tr>
+<tr><td><code>failed to read file &quot;.keys&quot;</code></td><td><code>changePassword</code> on a wallet from bytes</td><td><a href="02-wallets.html#the-password">The password</a></td></tr>
+<tr><td>&quot;Invalid original password.&quot;</td><td><code>changePassword</code></td><td>ask for the old password again</td></tr>
+<tr><td>&quot;Must specify source currency&quot;, &quot;Must specify account index to send from&quot;</td><td><code>createTxs</code>, <code>sweepUnlocked</code></td><td>set the currency pair and the account</td></tr>
+<tr><td>&quot;not a valid tx type&quot;</td><td><code>createTxs</code></td><td>use one of <a href="08-conversions-and-the-reserve.html#the-ten-pairs">the ten pairs</a></td></tr>
+<tr><td>&quot;not enough money&quot;</td><td><code>createTxs</code></td><td>offer a smaller amount</td></tr>
+<tr><td>&quot;Spot reserve ratio not satisfied. ...&quot; or &quot;Reserve ratio not satisfied. ...&quot;</td><td><code>createTxs</code> for a conversion</td><td><a href="08-conversions-and-the-reserve.html#the-reserve-ratio">The reserve ratio</a></td></tr>
+<tr><td>&quot;Mint/redeem TX amounts permit at most 4 decimal places&quot;</td><td><code>createTxs</code> for a conversion</td><td>round down to four decimals</td></tr>
+<tr><td>&quot;Cannot set amount because ZephyrTxConfig already has multiple destinations&quot;</td><td><code>ZephyrTxConfig.setAmount</code></td><td>set the amount on each destination</td></tr>
+<tr><td>&quot;Must provide account index&quot;</td><td><code>getBalance(asset, null)</code></td><td>pass an account index</td></tr>
+<tr><td>&quot;Wallet missing requested tx hashes: &quot; and the hashes</td><td><code>getTxs(hash)</code></td><td>sync, or use <code>getTxs(hashes, missing)</code></td></tr>
+<tr><td>&quot;Address has invalid ...&quot; or &quot;Address network type mismatch&quot;</td><td><code>validateAddress</code></td><td>ask the user to check the address</td></tr>
+<tr><td>&quot;The RPC classes need java.time: ...&quot;</td><td>the RPC classes on API 24 and 25</td><td><a href="10-android.html#the-rpc-classes-below-api-26">The RPC classes below API 26</a></td></tr>
+<tr><td>&quot;Not supported by ZephyrWalletRpc until the RPC port: reserve info&quot;</td><td><code>ZephyrWalletRpc</code></td><td>use <code>ZephyrWalletFull</code></td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>What an app can tell apart.</strong> The type separates only the broad cases. A library check or a wrapped core failure is a <code>ZephyrError</code>, a core failure that was not wrapped a <code>java.lang.Exception</code>, and an RPC error a <code>ZephyrRpcError</code>. Every refusal of <code>createTxs</code> by the core is the same <code>ZephyrError</code> with a <code>null</code> code; only the text differs. So the message table above is the only handle, and its texts are not guaranteed to stay the same across releases of the core. As advice:</p>
+<ul><li>check what you can before you build: round a conversion to four decimals, compare the amount with the unlocked balance, read <code>getReserveInfo()</code>;</li><li>match a known message only to choose a better screen text, and fall back to a general failure;</li><li>keep the message for the log.</li></ul>
+<p>In the runs of 2026-11-17 the messages of <code>createTxs</code> held only the core's own text. But a core message can carry text from the node. The core passes the node's own error text into some messages (read in the core's code; <a href="03-connecting-to-a-node.html#a-remote-node">A remote node</a>). Show such text as plain text, never as HTML.</p>
+<h2 id="showing-an-error">Showing an error<a class="heading-anchor" href="#showing-an-error" aria-label="Link to this section">#</a></h2>
+<p>As advice for screens, state what happened, why if known, and what to do next. For example, for &quot;not enough money&quot;: &quot;This account cannot pay the amount and its fee. Enter a smaller amount, or wait for pending funds to unlock.&quot; Keep the core's message for the log.</p>
+<h2 id="logging-safely">Logging safely<a class="heading-anchor" href="#logging-safely" aria-label="Link to this section">#</a></h2>
+<div class="lt-callout lt-callout-warning" role="note">
+<p class="lt-callout-title">Never log <code>ZephyrRpcError.toString()</code>.</p>
+<p>It appends the RPC method and its parameters as JSON. The calls of <code>ZephyrWalletRpc</code> that open or create a wallet put the wallet's password into those parameters, and its <code>setDaemonConnection</code> the node's login password. Log <code>getMessage()</code> and <code>getCode()</code> instead.</p>
+</div>
+<p>Releases after <code>2.3.0-sec.2-java.4</code> print the values of <code>password</code>, <code>old_password</code>, <code>new_password</code>, <code>seed</code>, <code>seed_offset</code>, <code>spendkey</code>, <code>viewkey</code> and <code>tx_key</code> as <code>&lt;redacted&gt;</code> in <code>toString()</code>, while <code>getRpcParams()</code> still holds them.</p>
+<p><code>toString()</code> also reaches a log without an explicit call: through <code>printStackTrace()</code>, through <code>&quot;&quot; + e</code>, and through the throwable output of most loggers. Never log the mnemonic, the private keys or the wallet password. For a <code>ZephyrError</code> without a code, <code>getMessage()</code> and <code>toString()</code> are the same text.</p>
+<p>The library logs secrets itself at some settings (read in the source):</p>
+<div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="logging-safely">
+<table>
+<thead><tr><th scope="col">Setting</th><th scope="col">What is logged, and where</th></tr></thead>
+<tbody>
+<tr><td><code>java.util.logging</code> level <code>FINE</code> for <code>zephyr.wallet.ZephyrWalletFull</code></td><td>the whole transaction config of <code>createTxs</code>, and the first 5,000 characters of the transactions <code>createTxs</code> and <code>sweepUnlocked</code> return, which can hold a transaction's secret key</td></tr>
+<tr><td><code>ZephyrUtils.setLogLevel(2)</code></td><td>every request body of the RPC classes, on <code>System.out</code>: for <code>ZephyrWalletRpc</code> that includes wallet passwords and mnemonics</td></tr>
+<tr><td><code>ZephyrUtils.setLogLevel(3)</code></td><td>every response as well, which can hold keys and mnemonics</td></tr>
+<tr><td><code>setPrintStackTrace(true)</code> on a <code>ZephyrRpcConnection</code></td><td>every request body, with a stack trace, on stderr</td></tr>
+<tr><td>any <code>ZephyrUtils.setLogLevel</code> call, <code>configureNativeLogging</code></td><td>the core's log, which holds the primary address, amounts and transaction hashes (<a href="#the-native-log">The native log</a>)</td></tr>
+</tbody>
+</table>
+</div>
+<p>On Android, <code>System.out</code> and <code>System.err</code> go to logcat. In a released app, keep <code>FINE</code> logging of the library off and do not call <code>setLogLevel</code> or <code>configureNativeLogging</code>. Without them the core printed nothing in the runs of 2026-11-17.</p>
+<h2 id="the-native-log">The native log<a class="heading-anchor" href="#the-native-log" aria-label="Link to this section">#</a></h2>
+<p>The core has its own log, separate from Java's. <code>ZephyrUtils.setLogLevel(level)</code> sets the level of zephyr-java's own messages (printed with <code>System.out</code>) and, once the native library is loaded, the core's level as well. <code>ZephyrUtils.configureNativeLogging(path, console)</code> sends the core's log to a file.</p>
+<p>Observed on 2026-11-17 on the desktop:</p>
+<div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="the-native-log">
+<table>
+<thead><tr><th scope="col">Setting</th><th scope="col">Where the core's log goes</th></tr></thead>
+<tbody>
+<tr><td>neither call</td><td>nowhere: no line on stdout or stderr, no file, even for errors</td></tr>
+<tr><td><code>setLogLevel(0)</code></td><td>warnings and errors on stdout, no file</td></tr>
+<tr><td><code>setLogLevel(1)</code></td><td>informational lines as well, still on stdout only</td></tr>
+<tr><td><code>configureNativeLogging(path, false)</code></td><td>the file at <code>path</code>, nothing on the console; without <code>setLogLevel</code> at the categories of level 0</td></tr>
+<tr><td><code>configureNativeLogging(path, true)</code></td><td>the file, and the same lines with ANSI colour codes on stdout</td></tr>
+</tbody>
+</table>
+</div>
+<p>Nothing went to stderr in any variant. The &quot;no file&quot; results rest on a search of the likely directories, not on a trace of every file the process opened.</p>
+<p><strong>The log holds private data.</strong> At level 0 it already records the wallet's primary address, the wallet file's path, and for each received or spent output the amount and the transaction hash. At level 1 it adds the node's URI. At level 1 the console line for an exception also carries the absolute source path of the machine that built the library. Treat a log file like the wallet: keep it in the app's private storage, out of backups and crash reports, and switch it on only to debug.</p>
+<p><strong>The log can grow fast.</strong> With a listener registered, a level-0 file log grew by one error line per scanned block: about 1.1 MB for 7,700 blocks. The line was &quot;wait should have been called before waiter dtor - waiting now&quot;. Without a listener there were 4 such lines.</p>
+<p>These runs used a developer build of the <code>2.3.0-sec.2-java.4</code> sources on Linux. A level-0 log of the released JAR held the same lines on 2026-11-17: the primary address, the wallet path, and the amounts and hashes of the outputs. Levels above 1 were not tried. On Android, <code>configureNativeLogging</code> has not been tried; nothing the core logs appears in logcat (<a href="10-android.html#logs">Logs</a>).</p>
+<nav class="site-pager" aria-label="Previous and next page">
+<a class="site-prev" rel="prev" href="08-conversions-and-the-reserve.html">Previous: 8. Conversions and the reserve</a>
+<a class="site-next" rel="next" href="10-android.html">Next: 10. Android</a>
+</nav>
+</article>
+</div>
+</main>
+<footer class="lt-footer">
+<div class="lt-wrap lt-wrap-wide">
+<p>Guide for zephyr-java 2.3.0-sec.2-java.4, built from commit <code>e59843ad</code> (2026-11-17 UTC).</p>
+<p>zephyr-java and this site are a <a href="https://lateo.dev/">lateo</a> project by an independent operator, not affiliated with or endorsed by ZephyrProtocol. Source: <a href="https://github.com/loki-notfound/myzephyr-java">github.com/loki-notfound/myzephyr-java</a>.</p>
+<p>The library and the guide are under the MIT licence of the repository; the stylesheet is BSD 3-Clause; the lateo name, mark and favicons are not covered by either and all rights in them are reserved by their owner (<a href="../assets/NOTICE.txt">notice</a>).</p>
+</div>
+</footer>
+</body>
+</html>

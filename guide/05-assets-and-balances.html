@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>5. Assets, accounts and balances - zephyr-java guide</title>
+<meta name="description" content="A Zephyr wallet holds several assets at once, so every balance in zephyr-java is a balance per asset. This chapter names the assets, shows how to convert and format amounts, and shows the four shapes ">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../assets/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon-180.png">
+<link rel="stylesheet" href="../assets/content.css">
+<link rel="stylesheet" href="../assets/print.css">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<a class="lt-skip-link" href="#main">Skip to main content</a>
+<header class="lt-header">
+  <div class="lt-wrap lt-wrap-wide lt-header-inner">
+    <div class="site-title">
+      <a class="lt-brand" href="../index.html">zephyr-java</a>
+      <p class="site-tagline">Java wallet library for Zephyr, a lateo project</p>
+    </div>
+    <nav class="lt-nav" aria-label="Site navigation">
+      <a href="index.html" aria-current="page">Guide</a>
+      <a href="../javadoc/index.html">Javadoc</a>
+      <a href="https://github.com/loki-notfound/myzephyr-java/releases">Releases</a>
+      <a href="https://github.com/loki-notfound/myzephyr-java">Repository</a>
+    </nav>
+  </div>
+</header>
+<main id="main" tabindex="-1">
+<div class="lt-wrap lt-wrap-wide lt-docs-layout">
+<aside class="lt-toc" aria-label="Guide navigation">
+<h2 id="site-nav-guide">Guide</h2>
+<nav aria-labelledby="site-nav-guide">
+<ol>
+<li><a href="index.html">zephyr-java user guide</a></li>
+<li><a href="01-getting-started.html">1. Getting started</a></li>
+<li><a href="02-wallets.html">2. Wallets</a></li>
+<li><a href="03-connecting-to-a-node.html">3. Connecting to a node</a></li>
+<li><a href="04-threads-and-listeners.html">4. Threads and listeners</a></li>
+<li><a href="05-assets-and-balances.html" aria-current="page">5. Assets, accounts and balances</a></li>
+<li><a href="06-history.html">6. History</a></li>
+<li><a href="07-sending.html">7. Sending</a></li>
+<li><a href="08-conversions-and-the-reserve.html">8. Conversions and the reserve</a></li>
+<li><a href="09-errors.html">9. Errors and exceptions</a></li>
+<li><a href="10-android.html">10. Android</a></li>
+<li><a href="11-the-rpc-classes.html">11. The RPC classes</a></li>
+<li><a href="12-coming-from-monero-java.html">12. Coming from monero-java</a></li>
+<li><a href="13-known-limitations.html">13. Known limitations</a></li>
+<li><a href="14-building-and-verifying.html">14. Building and verifying</a></li>
+</ol>
+</nav>
+<h2 id="site-nav-page">On this page</h2>
+<nav aria-labelledby="site-nav-page">
+<ol>
+<li><a href="#the-assets">The assets</a></li>
+<li><a href="#amounts">Amounts</a></li>
+<li><a href="#zephyrbalance">ZephyrBalance</a></li>
+<li><a href="#the-four-shapes-of-the-balance-api">The four shapes of the balance API</a></li>
+<li><a href="#accounts-and-subaddresses">Accounts and subaddresses</a></li>
+<li><a href="#locked-and-unlocked">Locked and unlocked</a></li>
+<li><a href="#keeping-balances-up-to-date">Keeping balances up to date</a></li>
+</ol>
+</nav>
+</aside>
+<article class="lt-docs-main lt-stack">
+<nav class="lt-breadcrumbs" aria-label="Breadcrumb"><ol><li><a href="../index.html">zephyr-java</a></li><li><a href="index.html">Guide</a></li><li><a href="05-assets-and-balances.html" aria-current="page">5. Assets, accounts and balances</a></li></ol></nav>
+<h1 id="5-assets-accounts-and-balances">5. Assets, accounts and balances</h1>
+<p>A Zephyr wallet holds several assets at once, so every balance in zephyr-java is a balance <strong>per asset</strong>. This chapter names the assets, shows how to convert and format amounts, and shows the four shapes of the balance API. It then covers accounts, subaddresses and labels, and locked and unlocked amounts.</p>
+<p>The blocks marked &quot;Java, compiled&quot; in this chapter come from <code>src/test/java/examples/GuideBalances.java</code>.</p>
+<h2 id="the-assets">The assets<a class="heading-anchor" href="#the-assets" aria-label="Link to this section">#</a></h2>
+<p>Since the V2 hard fork the network has four assets:</p>
+<div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="the-assets">
+<table>
+<thead><tr><th scope="col">Asset</th><th scope="col">Name</th><th scope="col">Constant</th></tr></thead>
+<tbody>
+<tr><td><code>ZPH</code></td><td>the base coin</td><td><code>ZephyrAssets.ZPH</code></td></tr>
+<tr><td><code>ZSD</code></td><td>the stable asset</td><td><code>ZephyrAssets.ZSD</code></td></tr>
+<tr><td><code>ZRS</code></td><td>the reserve asset</td><td><code>ZephyrAssets.ZRS</code></td></tr>
+<tr><td><code>ZYS</code></td><td>the yield asset</td><td><code>ZephyrAssets.ZYS</code></td></tr>
+</tbody>
+</table>
+</div>
+<p><code>ZephyrAssets.V2</code> lists the four in this order, which is the natural order for a user interface.</p>
+<p>Before that fork the same assets had other names, the V1 names: <code>ZEPH</code>, <code>ZEPHUSD</code>, <code>ZEPHRSV</code> and <code>ZYIELD</code>. They still appear in two places: in the history of wallets that received funds before the fork, and as entries in a wallet's balance. Since hard fork 11 (height 536,000, 2025-06-15) the chain rejects any new output with a V1 asset. The audit transactions that moved V1 coins to V2 are no longer allowed either, so V1 amounts that were not audited in time cannot be spent. A user interface shows the four V2 assets; the V1 entries matter only for the history. <code>ZephyrAssets</code> has no constants for the V1 names.</p>
+<p>In the API the asset is always an open <code>String</code>, never an enum. The core may report names this library has no constant for, and they pass through unchanged.</p>
+<h2 id="amounts">Amounts<a class="heading-anchor" href="#amounts" aria-label="Link to this section">#</a></h2>
+<p>Every amount in the API is a <code>BigInteger</code> in atomic units: 10^12 atomic units are one coin, for every asset (ZPH, ZSD, ZRS, ZYS alike). For user input and display, <code>BigDecimal</code> is exact:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>// amounts: coins as the user types them, to atomic units; more than 12 decimals throws ArithmeticException
+static BigInteger toAtomicUnits(String coins) {
+  BigInteger atomicUnits = new BigDecimal(coins.trim()).movePointRight(12).toBigIntegerExact();
+  if (atomicUnits.signum() &lt;= 0) throw new IllegalArgumentException(&quot;the amount must be above zero&quot;);
+  return atomicUnits;
+}
+
+// amounts: atomic units to coins with all 12 decimals, for a send review or a detail view
+static String formatFull(BigInteger atomicUnits) {
+  return new BigDecimal(atomicUnits, 12).toPlainString();  // 1500000000000 -&gt; &quot;1.500000000000&quot;
+}</code></pre>
+</div>
+<p><code>new BigDecimal(String)</code> throws a <code>NumberFormatException</code> for text that is not a number. Neither <code>BigDecimal</code> nor <code>ZephyrTxConfig.setAmount</code> rejects zero or a negative amount, so the helper does. A balance overview can show fewer decimals. This helper keeps 2 to 4 and never shows a non-zero amount as zero:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>// amounts: atomic units to coins with 2 to 4 decimals, for a balance overview; never shows dust as zero
+static String formatShort(BigInteger atomicUnits) {
+  BigDecimal coins = new BigDecimal(atomicUnits, 12);
+  BigDecimal shown = coins.setScale(4, RoundingMode.DOWN).stripTrailingZeros();
+  if (shown.signum() == 0 &amp;&amp; coins.signum() != 0) return coins.stripTrailingZeros().toPlainString();
+  return shown.scale() &lt; 2 ? shown.setScale(2).toPlainString() : shown.toPlainString();
+}</code></pre>
+</div>
+<p>Write the asset's ticker after the number (<code>1.50 ZPH</code>). Before a send, show the amount and the fee with all 12 decimals (<a href="07-sending.html#what-to-show-before-you-relay">What to show before you relay</a>).</p>
+<p><strong>Do not use <code>ZephyrUtils.toAtomicUnits(double)</code> for user input.</strong> It is the only conversion from coins that <code>ZephyrUtils</code> has, and it builds the amount from the <code>double</code>'s text (<code>&quot;&quot; + amount</code>). It fails for values that <code>Double.toString</code> prints in scientific notation: below 0.001, and from 10^7. It also drops or truncates decimals silently. Its results in <code>2.3.0-sec.2-java.4</code>:</p>
+<div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="amounts">
+<table>
+<thead><tr><th scope="col">Input</th><th scope="col">Result</th></tr></thead>
+<tbody>
+<tr><td><code>0.0001</code>, <code>0.000999</code></td><td><code>NumberFormatException: Illegal embedded sign character</code></td></tr>
+<tr><td><code>0.001</code></td><td>1,000,000,000</td></tr>
+<tr><td><code>9999999.999</code></td><td>9,999,999,999,000,000,000</td></tr>
+<tr><td><code>1e7</code></td><td><code>NumberFormatException: For input string: &quot;10E7&quot;</code></td></tr>
+<tr><td><code>12345678.9</code></td><td><code>NumberFormatException: For input string: &quot;3456789E7&quot;</code></td></tr>
+<tr><td><code>1.5</code>, <code>0.1</code></td><td>1,500,000,000,000 and 100,000,000,000</td></tr>
+<tr><td><code>1.0000000000001</code> (13 decimals)</td><td>1,000,000,000,000: the 13th decimal is dropped without an error</td></tr>
+<tr><td><code>0.1 + 0.2</code> (that is <code>0.30000000000000004</code>)</td><td>300,000,000,000: truncated without an error</td></tr>
+</tbody>
+</table>
+</div>
+<p><code>ZephyrUtils.fromAtomicUnits(BigInteger)</code> returns a <code>double</code>. One atomic unit gives <code>1.0E-12</code>, which <code>toAtomicUnits</code> then rejects. The round trip is exact only while the amount fits a double's precision and prints in plain notation. For example, 123,456,789,012,345,678 atomic units come back as 123,456,789,012,345,670. These results follow from <code>Double.toString</code>, which is specified Java behaviour; they were run on desktop Java 21 on 2026-11-17, not on Android.</p>
+<p><code>ZephyrTxConfig.setAmount(String)</code> takes atomic units, not coins: <code>setAmount(&quot;1.5&quot;)</code> throws a <code>NumberFormatException</code>, and <code>setAmount(&quot;1&quot;)</code> sets one atomic unit.</p>
+<h2 id="zephyrbalance">ZephyrBalance<a class="heading-anchor" href="#zephyrbalance" aria-label="Link to this section">#</a></h2>
+<p><code>ZephyrBalance</code> is a small map from asset name to amount:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>ZephyrBalance balance = wallet.getBalance();
+BigInteger zph = balance.get(ZephyrAssets.ZPH);   // BigInteger.ZERO if the asset is absent, never null
+Set&lt;String&gt; assets = balance.getAssetTypes();     // sorted
+Map&lt;String, BigInteger&gt; map = balance.toMap();    // unmodifiable, sorted by asset</code></pre>
+</div>
+<p>Its JSON form is the plain object the core emits, <code>{&quot;ZPH&quot;:123,&quot;ZSD&quot;:0}</code>.</p>
+<p><strong>Absent equals zero.</strong> <code>get</code> returns zero for an asset the balance does not list, and <code>equals</code> and <code>hashCode</code> follow the same rule: <code>{ZPH=1}</code> equals <code>{ZPH=1, ZRS=0}</code>. The rule exists because the two sources of balances list zeros differently (<a href="#the-four-shapes-of-the-balance-api">The four shapes</a>). A balance from one should equal the same amounts from the other. <code>toMap()</code> still shows exactly the entries that are there.</p>
+<h2 id="the-four-shapes-of-the-balance-api">The four shapes of the balance API<a class="heading-anchor" href="#the-four-shapes-of-the-balance-api" aria-label="Link to this section">#</a></h2>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>ZephyrBalance all            = wallet.getBalance();                          // the whole wallet
+Map&lt;Integer, ZephyrBalance&gt; m = wallet.getBalance(0);                        // account 0, per subaddress
+BigInteger acct              = wallet.getBalance(ZephyrAssets.ZPH, 0);       // one asset, one account
+BigInteger sub               = wallet.getBalance(ZephyrAssets.ZPH, 0, 1);    // one asset, one subaddress</code></pre>
+</div>
+<p>The same four exist as <code>getUnlockedBalance(...)</code>.</p>
+<ul><li><strong><code>getBalance()</code></strong> returns the wallet's balance per asset and lists <strong>every</strong> asset the core knows, zeros included. A fresh wallet shows eight entries: the four V2 and the four V1 names, all zero. Filter with <code>ZephyrAssets.V2</code> for display.</li><li><strong><code>getBalance(accountIdx)</code></strong> returns the balances of the account's subaddresses, as a map keyed by <strong>subaddress index</strong>. It lists only subaddresses and assets that hold something; for an empty account the map is empty.</li><li><strong><code>getBalance(asset, accountIdx)</code></strong> and <strong><code>getBalance(asset, accountIdx, subaddressIdx)</code></strong> return one amount. A <code>null</code> account index throws &quot;Must provide account index&quot;.</li></ul>
+<p>Accounts and subaddresses carry their balances too, as <code>ZephyrBalance</code>:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>for (ZephyrAccount account : wallet.getAccounts(true)) {          // true: with subaddresses
+  ZephyrBalance accountBalance = account.getBalance();             // only the assets it holds
+  for (ZephyrSubaddress subaddress : account.getSubaddresses()) {
+    BigInteger zrs = subaddress.getUnlockedBalance().get(ZephyrAssets.ZRS);
+    System.out.println(account.getIndex() + &quot;/&quot; + subaddress.getIndex() + &quot; &quot; + accountBalance + &quot; &quot; + zrs);
+  }
+}</code></pre>
+</div>
+<p>On the mainnet test run, a wallet holding 101 ZPH reported eight entries from <code>getBalance()</code> (<code>ZPH=101000000000000</code> and seven zeros) and <code>{ZPH=101000000000000}</code> for its account. Per asset they agree, and with the absent-equals-zero rule the two objects are equal.</p>
+<h2 id="accounts-and-subaddresses">Accounts and subaddresses<a class="heading-anchor" href="#accounts-and-subaddresses" aria-label="Link to this section">#</a></h2>
+<p>A wallet has accounts, and each account has subaddresses. Account 0, subaddress 0 is the primary address. A subaddress is a separate receiving address of the same wallet, for example one per invoice or per payer:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Java, compiled</span></div>
+<pre><code>ZephyrAccount savings = wallet.createAccount(&quot;Savings&quot;);
+ZephyrSubaddress invoice = wallet.createSubaddress(0, &quot;Invoice 0001&quot;);
+wallet.setSubaddressLabel(0, invoice.getIndex(), &quot;Invoice 0001, paid&quot;);</code></pre>
+</div>
+<div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="accounts-and-subaddresses">
+<table>
+<thead><tr><th scope="col">Call</th><th scope="col">Returns</th></tr></thead>
+<tbody>
+<tr><td><code>getAccounts()</code>, <code>getAccounts(true)</code></td><td>every account, with or without its subaddresses</td></tr>
+<tr><td><code>getAccount(accountIdx)</code></td><td>one account</td></tr>
+<tr><td><code>getSubaddresses(accountIdx)</code>, <code>getSubaddress(accountIdx, subaddressIdx)</code></td><td>the subaddresses of an account, or one</td></tr>
+<tr><td><code>createAccount(label)</code>, <code>createSubaddress(accountIdx, label)</code></td><td>a new account or subaddress</td></tr>
+<tr><td><code>setSubaddressLabel(accountIdx, subaddressIdx, label)</code></td><td>changes a label</td></tr>
+</tbody>
+</table>
+</div>
+<p>Reading accounts and their balances ran on mainnet. Creating accounts and subaddresses and setting their labels are inherited from monero-java; not tested against Zephyr. Save after such changes (<a href="02-wallets.html#when-to-save">When to save</a>).</p>
+<p><strong>Labels are text from a wallet file.</strong> A wallet opened from a file or from bytes you did not write can carry any label. As advice: show labels as plain text, never as HTML (on Android, not through <code>Html.fromHtml</code>), and keep them visually apart from your own text.</p>
+<h2 id="locked-and-unlocked">Locked and unlocked<a class="heading-anchor" href="#locked-and-unlocked" aria-label="Link to this section">#</a></h2>
+<p>The <strong>balance</strong> counts everything the wallet owns, including funds that cannot be spent until they unlock. The <strong>unlocked balance</strong> counts what can be spent now. Two things lock funds:</p>
+<ul><li><strong>Received funds</strong> (including the change of your own transactions) unlock 10 blocks after the block that contains them. At the network's two-minute block target that is about 20 min. On the mainnet test run the waits until the change of a transfer and the output of a conversion were spendable were 982 s, 1,203 s and 1,684 s.</li><li><strong>Converted funds</strong> follow the same rule: the ZRS from a mint was spendable 10 blocks after the mint was mined. <a href="08-conversions-and-the-reserve.html">Conversions and the reserve</a> covers conversions.</li></ul>
+<p>Funds in the pool (sent to you but not in a block) count in the balance, not in the unlocked balance. On the mainnet test run a receiving wallet showed <code>onBalancesChanged</code> with <code>ZPH 10000000000000/0</code> (balance 10 ZPH, unlocked 0) as soon as the transfer reached the pool.</p>
+<p>A send can only use unlocked funds. An app that shows one number should show the balance and, next to it, how much of it is still locked.</p>
+<h2 id="keeping-balances-up-to-date">Keeping balances up to date<a class="heading-anchor" href="#keeping-balances-up-to-date" aria-label="Link to this section">#</a></h2>
+<p>Two ways work together:</p>
+<ul><li>Call the balance methods after each <code>sync()</code> (or on a timer while <code>startSyncing()</code> runs). They read the wallet's local state and do not contact the node.</li><li>Listen for <code>onBalancesChanged(balance, unlockedBalance, assetType)</code>. It fires once per asset that changed, so a mint that turns ZPH into ZRS produces one call for ZPH and one for ZRS.</li></ul>
+<p>The listener's numbers are the wallet-level amounts of that asset, like <code>getBalance().get(asset)</code>. Do not use the asset of <code>onOutputReceived</code> for a pending payment: it is empty in the pool (<a href="04-threads-and-listeners.html#outputs-in-the-pool-carry-no-asset">Outputs in the pool carry no asset</a>).</p>
+<nav class="site-pager" aria-label="Previous and next page">
+<a class="site-prev" rel="prev" href="04-threads-and-listeners.html">Previous: 4. Threads and listeners</a>
+<a class="site-next" rel="next" href="06-history.html">Next: 6. History</a>
+</nav>
+</article>
+</div>
+</main>
+<footer class="lt-footer">
+<div class="lt-wrap lt-wrap-wide">
+<p>Guide for zephyr-java 2.3.0-sec.2-java.4, built from commit <code>e59843ad</code> (2026-11-17 UTC).</p>
+<p>zephyr-java and this site are a <a href="https://lateo.dev/">lateo</a> project by an independent operator, not affiliated with or endorsed by ZephyrProtocol. Source: <a href="https://github.com/loki-notfound/myzephyr-java">github.com/loki-notfound/myzephyr-java</a>.</p>
+<p>The library and the guide are under the MIT licence of the repository; the stylesheet is BSD 3-Clause; the lateo name, mark and favicons are not covered by either and all rights in them are reserved by their owner (<a href="../assets/NOTICE.txt">notice</a>).</p>
+</div>
+</footer>
+</body>
+</html>

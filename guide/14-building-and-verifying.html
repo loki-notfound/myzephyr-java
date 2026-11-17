@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>14. Building and verifying - zephyr-java guide</title>
+<meta name="description" content="Every zephyr-java release is built from pinned sources with scripts in this repository, and every release can be rebuilt and compared. This chapter describes the pins, the root certificates, the build">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../assets/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon-180.png">
+<link rel="stylesheet" href="../assets/content.css">
+<link rel="stylesheet" href="../assets/print.css">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<a class="lt-skip-link" href="#main">Skip to main content</a>
+<header class="lt-header">
+  <div class="lt-wrap lt-wrap-wide lt-header-inner">
+    <div class="site-title">
+      <a class="lt-brand" href="../index.html">zephyr-java</a>
+      <p class="site-tagline">Java wallet library for Zephyr, a lateo project</p>
+    </div>
+    <nav class="lt-nav" aria-label="Site navigation">
+      <a href="index.html" aria-current="page">Guide</a>
+      <a href="../javadoc/index.html">Javadoc</a>
+      <a href="https://github.com/loki-notfound/myzephyr-java/releases">Releases</a>
+      <a href="https://github.com/loki-notfound/myzephyr-java">Repository</a>
+    </nav>
+  </div>
+</header>
+<main id="main" tabindex="-1">
+<div class="lt-wrap lt-wrap-wide lt-docs-layout">
+<aside class="lt-toc" aria-label="Guide navigation">
+<h2 id="site-nav-guide">Guide</h2>
+<nav aria-labelledby="site-nav-guide">
+<ol>
+<li><a href="index.html">zephyr-java user guide</a></li>
+<li><a href="01-getting-started.html">1. Getting started</a></li>
+<li><a href="02-wallets.html">2. Wallets</a></li>
+<li><a href="03-connecting-to-a-node.html">3. Connecting to a node</a></li>
+<li><a href="04-threads-and-listeners.html">4. Threads and listeners</a></li>
+<li><a href="05-assets-and-balances.html">5. Assets, accounts and balances</a></li>
+<li><a href="06-history.html">6. History</a></li>
+<li><a href="07-sending.html">7. Sending</a></li>
+<li><a href="08-conversions-and-the-reserve.html">8. Conversions and the reserve</a></li>
+<li><a href="09-errors.html">9. Errors and exceptions</a></li>
+<li><a href="10-android.html">10. Android</a></li>
+<li><a href="11-the-rpc-classes.html">11. The RPC classes</a></li>
+<li><a href="12-coming-from-monero-java.html">12. Coming from monero-java</a></li>
+<li><a href="13-known-limitations.html">13. Known limitations</a></li>
+<li><a href="14-building-and-verifying.html" aria-current="page">14. Building and verifying</a></li>
+</ol>
+</nav>
+<h2 id="site-nav-page">On this page</h2>
+<nav aria-labelledby="site-nav-page">
+<ol>
+<li><a href="#the-pins">The pins</a></li>
+<li><a href="#the-root-certificates">The root certificates</a></li>
+<li><a href="#build-layer-patches">Build-layer patches</a></li>
+<li><a href="#the-builds">The builds</a></li>
+<li><a href="#reproducibility">Reproducibility</a></li>
+<li><a href="#the-manifest">The manifest</a></li>
+<li><a href="#signatures">Signatures</a></li>
+<li><a href="#reproducing-a-release">Reproducing a release</a></li>
+<li><a href="#the-guide-and-its-site">The guide and its site</a></li>
+</ol>
+</nav>
+</aside>
+<article class="lt-docs-main lt-stack">
+<nav class="lt-breadcrumbs" aria-label="Breadcrumb"><ol><li><a href="../index.html">zephyr-java</a></li><li><a href="index.html">Guide</a></li><li><a href="14-building-and-verifying.html" aria-current="page">14. Building and verifying</a></li></ol></nav>
+<h1 id="14-building-and-verifying">14. Building and verifying</h1>
+<p>Every zephyr-java release is built from pinned sources with scripts in this repository, and every release can be rebuilt and compared. This chapter describes the pins, the root certificates, the build-layer patches, the builds, the manifest and the signatures. It ends with how to reproduce a release and how the guide's site is built.</p>
+<h2 id="the-pins">The pins<a class="heading-anchor" href="#the-pins" aria-label="Link to this section">#</a></h2>
+<p><code>bin/pins.env</code> names the two source trees of the native core, by commit, from the zephyr-backports release set of 2026-11-07:</p>
+<div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="the-pins">
+<table>
+<thead><tr><th scope="col">Tree</th><th scope="col">Repository</th><th scope="col">Tag</th><th scope="col">Commit</th></tr></thead>
+<tbody>
+<tr><td>zephyr</td><td><code>zephyr-backports/zephyr</code></td><td><code>v2.3.0-sec.2</code></td><td><code>8c6a120256b4bd887d6e7167d929d76e3507e0e5</code></td></tr>
+<tr><td>zephyr-cpp</td><td><code>zephyr-backports/zephyr-cpp</code></td><td><code>v2.3.0-sec.1</code></td><td><code>3a2ee602ee28e6b7941b617ad4706349ad992641</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>The backports number each fork on its own, so the two tags differ. A release set says which tags belong together. This one also names zephyr-javascript and zephyr-wallet <code>v2.3.0-sec.1</code>, which zephyr-java does not build. The release version's <code>sec.&lt;N&gt;</code> is zephyr's number.</p>
+<p>zephyr-cpp is the git submodule <code>external/zephyr-cpp</code>, at that commit. The zephyr tree is placed by <code>bin/place_zephyr_tree.sh</code>, which the build scripts call, at <code>external/zephyr-cpp/external/zephyr</code>, fetched by commit. zephyr-cpp's own <code>bin/update_submodules.sh</code> is never used, because it checks out a branch. Nothing is ever built from a branch. When a tree's own tag (<code>ZEPHYR_TAG</code>, <code>ZEPHYR_CPP_TAG</code>) is present locally, the scripts check that it points at the pinned commit. They also run <code>git verify-tag</code> on it (<a href="#signatures">Signatures</a>).</p>
+<p>The backports are ZephyrProtocol's Zephyr 2.3.0 plus Monero security fixes, with no changes to the headers that zephyr-java compiles against. A build against ZephyrProtocol's original release must therefore work too: zephyr tag <code>v2.3.0</code> (<code>67c5f53b878fef41fb5e74c4382d5b7a2f37fd8a</code>) and zephyr-cpp <code>4a99272f6d7a171cf6625016939094637459975a</code> (zephyr-cpp has no tag there). The comments in <code>bin/pins.env</code> name both. To build against them, put their URLs and commits into the four variables and check out the submodule at that commit. This is a requirement on the sources, not a CI job; releases are always built from the backports.</p>
+<h2 id="the-root-certificates">The root certificates<a class="heading-anchor" href="#the-root-certificates" aria-label="Link to this section">#</a></h2>
+<p>The library ships Mozilla's root certificates as curl publishes them (<code>src/main/resources-raw/zephyr/common/cacert.pem</code>, the default trust of the native wallet on Android). They are a pinned input like the sources:</p>
+<ul><li><code>bin/ca-bundle.env</code> names the dated file by date, URL and sha256;</li><li><code>bin/update_ca_bundle.sh</code> downloads it and checks the hash;</li><li><code>bin/check_versions.sh</code>, the first step of every release build, fails when the committed file differs from the pin.</li></ul>
+<p>Builds never download it. Before each release <code>bin/update_ca_bundle.sh --check-latest</code> says whether curl has published a newer file; the release then moves the pin to it.</p>
+<h2 id="build-layer-patches">Build-layer patches<a class="heading-anchor" href="#build-layer-patches" aria-label="Link to this section">#</a></h2>
+<p>zephyr-java never patches zephyr or zephyr-cpp source code. It does patch build tooling: six patches under <code>patches/depends/</code>, each with a DEP-3 header. The build scripts apply them to zephyr's <code>contrib/depends</code>, the tree that builds boost, OpenSSL, unbound and the other libraries from pinned archives. One of them, <code>0006</code>, adds a patch that the OpenSSL recipe applies to OpenSSL's own source:</p>
+<div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="build-layer-patches">
+<table>
+<thead><tr><th scope="col">Patch</th><th scope="col">What</th><th scope="col">Why</th></tr></thead>
+<tbody>
+<tr><td><code>0001-android-ndk-python3</code></td><td>run NDK r18b's toolchain script with <code>python3</code></td><td>current hosts have no Python 2</td></tr>
+<tr><td><code>0002-boost-1.64-b2-engine-declarations</code></td><td>add the includes and two prototypes boost 1.64's build engine needs</td><td>gcc 14 rejects implicit declarations</td></tr>
+<tr><td><code>0003-android-ndk-x86_64</code></td><td>pass <code>--arch x86_64</code> for the x86_64 standalone toolchain</td><td>the x86_64 Android toolchain is not built otherwise</td></tr>
+<tr><td><code>0004-openssl-openssldir</code></td><td>build OpenSSL with <code>OPENSSLDIR /etc/ssl</code></td><td>the default embedded the build directory, an empty CA store on any other machine</td></tr>
+<tr><td><code>0005-neutral-engines-and-unbound-sysconfdir</code></td><td>neutral <code>ENGINESDIR</code>, <code>MODULESDIR</code> and unbound <code>sysconfdir</code></td><td>they embedded the build directory, which breaks reproducibility across paths</td></tr>
+<tr><td><code>0006-openssl-android-environment</code></td><td>on Android, OpenSSL's <code>OPENSSL_issetugid()</code> compares the user and group ids instead of asking <code>getauxval(AT_SECURE)</code></td><td><code>AT_SECURE</code> is set in every Android app process, so OpenSSL ignored <code>SSL_CERT_FILE</code> and <code>SSL_CERT_DIR</code> there and the native wallet could not verify an <code>https://</code> node</td></tr>
+</tbody>
+</table>
+</div>
+<p>Two more build-layer settings:</p>
+<ul><li>the JNI library is compiled with <code>-include map</code>, because zephyr-cpp's model header relies on boost to include <code>&lt;map&gt;</code> and newer boost does not;</li><li>zephyr's dead <code>blocks</code> library is not linked, because the pinned tree never builds it.</li></ul>
+<h2 id="the-builds">The builds<a class="heading-anchor" href="#the-builds" aria-label="Link to this section">#</a></h2>
+<p>Clone and fetch the submodule (not recursively; the scripts place the zephyr tree themselves):</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Shell</span></div>
+<pre><code>git clone https://github.com/loki-notfound/myzephyr-java.git
+cd myzephyr-java
+git submodule update --init external/zephyr-cpp</code></pre>
+</div>
+<p>There are four entry points:</p>
+<ul><li><strong><code>bin/build_libzephyr_java.sh</code></strong>, the developer build. It builds zephyr and the JNI library against the host's shared libraries (boost, OpenSSL, unbound, sodium, hidapi, protobuf) into <code>build/</code>, where <code>mvn test</code> finds it. Quick, but the result runs only on hosts like the one that built it. The CI workflow's &quot;System libraries of the developer build&quot; step lists the packages it needs on Ubuntu 24.04.</li><li><strong><code>bin/build_linux_container.sh &lt;x86_64|arm64|--all&gt;</code></strong>, the Linux release natives. It runs <code>bin/build_linux.sh</code> in the pinned <code>debian:12</code> image with podman or docker, the same image as the CI job. Everything but glibc comes from zephyr's depends and is linked statically. The results are <code>build/natives/linux-&lt;arch&gt;/libzephyr-java.so</code>.</li><li><strong><code>bin/build_android.sh &lt;abi|--all&gt;</code></strong>, the Android natives with zephyr's depends and NDK r18b (downloaded and checked by depends), into <code>build/android/&lt;abi&gt;/</code>. For releases, <strong><code>bin/build_android_container.sh &lt;abi|--all&gt;</code></strong> runs it in the same pinned image.</li><li><strong><code>bin/build_release.sh</code></strong>, everything: the natives, stripping with separate debug files, the JAR with sources and Javadoc jars, the AAR through Gradle in <code>android/</code>, and <code>dist/&lt;version&gt;/</code> with <code>manifest.json</code> and <code>SHA256SUMS</code>. The pure tests run on the depends-built library.</li></ul>
+<p>The packaging of <code>bin/build_release.sh</code> runs in the same pinned image (<code>bin/package_release_container.sh</code>, with the image's own JDK and Maven). It needs podman or docker and an Android SDK in <code>ANDROID_HOME</code>, which it mounts read-only. The SDK needs cmdline-tools 22.0, <code>platforms;android-36</code> and build-tools 36.0.0. <code>BUILD_LINUX_ARCHES</code> and <code>BUILD_ANDROID_ABIS</code> choose what to build; an empty value builds none. <code>SKIP_NATIVES=1</code> packages the natives already in <code>build/</code> again.</p>
+<p>Every step is a plain shell command, so the same scripts serve a developer, CI and an F-Droid build. The first depends build takes a while: about 14 min per Android ABI and 10 min for Linux x86_64 on the machine this project is developed on. Depends downloads each source archive from the address in its recipe. When that fails or stalls (below 1000 bytes/s for 2 min), it uses <code>downloads.getmonero.org</code>. Either way it checks the archive's sha256 against the recipe before it uses it.</p>
+<h2 id="reproducibility">Reproducibility<a class="heading-anchor" href="#reproducibility" aria-label="Link to this section">#</a></h2>
+<p>Two builds from the same commit give the same files:</p>
+<ul><li><code>SOURCE_DATE_EPOCH</code> is the commit time unless set, and goes into every step; Maven gets it as <code>project.build.outputTimestamp</code>.</li><li>The Linux natives are built with gcc and <code>-ffile-prefix-map</code>, so they contain no build path and are the same from <strong>any</strong> checkout directory. Verified: the x86_64 library and its debug file were equal across two checkout paths.</li><li>The Android natives are reproducible at the <strong>same</strong> build path only. NDK r18b's clang 7 cannot rewrite <code>__FILE__</code>, so about 700 source paths per library keep the build directory: source file names in error messages, and the location of lambdas in function names. They leak nothing beyond that directory name. Release builds therefore run at a fixed path, as F-Droid does. Verified: <code>arm64-v8a</code> was equal on a rebuild at the same path.</li><li>The JARs and the AAR were equal across clean builds. Stripping is deterministic, and the debug symbols are packed into a tar with fixed order, times and owners.</li></ul>
+<h2 id="the-manifest">The manifest<a class="heading-anchor" href="#the-manifest" aria-label="Link to this section">#</a></h2>
+<p><code>dist/&lt;version&gt;/manifest.json</code> records what went into a release:</p>
+<div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="the-manifest">
+<table>
+<thead><tr><th scope="col">Key</th><th scope="col">Contents</th></tr></thead>
+<tbody>
+<tr><td><code>core</code></td><td>zephyr and zephyr-cpp: repository URL, tag, commit; <code>release_set</code> (the zephyr-backports release set, <code>2026-11-07</code>) and <code>release_set_members</code> (name, tag, commit of each member)</td></tr>
+<tr><td><code>depends</code></td><td>every package of zephyr's depends: archive name, version, sha256</td></tr>
+<tr><td><code>patches</code></td><td>the build-layer patches: name, sha256</td></tr>
+<tr><td><code>root_certificates</code></td><td>the shipped root certificates: date, URL and sha256 of curl's dated file</td></tr>
+<tr><td><code>toolchain</code></td><td>gcc, binutils, CMake, glibc, JDK and Maven of the packaging environment (<code>packaging_env</code>, <code>packaging_container</code>), NDK (version and sha256) and its clang, Android Gradle plugin, Gradle (distribution and sha256), compile and min SDK, build-tools, the Android SDK package revisions; per Linux native its compiler, glibc and container; per Android native its NDK, clang, API level, build path and container</td></tr>
+<tr><td><code>zephyr_java</code></td><td>the commit, its <code>SOURCE_DATE_EPOCH</code>, the version</td></tr>
+<tr><td><code>artifacts</code></td><td>every release file with its size and sha256</td></tr>
+</tbody>
+</table>
+</div>
+<p><code>SHA256SUMS</code> lists every file of the release, the manifest included. The Maven repository and the site are the archive <code>site-&lt;version&gt;.tar.gz</code>, whose hash is in <code>SHA256SUMS</code>; Pages serves its contents.</p>
+<h2 id="signatures">Signatures<a class="heading-anchor" href="#signatures" aria-label="Link to this section">#</a></h2>
+<p>Two keys are involved:</p>
+<ul><li><strong>The maintainer key</strong> <code>31DA 39AB 43E0 CA67 F1F3  A661 BA2A FF22 DF8A 4A13</code> signs the zephyr-java release tags and <code>SHA256SUMS</code>. It is <a href="https://github.com/loki-notfound/myzephyr-java/blob/main/KEYS.asc"><code>KEYS.asc</code></a> in this repository.</li><li><strong>The zephyr-backports release key</strong> <code>FB39 94F0 997C A6F0 43D7  2491 9EFF 03F5 27D2 40A1</code> signs the core's tags. It is <code>keys/zephyr-backports.asc</code> in the zephyr-backports repository. The build scripts verify the tags with <code>git verify-tag</code> when the tag is present. Without gpg or without the key they print a warning and build anyway; a bad signature stops the build.</li></ul>
+<p>To check a release you downloaded:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Shell</span></div>
+<pre><code>gpg --import KEYS.asc
+git verify-tag v2.3.0-sec.2-java.4
+gpg --verify SHA256SUMS.asc SHA256SUMS
+sha256sum -c SHA256SUMS</code></pre>
+</div>
+<p>Run <code>git verify-tag</code> in a clone of this repository, and the last two commands in the directory of the release files. Then compare <code>core</code> in <code>manifest.json</code> with <code>bin/pins.env</code> at the tag.</p>
+<h2 id="reproducing-a-release">Reproducing a release<a class="heading-anchor" href="#reproducing-a-release" aria-label="Link to this section">#</a></h2>
+<p>The release flow:</p>
+<ol><li>CI builds the artifacts.</li><li>A second build in the same environment must give the same hashes.</li><li>Only then is <code>SHA256SUMS</code> signed, on the maintainer's machine.</li></ol>
+<p>Anyone can repeat the second build. Every release file comes from one environment, in CI and locally alike: the pinned <code>debian:12</code> image, the checkout at <code>/work</code> and <code>umask 022</code>. The image's packages (compilers, OpenJDK 17, Maven) come from the Debian snapshot <code>20261107T000000Z</code>. The image installs them from <code>snapshot.debian.org</code> (recorded in the manifest as <code>toolchain.debian_snapshot</code>), so both builds use the same compilers and binutils. The source paths that NDK r18b leaves in the Android libraries read <code>/work/...</code> on both sides, and the libraries match.</p>
+<p>The natives are built in that image, and so is the packaging. CI's <code>package</code> job runs <code>bin/package_release.sh</code> in it; locally <code>bin/package_release_container.sh</code> does the same with the Android SDK mounted read-only. The jar entries and the tar archives carry normalised modes (<code>-rw-r--r--</code>, <code>-rwxr-xr-x</code> for the natives, <code>drwxr-xr-x</code>). So the jars, the AAR and the archives of the two builds can match byte for byte, not only the natives. The Javadoc is generated from a sorted list of the source files (<code>bin/javadoc_sorted.sh</code>). JDK 17's javadoc builds its index in the order it reads the files, which would otherwise be the file system's.</p>
+<p>The whole second build is two commands:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Shell</span></div>
+<pre><code>git submodule update --init external/zephyr-cpp
+ANDROID_HOME=&lt;android-sdk&gt; bin/build_release.sh</code></pre>
+</div>
+<p>Replace <code>&lt;android-sdk&gt;</code> with the directory of your Android SDK. <code>dist/&lt;version&gt;/SHA256SUMS</code> can then be compared with the release's. Step by step:</p>
+<ol><li>Clone, check out the release tag, verify it, and fetch the submodule (<a href="#the-builds">The builds</a>, <a href="#signatures">Signatures</a>).</li><li>Build the Linux natives with <code>bin/build_linux_container.sh --all</code> and compare each <code>build/natives/linux-&lt;arch&gt;/libzephyr-java.so</code> with the copy inside the release JAR (<code>unzip -p zephyr-java-&lt;version&gt;.jar linux-x86_64/libzephyr-java.so | sha256sum</code>).</li><li>Build the Android natives with <code>bin/build_android_container.sh --all</code>, and compare with the libraries in the AAR (<code>jni/&lt;abi&gt;/libzephyr-java.so</code>).</li><li>Package with <code>bin/package_release_container.sh &lt;version&gt;</code> and compare the jars, the AAR and the archives with the release's. <code>manifest.json</code> itself records the build environment (compilers, glibc, JDK, Maven, the SDK packages, the container). Its hash matches only a build in the same environment.</li></ol>
+<p>The stripped libraries carry a <code>gnu_debuglink</code> to their debug files, which ship in <code>debug-symbols-&lt;version&gt;.tar.gz</code>. A crash report from a release can therefore be symbolised without rebuilding.</p>
+<h2 id="the-guide-and-its-site">The guide and its site<a class="heading-anchor" href="#the-guide-and-its-site" aria-label="Link to this section">#</a></h2>
+<p>This guide is the Markdown in <code>docs/guide/</code>, readable on GitHub as it is. It is also a static site on the project's GitHub Pages, <code>https://loki-notfound.github.io/myzephyr-java/guide/</code>. Two scripts build and check it, with Python 3 and its standard library only:</p>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Shell</span></div>
+<pre><code>bin/build_site.sh
+bin/check_site.sh</code></pre>
+</div>
+<p><code>bin/build_site.sh</code> writes the landing page, one page per guide file and the assets to <code>build/site/</code> (<code>site/build_site.py</code>). Its Markdown converter (<code>site/markdown.py</code>) knows exactly the Markdown this guide uses and fails on anything else, so a page never differs from what GitHub shows. With <code>--maven &lt;site&gt;/maven</code> the landing page lists the older releases found in a published Maven repository, the same section a release's site has.</p>
+<p><code>bin/check_site.sh</code> checks the result (<code>site/check_site.py</code>):</p>
+<ul><li>a page for every guide file;</li><li>the page policy <code>default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'</code> in every page;</li><li>no script, no style attribute, no external resource or absolute path;</li><li>well-formed pages;</li><li>every relative link and anchor resolves.</li></ul>
+<p>The pages carry no JavaScript. The footer names the version and the commit with its date, so the same commit gives the same site.</p>
+<p>Two forms go beyond plain Markdown:</p>
+<ul><li><strong>Callouts.</strong> A callout is written in GitHub's alert syntax: a block quote whose first line is <code>&gt; [!NOTE]</code>, <code>&gt; [!WARNING]</code> or <code>&gt; [!CAUTION]</code>, and whose next line starts with a bold title. It becomes an info, warning or danger box on the site, at most two per page. Any other block quote is an error.</li><li><strong>Compiled examples.</strong> A Java block whose info string names a compiled example, <code>java examples/&lt;Class&gt;.java</code>, is labelled &quot;Java, compiled&quot;. The file must exist in <code>src/test/java/examples/</code>. The pure tests (<code>TestExamples</code>) check that the block is verbatim in it.</li></ul>
+<p>The version a release names in the guide and in the README is checked as well. <code>bin/check_versions.sh</code> fails when a coordinate, the Maven snippet, the version catalog entry, a <code>git verify-tag</code> line or the index's version line names another version than <code>pom.xml</code>.</p>
+<p><code>bin/make_site.sh</code> builds the same pages into a release's site, next to the Javadoc and the Maven repository. The site archive of a release therefore carries the guide of its commit. Every CI run builds and checks the site too (job <code>java</code>).</p>
+<p>The look comes from the lateo house style, <code>@lateo/style</code> 0.1.0. <code>site/assets/</code> holds unchanged copies of its stylesheets <code>content.css</code> and <code>print.css</code> (BSD 3-Clause, <code>LICENSE-style.txt</code>) and of its favicons; <code>STYLE-VERSION</code> names the version. <code>site/assets/site.css</code> is this repository's own, under its MIT licence. The lateo name and the favicons are under neither licence: <code>site/assets/NOTICE.txt</code> and <code>site/assets/TRADEMARKS.txt</code> state the terms.</p>
+<nav class="site-pager" aria-label="Previous and next page">
+<a class="site-prev" rel="prev" href="13-known-limitations.html">Previous: 13. Known limitations</a>
+</nav>
+</article>
+</div>
+</main>
+<footer class="lt-footer">
+<div class="lt-wrap lt-wrap-wide">
+<p>Guide for zephyr-java 2.3.0-sec.2-java.4, built from commit <code>e59843ad</code> (2026-11-17 UTC).</p>
+<p>zephyr-java and this site are a <a href="https://lateo.dev/">lateo</a> project by an independent operator, not affiliated with or endorsed by ZephyrProtocol. Source: <a href="https://github.com/loki-notfound/myzephyr-java">github.com/loki-notfound/myzephyr-java</a>.</p>
+<p>The library and the guide are under the MIT licence of the repository; the stylesheet is BSD 3-Clause; the lateo name, mark and favicons are not covered by either and all rights in them are reserved by their owner (<a href="../assets/NOTICE.txt">notice</a>).</p>
+</div>
+</footer>
+</body>
+</html>

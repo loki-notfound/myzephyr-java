@@ -1,37 +1,96 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
 <title>zephyr-java</title>
-<style>
-body { font-family: sans-serif; max-width: 46rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
-pre { background: #f4f4f4; padding: 0.75rem; overflow-x: auto; }
-code { overflow-wrap: anywhere; }
-</style>
+<meta name="description" content="Java bindings for the Zephyr Protocol wallet core, for Android (AAR) and for desktop and server JVMs (JAR): the Maven coordinates, the user guide, the Javadoc and the releases.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon-180.png">
+<link rel="stylesheet" href="assets/content.css">
+<link rel="stylesheet" href="assets/print.css">
+<link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
-<h1>zephyr-java</h1>
-<p>Java bindings for the Zephyr Protocol wallet core, for Android (AAR) and for desktop and server
-JVMs (JAR), built from the security-hardened forks of zephyr-backports. Version 2.3.0-sec.2-java.4.</p>
-<p><strong>Not affiliated with ZephyrProtocol.</strong> An independent project. Report Zephyr
-vulnerabilities to the ZephyrProtocol team, not here.</p>
-
-<h2>Android (Gradle, Kotlin DSL)</h2>
-<pre>repositories {
-    maven { url = uri("https://loki-notfound.github.io/myzephyr-java/maven") }
+<a class="lt-skip-link" href="#main">Skip to main content</a>
+<header class="lt-header">
+  <div class="lt-wrap lt-wrap-wide lt-header-inner">
+    <div class="site-title">
+      <a class="lt-brand" href="index.html">zephyr-java</a>
+      <p class="site-tagline">Java wallet library for Zephyr, a lateo project</p>
+    </div>
+    <nav class="lt-nav" aria-label="Site navigation">
+      <a href="guide/index.html">Guide</a>
+      <a href="javadoc/index.html">Javadoc</a>
+      <a href="https://github.com/loki-notfound/myzephyr-java/releases">Releases</a>
+      <a href="https://github.com/loki-notfound/myzephyr-java">Repository</a>
+    </nav>
+  </div>
+</header>
+<main id="main" tabindex="-1">
+<div class="lt-wrap lt-wrap-wide lt-docs-layout">
+<aside class="lt-toc" aria-label="Guide navigation">
+<h2 id="site-nav-guide">Guide</h2>
+<nav aria-labelledby="site-nav-guide">
+<ol>
+<li><a href="guide/index.html">zephyr-java user guide</a></li>
+<li><a href="guide/01-getting-started.html">1. Getting started</a></li>
+<li><a href="guide/02-wallets.html">2. Wallets</a></li>
+<li><a href="guide/03-connecting-to-a-node.html">3. Connecting to a node</a></li>
+<li><a href="guide/04-threads-and-listeners.html">4. Threads and listeners</a></li>
+<li><a href="guide/05-assets-and-balances.html">5. Assets, accounts and balances</a></li>
+<li><a href="guide/06-history.html">6. History</a></li>
+<li><a href="guide/07-sending.html">7. Sending</a></li>
+<li><a href="guide/08-conversions-and-the-reserve.html">8. Conversions and the reserve</a></li>
+<li><a href="guide/09-errors.html">9. Errors and exceptions</a></li>
+<li><a href="guide/10-android.html">10. Android</a></li>
+<li><a href="guide/11-the-rpc-classes.html">11. The RPC classes</a></li>
+<li><a href="guide/12-coming-from-monero-java.html">12. Coming from monero-java</a></li>
+<li><a href="guide/13-known-limitations.html">13. Known limitations</a></li>
+<li><a href="guide/14-building-and-verifying.html">14. Building and verifying</a></li>
+</ol>
+</nav>
+<h2 id="site-nav-page">On this page</h2>
+<nav aria-labelledby="site-nav-page">
+<ol>
+<li><a href="#android-gradle-kotlin-dsl">Android (Gradle, Kotlin DSL)</a></li>
+<li><a href="#desktop-and-server-maven">Desktop and server (Maven)</a></li>
+<li><a href="#older-releases">Older releases</a></li>
+<li><a href="#documentation">Documentation</a></li>
+<li><a href="#verifying">Verifying</a></li>
+<li><a href="#donations">Donations</a></li>
+</ol>
+</nav>
+</aside>
+<article class="lt-docs-main lt-stack">
+<h1 id="zephyr-java">zephyr-java</h1>
+<p class="lead">Java bindings for the Zephyr Protocol wallet core, for Android (AAR) and for desktop and server JVMs (JAR), built from the forks of zephyr-backports: ZephyrProtocol's Zephyr 2.3.0 plus Monero security fixes. Version 2.3.0-sec.2-java.4.</p>
+<div class="lt-callout lt-callout-info" role="note">
+<p class="lt-callout-title">Not affiliated with ZephyrProtocol.</p>
+<p>An independent project. Report Zephyr vulnerabilities to the ZephyrProtocol team, not here.</p>
+</div>
+<h2 id="android-gradle-kotlin-dsl">Android (Gradle, Kotlin DSL)<a class="heading-anchor" href="#android-gradle-kotlin-dsl" aria-label="Link to this section">#</a></h2>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>Kotlin</span></div>
+<pre><code>repositories {
+    maven { url = uri(&quot;https://loki-notfound.github.io/myzephyr-java/maven&quot;) }
 }
 
 android {
-    packaging { resources.excludes += "/META-INF/DEPENDENCIES" }
+    packaging { resources.excludes += &quot;/META-INF/DEPENDENCIES&quot; }
 }
 
 dependencies {
-    implementation("io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.4")
-}</pre>
-
-<h2>Desktop and server (Maven)</h2>
-<pre>&lt;repositories&gt;
+    implementation(&quot;io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.4&quot;)
+}</code></pre>
+</div>
+<h2 id="desktop-and-server-maven">Desktop and server (Maven)<a class="heading-anchor" href="#desktop-and-server-maven" aria-label="Link to this section">#</a></h2>
+<div class="lt-code-block">
+<div class="lt-code-head"><span>XML</span></div>
+<pre><code>&lt;repositories&gt;
   &lt;repository&gt;
     &lt;id&gt;zephyr-java&lt;/id&gt;
     &lt;url&gt;https://loki-notfound.github.io/myzephyr-java/maven&lt;/url&gt;
@@ -42,35 +101,38 @@ dependencies {
   &lt;groupId&gt;io.github.loki-notfound&lt;/groupId&gt;
   &lt;artifactId&gt;zephyr-java&lt;/artifactId&gt;
   &lt;version&gt;2.3.0-sec.2-java.4&lt;/version&gt;
-&lt;/dependency&gt;</pre>
-
-<h2>Older releases</h2>
-<p>The Maven repository keeps every release, so a build can stay on an older version with the same
-repository line. The <a href="javadoc/index.html">Javadoc</a> on this site is that of version
-2.3.0-sec.2-java.4 only; an older version's Javadoc is its <code>zephyr-java-&lt;version&gt;-javadoc.jar</code>,
-in the repository and among the files of its release.</p>
+&lt;/dependency&gt;</code></pre>
+</div>
+<h2 id="older-releases">Older releases<a class="heading-anchor" href="#older-releases" aria-label="Link to this section">#</a></h2>
+<p>The Maven repository keeps every release, so a build can stay on an older version with the same repository line. The <a href="javadoc/index.html">Javadoc</a> on this site is that of version 2.3.0-sec.2-java.4 only; an older version's Javadoc is its <code>zephyr-java-&lt;version&gt;-javadoc.jar</code>, in the repository and among the files of its release.</p>
 <ul>
 <li>2.3.0-sec.2-java.3 (<a href="https://github.com/loki-notfound/myzephyr-java/releases/tag/v2.3.0-sec.2-java.3">release</a>): <code>io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.3</code>, <code>io.github.loki-notfound:zephyr-java:2.3.0-sec.2-java.3</code></li>
 <li>2.3.0-sec.2-java.2 (<a href="https://github.com/loki-notfound/myzephyr-java/releases/tag/v2.3.0-sec.2-java.2">release</a>): <code>io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.2</code>, <code>io.github.loki-notfound:zephyr-java:2.3.0-sec.2-java.2</code></li>
 <li>2.3.0-sec.2-java.1 (<a href="https://github.com/loki-notfound/myzephyr-java/releases/tag/v2.3.0-sec.2-java.1">release</a>): <code>io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.1</code>, <code>io.github.loki-notfound:zephyr-java:2.3.0-sec.2-java.1</code></li>
 </ul>
-
-<h2>Documentation</h2>
+<h2 id="documentation">Documentation<a class="heading-anchor" href="#documentation" aria-label="Link to this section">#</a></h2>
 <ul>
-<li><a href="https://github.com/loki-notfound/myzephyr-java/blob/main/docs/guide/README.md">User guide</a> (on GitHub)</li>
+<li><a href="guide/index.html">User guide</a>, also as Markdown in the repository (<a href="https://github.com/loki-notfound/myzephyr-java/blob/main/docs/guide/README.md">docs/guide</a> on GitHub)</li>
 <li><a href="javadoc/index.html">Javadoc</a> of version 2.3.0-sec.2-java.4</li>
 <li><a href="https://github.com/loki-notfound/myzephyr-java/releases">Releases</a> with the build manifest and the signed SHA256SUMS</li>
 <li><a href="https://github.com/loki-notfound/myzephyr-java">Source</a></li>
 </ul>
-
-<h2>Verifying</h2>
+<h2 id="verifying">Verifying<a class="heading-anchor" href="#verifying" aria-label="Link to this section">#</a></h2>
 <p>Release tags and SHA256SUMS are signed with the maintainer key</p>
-<pre>31DA 39AB 43E0 CA67 F1F3  A661 BA2A FF22 DF8A 4A13</pre>
-<p>whose public key is <a href="https://github.com/loki-notfound/myzephyr-java/blob/main/KEYS.asc">KEYS.asc</a>
-in the repository.</p>
-
-<h2>Donations</h2>
-<p>If zephyr-java is useful to you, donations are welcome at this ZEPH address:</p>
-<p><code>ZEPHs8MmrN556ieVvv9YUZf3J5pW2uN1z5S88mb9DksG9bcEcqVGg9XbuQc6Q9e9Ka6bjMHYgaSidWfL1r1DGLyngj8NHT3Q6gp</code></p>
+<p class="lt-fingerprint"><code>31DA 39AB 43E0 CA67 F1F3  A661 BA2A FF22 DF8A 4A13</code></p>
+<p>whose public key is <a href="https://github.com/loki-notfound/myzephyr-java/blob/main/KEYS.asc">KEYS.asc</a> in the repository.</p>
+<h2 id="donations">Donations<a class="heading-anchor" href="#donations" aria-label="Link to this section">#</a></h2>
+<p>If zephyr-java is useful to you, donations are welcome at this Zephyr address:</p>
+<pre class="addr"><code>ZEPHs8MmrN556ieVvv9YUZf3J5pW2uN1z5S88mb9DksG9bcEcqVGg9XbuQc6Q9e9Ka6bjMHYgaSidWfL1r1DGLyngj8NHT3Q6gp</code></pre>
+</article>
+</div>
+</main>
+<footer class="lt-footer">
+<div class="lt-wrap lt-wrap-wide">
+<p>Guide for zephyr-java 2.3.0-sec.2-java.4, built from commit <code>e59843ad</code> (2026-11-17 UTC).</p>
+<p>zephyr-java and this site are a <a href="https://lateo.dev/">lateo</a> project by an independent operator, not affiliated with or endorsed by ZephyrProtocol. Source: <a href="https://github.com/loki-notfound/myzephyr-java">github.com/loki-notfound/myzephyr-java</a>.</p>
+<p>The library and the guide are under the MIT licence of the repository; the stylesheet is BSD 3-Clause; the lateo name, mark and favicons are not covered by either and all rights in them are reserved by their owner (<a href="assets/NOTICE.txt">notice</a>).</p>
+</div>
+</footer>
 </body>
 </html>
