@@ -34,6 +34,7 @@ public class GuideHistory {
     for (ZephyrTxWallet tx : wallet.getTxs(txHash)) {
       if (tx.getIncomingTransfers() == null) continue;
       for (ZephyrIncomingTransfer transfer : tx.getIncomingTransfers()) {
+        if (!address.equals(transfer.getAddress())) continue;  // only what this address received
         received.merge(transfer.getAssetType(), transfer.getAmount(), BigInteger::add);
       }
     }

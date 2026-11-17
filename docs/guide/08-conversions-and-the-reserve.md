@@ -219,18 +219,29 @@ at hand.
 ## Converting everything at once
 
 `sweepUnlocked` takes the same currency pair as `createTxs`, so it can also convert everything at
-once:
+once. Build without relaying, show the total fee and the quote, then relay every transaction. The
+returned transactions carry the converted amount in an incoming transfer, as for `createTxs` (read
+in the core's code):
 
 ```java examples/GuideConversions.java
 List<ZephyrTxWallet> txs = wallet.sweepUnlocked(new ZephyrTxConfig()
     .setAddress(wallet.getPrimaryAddress())
     .setSourceCurrency(ZephyrAssets.ZPH)
     .setDestinationCurrency(ZephyrAssets.ZRS)
-    .setAccountIndex(0)
-    .setRelay(true));
+    .setAccountIndex(0));                 // relay defaults to false: nothing is sent yet
+BigInteger fee = BigInteger.ZERO;
+BigInteger minted = BigInteger.ZERO;
+for (ZephyrTxWallet tx : txs) {
+  fee = fee.add(tx.getFee());             // in ZPH
+  if (tx.getIncomingTransfers() == null) continue;
+  for (ZephyrIncomingTransfer transfer : tx.getIncomingTransfers()) minted = minted.add(transfer.getAmount());  // in ZRS
+}
+System.out.println("fee " + GuideBalances.formatFull(fee) + " ZPH, quote " + GuideBalances.formatFull(minted) + " ZRS");
+return wallet.relayTxs(txs);              // only after the user has agreed to fee and quote
 ```
 
-On the mainnet test run this left exactly 0 ZPH. 40.9987 ZPH was converted, and the unconvertible
+The mainnet test run used `setRelay(true)` instead, which builds and relays in one call without a
+review. That run left exactly 0 ZPH. 40.9987 ZPH was converted, and the unconvertible
 residue went into the fee (0.0005346 ZPH, against 0.0004574 for the 50 ZPH `createTxs` mint).
 
 ## What was tested

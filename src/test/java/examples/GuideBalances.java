@@ -20,7 +20,9 @@ public class GuideBalances {
 
   // amounts: coins as the user types them, to atomic units; more than 12 decimals throws ArithmeticException
   static BigInteger toAtomicUnits(String coins) {
-    return new BigDecimal(coins.trim()).movePointRight(12).toBigIntegerExact();
+    BigInteger atomicUnits = new BigDecimal(coins.trim()).movePointRight(12).toBigIntegerExact();
+    if (atomicUnits.signum() <= 0) throw new IllegalArgumentException("the amount must be above zero");
+    return atomicUnits;
   }
 
   // amounts: atomic units to coins with all 12 decimals, for a send review or a detail view

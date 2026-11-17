@@ -122,7 +122,8 @@ always empty.
 
 **Workaround.** Trust the check for `isGood()` and the confirmations, and read the amount from the
 wallet's own history, where every transfer carries its asset. The receiver checks the key it got
-from the sender and sums its incoming transfers per asset:
+from the sender and sums, per asset, the incoming transfers to the checked address. A transaction
+can pay several addresses of the same wallet, so the filter on the address matters:
 
 ```java examples/GuideHistory.java
 static Map<String, BigInteger> receivedPerAsset(ZephyrWallet wallet, String txHash, String txKey, String address, long minConfirmations) {
@@ -134,6 +135,7 @@ static Map<String, BigInteger> receivedPerAsset(ZephyrWallet wallet, String txHa
   for (ZephyrTxWallet tx : wallet.getTxs(txHash)) {
     if (tx.getIncomingTransfers() == null) continue;
     for (ZephyrIncomingTransfer transfer : tx.getIncomingTransfers()) {
+      if (!address.equals(transfer.getAddress())) continue;  // only what this address received
       received.merge(transfer.getAssetType(), transfer.getAmount(), BigInteger::add);
     }
   }

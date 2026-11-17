@@ -34,18 +34,22 @@ recipient's address first ([Addresses and keys](02-wallets.md#addresses-and-keys
 
 ## Create, then relay
 
-`createTxs` builds and signs; by default it does **not** broadcast. Show the user the fee, then
-relay:
+`createTxs` builds and signs; by default it does **not** broadcast. It returns a list, because the
+core can split a send into several transactions. Show the user the total fee, then relay all of
+them:
 
 ```java examples/GuideSending.java
-List<ZephyrTxWallet> txs = wallet.createTxs(config);      // relay defaults to false
-BigInteger fee = txs.get(0).getFee();                     // in the source asset
-String hash = wallet.relayTx(txs.get(0));                 // now it is sent
+List<ZephyrTxWallet> txs = wallet.createTxs(config);      // relay defaults to false; can be several
+BigInteger fee = BigInteger.ZERO;
+for (ZephyrTxWallet tx : txs) fee = fee.add(tx.getFee()); // in the source asset
+System.out.println("fee " + fee);                         // show it; relay only after the user agrees
+return wallet.relayTxs(txs);                              // now every transaction is sent
 ```
 
-`setRelay(true)` on the config does both in one call. `createTx` is the same as `createTxs` for a
-config that must fit in one transaction. `relayTxs(txs)` relays every transaction of a list and
-returns their hashes.
+`relayTxs(txs)` relays every transaction of the list and returns their hashes. Relaying only the
+first one of a split send would send part of it. `createTx` sets `setCanSplit(false)`: it returns
+one transaction or throws, and `relayTx(tx)` then sends it. `setRelay(true)` on the config builds
+and relays in one call, without a review.
 
 ## What to show before you relay
 

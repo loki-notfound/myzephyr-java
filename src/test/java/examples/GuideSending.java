@@ -27,13 +27,13 @@ public class GuideSending {
     return tx;
   }
 
-  // create, show the fee, then relay
-  static String relay(ZephyrWalletFull wallet, ZephyrTxConfig config) {
-    List<ZephyrTxWallet> txs = wallet.createTxs(config);      // relay defaults to false
-    BigInteger fee = txs.get(0).getFee();                     // in the source asset
-    String hash = wallet.relayTx(txs.get(0));                 // now it is sent
-    System.out.println("fee " + fee);
-    return hash;
+  // create, show the total fee, then relay every transaction of the send
+  static List<String> relay(ZephyrWalletFull wallet, ZephyrTxConfig config) {
+    List<ZephyrTxWallet> txs = wallet.createTxs(config);      // relay defaults to false; can be several
+    BigInteger fee = BigInteger.ZERO;
+    for (ZephyrTxWallet tx : txs) fee = fee.add(tx.getFee()); // in the source asset
+    System.out.println("fee " + fee);                         // show it; relay only after the user agrees
+    return wallet.relayTxs(txs);                              // now every transaction is sent
   }
 
   // what to show before relaying: the amount, the asset, the address and the fee, with all 12 decimals
