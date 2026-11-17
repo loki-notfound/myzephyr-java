@@ -258,6 +258,10 @@ Two forms go beyond plain Markdown:
   `src/test/java/examples/`. The pure tests (`TestExamples`) check that the block is verbatim in
   it.
 
+The version a release names in the guide and in the README is checked as well.
+`bin/check_versions.sh` fails when a coordinate, the Maven snippet, the version catalog entry, a
+`git verify-tag` line or the index's version line names another version than `pom.xml`.
+
 `bin/make_site.sh` builds the same pages into a release's site, next to the Javadoc and the Maven
 repository. The site archive of a release therefore carries the guide of its commit. Every CI run
 builds and checks the site too (job `java`).

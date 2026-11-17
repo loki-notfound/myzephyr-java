@@ -9,6 +9,14 @@
 # the shipped root certificates are the pinned ones:
 #   src/main/resources-raw/zephyr/common/cacert.pem   sha256 CA_BUNDLE_SHA256 of bin/ca-bundle.env
 #   src/main/resources/zephyr-java.properties         ca.bundle.date = CA_BUNDLE_DATE
+# and that the release-bound strings of README.md and the guide (docs/guide/*.md) name the
+# version of pom.xml:
+#   io.github.loki-notfound:zephyr-java(-android):<version>    every coordinate with a version
+#   <version> after <artifactId>zephyr-java(-android)</artifactId>    the Maven snippet
+#   zephyrJava = "<version>"                                the version catalog entry
+#   git verify-tag v<version>                               the command that checks a release tag
+#   This guide describes version `<version>`.              the guide index, exactly once
+# A coordinate or tag with a placeholder (zephyr-java:<version>) is not checked.
 # Prints the version and exits 0 when they agree; prints the differing values and exits 1
 # otherwise. bin/build_release.sh calls it first.
 #
@@ -54,6 +62,52 @@ fi
 PROPS_DATE="$(sed -n 's/^ca\.bundle\.date=//p' src/main/resources/zephyr-java.properties)"
 if [ "$PROPS_DATE" != "$CA_BUNDLE_DATE" ]; then
   echo "root certificates: zephyr-java.properties ca.bundle.date '$PROPS_DATE', bin/ca-bundle.env CA_BUNDLE_DATE $CA_BUNDLE_DATE" >&2
+  STATUS=1
+fi
+if ! python3 -I - "$POM_VERSION" README.md docs/guide/*.md <<'PY'
+import re
+import sys
+
+version, files = sys.argv[1], sys.argv[2:]
+coordinate = re.compile(r"zephyr-java(?:-android)?:([0-9][^\"'\s)`<]*)")
+artifact = re.compile(r"<artifactId>zephyr-java(?:-android)?</artifactId>")
+maven = re.compile(r"<version>([^<]*)</version>")
+catalog = re.compile(r"^\s*zephyrJava\s*=\s*\"([^\"]*)\"")
+tag = re.compile(r"verify-tag v([0-9]\S*)")
+index = re.compile(r"^This guide describes version `([^`]*)`\.$")
+bad = 0
+index_lines = 0
+for path in files:
+    after_artifact = False
+    with open(path, encoding="utf-8") as f:
+        for number, line in enumerate(f, 1):
+            found = [(what, m.group(1)) for what, rx in (("coordinate", coordinate), ("verify-tag", tag))
+                     for m in rx.finditer(line)]
+            m = catalog.search(line)
+            if m:
+                found.append(("version catalog", m.group(1)))
+            m = maven.search(line)
+            if m and after_artifact:
+                found.append(("Maven <version>", m.group(1)))
+            if artifact.search(line):
+                after_artifact = True
+            elif "</dependency>" in line or line.startswith("```"):
+                after_artifact = False
+            if path == "docs/guide/README.md":
+                m = index.match(line.rstrip("\n"))
+                if m:
+                    index_lines += 1
+                    found.append(("guide index", m.group(1)))
+            for what, value in found:
+                if value != version:
+                    print(f"release-bound string: {path}:{number} {what} '{value}', pom.xml {version}", file=sys.stderr)
+                    bad += 1
+if index_lines != 1:
+    print(f"release-bound string: docs/guide/README.md has {index_lines} version lines, expected 1", file=sys.stderr)
+    bad += 1
+sys.exit(1 if bad else 0)
+PY
+then
   STATUS=1
 fi
 [ "$STATUS" = 0 ] && echo "version $POM_VERSION${RELEASE_TAG:+ (tag $RELEASE_TAG)}"
