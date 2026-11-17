@@ -67,7 +67,7 @@ environment override it, as before.
 `addTrustedCertificates` or `setUseSystemCertificates(true)`. The options, all in
 `src/test/java/examples/GuideTls.java` (compiled with the tests):
 
-```java
+```java examples/GuideTls.java
 ZephyrTls.addTrustedCertificates(caPem);    // your own CA, or a self-signed node certificate
                                             // whose name matches the node's host name
 ZephyrTls.setUseSystemCertificates(true);   // the device's system store as well

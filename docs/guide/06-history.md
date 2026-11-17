@@ -31,7 +31,7 @@ always empty.
 wallet's own history, where every transfer carries its asset. The receiver checks the key it got
 from the sender and sums its incoming transfers per asset:
 
-```java
+```java examples/GuideHistory.java
 static Map<String, BigInteger> receivedPerAsset(ZephyrWallet wallet, String txHash, String txKey, String address, long minConfirmations) {
   ZephyrCheckTx check = wallet.checkTxKey(txHash, txKey, address);
   if (!check.isGood()) throw new IllegalStateException("the transaction does not pay " + address);
@@ -50,7 +50,7 @@ static Map<String, BigInteger> receivedPerAsset(ZephyrWallet wallet, String txHa
 
 The sender has the amount in the destinations of its outgoing transfer:
 
-```java
+```java examples/GuideHistory.java
 static Map<String, BigInteger> sentPerAsset(ZephyrWallet wallet, String txHash, String address) {
   Map<String, BigInteger> sent = new HashMap<>();
   for (ZephyrTxWallet tx : wallet.getTxs(txHash)) {
@@ -92,7 +92,7 @@ transaction credits one asset per subaddress). For a transaction the wallet sent
 account, the core lists no incoming transfer for the change, so an output without a matching
 transfer in another asset is in the source asset, which the outgoing transfer carries:
 
-```java
+```java examples/GuideHistory.java
 static String assetOf(ZephyrWallet wallet, ZephyrOutputWallet output) {
   List<ZephyrTxWallet> txs = wallet.getTxs(Arrays.asList(output.getTx().getHash()), new ArrayList<String>());
   if (txs.isEmpty()) return null;  // the transaction is not in the wallet
@@ -115,7 +115,7 @@ static String assetOf(ZephyrWallet wallet, ZephyrOutputWallet output) {
 
 Coin control per asset then filters the outputs through it:
 
-```java
+```java examples/GuideHistory.java
 static List<ZephyrOutputWallet> unspentOutputs(ZephyrWallet wallet, String asset) {
   List<ZephyrOutputWallet> outputs = new ArrayList<>();
   for (ZephyrOutputWallet output : wallet.getOutputs(new ZephyrOutputQuery().setIsSpent(false))) {

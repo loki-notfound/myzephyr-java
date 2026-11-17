@@ -57,7 +57,7 @@ repository (`src/test/java/examples/QuickStart.java`), so it always matches the 
 Before you build the wallet into the app, check that the library loads and works on your devices.
 `src/test/java/examples/GuideFirstProgram.java` is plain Java, compiled with this project's tests:
 
-```java
+```java examples/GuideFirstProgram.java
 // loads the native library, creates an offline wallet in memory and returns its primary address
 public static String smokeTest() {
   ZephyrUtils.loadNativeLibrary();

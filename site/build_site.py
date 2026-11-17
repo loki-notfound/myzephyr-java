@@ -13,9 +13,10 @@ link into javadoc/. The converter (site/markdown.py) fails on any Markdown it do
 
 A code block takes its language and nothing else, with one exception: a Java block whose info
 string is "java examples/<Class>.java" quotes that compiled example (the file must exist in
-src/test/java/examples/) and is labelled "Java, compiled". A callout (GitHub's alert syntax)
-becomes the house style's lt-callout box, info for NOTE, warning for WARNING, danger for CAUTION,
-with its bold title as lt-callout-title; a page has at most two.
+src/test/java/examples/; test/TestExamples.java checks that the block is verbatim in it) and is
+labelled "Java, compiled". A callout (GitHub's alert syntax) becomes the house style's lt-callout
+box, info for NOTE, warning for WARNING, danger for CAUTION, with its bold title as
+lt-callout-title; a page has at most two.
 
 The footer names the version of pom.xml and the commit the site was built from, with the
 commit's date in UTC, and "with local changes" when docs/guide/ or site/ differ from it. Without

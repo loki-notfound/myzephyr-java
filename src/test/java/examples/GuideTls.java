@@ -32,6 +32,16 @@ public class GuideTls {
     ZephyrTls.setCaFile(pem);
   }
 
+  // TLS: the options as the guide lists them, in one place; an app calls the ones it needs
+  public static void options(File caPem, File pem) {
+    ZephyrTls.addTrustedCertificates(caPem);    // your own CA, or a self-signed node certificate
+                                                // whose name matches the node's host name
+    ZephyrTls.setUseSystemCertificates(true);   // the device's system store as well
+    ZephyrTls.setUseUserCertificates(true);     // the certificates the user installed
+    ZephyrTls.setUseShippedCertificates(false); // without the shipped root certificates
+    ZephyrTls.setCaFile(pem);                   // exactly this file and nothing else (null: back)
+  }
+
   // TLS: at start, the root certificates downloaded earlier, when there are any
   public static void addDownloadedRoots(File filesDir) {
     File roots = new File(filesDir, "cacert.pem");

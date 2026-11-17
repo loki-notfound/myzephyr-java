@@ -230,7 +230,8 @@ whose first line is `> [!NOTE]`, `> [!WARNING]` or `> [!CAUTION]` and whose next
 a bold title. It becomes an info, warning or danger box on the site, at most two per page; any
 other block quote is an error. A Java block whose info string names a compiled example,
 `java examples/<Class>.java`, is labelled "Java, compiled"; the file must exist in
-`src/test/java/examples/`.
+`src/test/java/examples/`, and the pure test suite (`TestExamples`) checks that the block is
+verbatim in it.
 
 `bin/make_site.sh` builds the same pages into a release's site, next to the Javadoc and the Maven
 repository, so the site archive of a release carries the guide of its commit. Every CI run builds
