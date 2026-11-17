@@ -53,18 +53,25 @@ closed wallet until the fix of 2026-11-07; it now accepts both codes.
 
 ## ZephyrRpcError
 
-The RPC classes throw `zephyr.common.ZephyrRpcError`, a `ZephyrError` with three more facts:
+For an RPC error or an HTTP error, the RPC classes throw `zephyr.common.ZephyrRpcError`, a
+`ZephyrError` with three more facts:
 
 - `getCode()` is the RPC error code, or the HTTP status for an HTTP error;
 - `getRpcMethod()` is the RPC method, `null` for an HTTP error;
-- `getRpcParams()` is the request's parameters.
+- `getRpcParams()` is the request's parameters, `null` for an HTTP error.
+
+A failure to connect is not a `ZephyrRpcError`: it arrives as a plain `ZephyrError` whose message is
+the cause's text (read in the source). An HTTP error's message holds the HTTP status and the body
+of the answer, which is text from the server.
 
 Its `toString()` appends the method and the parameters as JSON, and the parameters can hold the
 wallet's password or the node's login password
-([Logging safely](09-errors.md#logging-safely)). Log the method, the code and the message:
+([Logging safely](09-errors.md#logging-safely)). Catch `ZephyrError` and log the method, the code and
+the message:
 
 ```java examples/GuideRpc.java
-return "RPC " + e.getRpcMethod() + " failed: " + e.getCode() + " " + e.getMessage();
+if (e instanceof ZephyrRpcError) return "RPC " + ((ZephyrRpcError) e).getRpcMethod() + " failed: " + e.getCode() + " " + e.getMessage();
+return "no RPC answer: " + e.getMessage();  // for example no connection: a plain ZephyrError
 ```
 
 ## TLS and Android

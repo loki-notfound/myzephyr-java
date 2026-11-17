@@ -1,6 +1,7 @@
 package examples;
 
 import java.math.BigInteger;
+import zephyr.common.ZephyrError;
 import zephyr.common.ZephyrRpcError;
 import zephyr.daemon.ZephyrDaemonRpc;
 import zephyr.daemon.model.ZephyrPricingRecord;
@@ -18,8 +19,9 @@ public class GuideRpc {
     return record.getReserve();  // the price of one ZRS in ZPH, times 10^12
   }
 
-  // an RPC error: log the code and the message, never toString(), which prints the parameters
-  static String describe(ZephyrRpcError e) {
-    return "RPC " + e.getRpcMethod() + " failed: " + e.getCode() + " " + e.getMessage();
+  // an error of the RPC classes: log the code and the message, never toString(), which prints the parameters
+  static String describe(ZephyrError e) {
+    if (e instanceof ZephyrRpcError) return "RPC " + ((ZephyrRpcError) e).getRpcMethod() + " failed: " + e.getCode() + " " + e.getMessage();
+    return "no RPC answer: " + e.getMessage();  // for example no connection: a plain ZephyrError
   }
 }

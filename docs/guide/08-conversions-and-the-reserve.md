@@ -49,7 +49,9 @@ would produce, and it is the authoritative answer. Observed on 2026-11-17 with `
 | ZRS → ZPH | `Reserve ratio not satisfied. New reserve ratio would be 1.848989637479 which is less than the minimum 4.0` |
 
 The two messages differ in their wording ("Spot reserve ratio not satisfied" against "Reserve
-ratio not satisfied"). Match on the exception, not on the text. For a conversion the core checked
+ratio not satisfied"). Both arrive as the same `ZephyrError` with a `null` code as "not enough
+money", so only the text tells them apart, and it can change with the core
+([The messages a wallet meets](09-errors.md#the-messages-a-wallet-meets)). For a conversion the core checked
 the decimal places first, then the ratio, then the funds. An amount of one atomic unit gave the
 decimal-places message for every conversion pair ([Building a conversion](#building-a-conversion)).
 

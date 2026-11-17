@@ -166,8 +166,9 @@ ZephyrWalletFull wallet = ZephyrWalletFull.openWallet(new ZephyrWalletConfig()
 The keys array is encrypted with the wallet password. The cache array, which holds the synced
 history, is encrypted with a key derived from it. The files are encrypted the same way.
 
-A wallet opened this way has no path (`getPath()` returns `null`), so `save()` has nowhere to
-write. Call `getData()` again and store the result whenever you would otherwise save.
+A wallet opened this way has no path (`getPath()` returns `null`). `save()` and `close(true)` then
+write nothing and report no error (read in the core's code). Call `getData()` again and store the
+result whenever you would otherwise save, and before `close()`.
 `changePassword` does not work for such a wallet; [The password](#the-password) has the details.
 
 `moveTo(path)` gives a wallet held in memory its files:
@@ -211,15 +212,20 @@ arrays again:
 ## Closing
 
 `close()` closes without saving; `close(true)` saves first. After `close` the object must not be
-used again: `isClosed()` returns `true`, and the other calls throw a `ZephyrError` "Wallet is
-closed". Closing a closed wallet has no effect.
+used again: `isClosed()` returns `true`, and most other calls throw a `ZephyrError` "Wallet is
+closed". A few have no such check; `changePassword` after `close()` fails with an unrelated error.
+Closing a closed wallet has no effect.
+
+`close(true)` saves in native code that does not catch a failure of the save (read in the bridge's
+code; not run). Call `save()` first, which reports a failure as an exception, then `close()`.
 
 ```java examples/GuideWallets.java
 try {
   wallet.sync();
   System.out.println(wallet.getBalance());
+  wallet.save();     // reports a failure; close(true) would not
 } finally {
-  wallet.close(true);
+  wallet.close();
 }
 ```
 

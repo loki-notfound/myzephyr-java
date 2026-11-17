@@ -22,6 +22,7 @@ Status words:
 | `getOutputAssetType` reads a split conversion to one's own account as the source asset | core, open | [getOutputs() reports no asset](06-history.md#getoutputs-reports-no-asset) |
 | the asset of an output notification in the pool is empty | core, stays; observed on mainnet on 2026-11-07 | [Outputs in the pool carry no asset](04-threads-and-listeners.md#outputs-in-the-pool-carry-no-asset) |
 | `changePassword` fails for a wallet opened from bytes | core; confirmed on mainnet | [The password](02-wallets.md#the-password) |
+| `save()` and `close(true)` write nothing for a wallet without a path, and report no error | core, read in the code | [Wallet bytes](02-wallets.md#wallet-bytes) |
 | `sweepOutput` validates with `ZEPH` and is most likely unusable | core, read in the code; not tested | [Sweeping](07-sending.md#sweeping) |
 | `sweepUnlocked` without an account index sweeps every subaddress | core, read in the code; a candidate for the backports | [Sweeping](07-sending.md#sweeping) |
 | testnet and stagenet never reach the V2 rules | core network tables | [Network types](02-wallets.md#network-types) |
@@ -37,6 +38,10 @@ Status words:
 | an exception from a callback during `sync()` is printed and swallowed, and skips the rest of that block's notifications | observed on 2026-11-17 | [An exception thrown in a callback](04-threads-and-listeners.md#an-exception-thrown-in-a-callback) |
 | calls from several threads on one wallet are not known to be safe | not established | [Calls from several threads](04-threads-and-listeners.md#calls-from-several-threads) |
 | a wrong password in `openWallet` throws `java.lang.Exception`, not `ZephyrError` | observed on 2026-11-17, also with the released JAR; open | [Where messages come from](09-errors.md#where-messages-come-from) |
+| many wallet calls, among them the balance calls, `save` and the account calls, let the core's `java.lang.Exception` through | read in the source; open | [Calls that let the core's exception through](09-errors.md#calls-that-let-the-cores-exception-through) |
+| an invalid account or subaddress index may end the process: some native calls do not catch the core's failure | read in the code; not run | [Calls that let the core's exception through](09-errors.md#calls-that-let-the-cores-exception-through) |
+| `close(true)` does not catch a failing save in native code | read in the code; not run | [Closing](02-wallets.md#closing) |
+| at `FINE` and from `setLogLevel(2)` the library logs transaction keys, passwords and mnemonics | read in the source | [Logging safely](09-errors.md#logging-safely) |
 | `ZephyrUtils.toAtomicUnits(double)` throws below 0.001 and from 10^7, and truncates silently | specified Java behaviour; run on 2026-11-17 | [Amounts](05-assets-and-balances.md#amounts) |
 | `ZephyrRpcError.toString()` prints the request parameters, which can hold passwords | open | [Logging safely](09-errors.md#logging-safely) |
 | the RPC classes are a first pass: `ZephyrWalletRpc` serves the base coin only | planned work | [ZephyrWalletRpc](11-the-rpc-classes.md#zephyrwalletrpc) |

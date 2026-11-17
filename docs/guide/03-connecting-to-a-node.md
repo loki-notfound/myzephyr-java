@@ -208,7 +208,7 @@ What the table shows:
 - A new random wallet reports `getHeight()` 1 until its first sync, not its restore height. Its
   restore height is the node's height when it was created.
 - The calls about the node throw a `ZephyrError` "Wallet is not connected to daemon" when no node
-  is reachable; they return no default value. `getHeightByDate` needs the node as well and throws
+  was reachable at the last connection check; they return no default value. `getHeightByDate` needs the node as well and throws
   "failed to connect to daemon: " followed by the URI.
 - `isSynced()` keeps its last value when the node goes away.
 
@@ -224,12 +224,20 @@ while the core fetches block hashes. Observed on 2026-11-17: 79,979 for a restor
 `getDaemonHeight()` and the like) throws a `ZephyrError` "Wallet is not connected to daemon". The
 balance methods still work: they read the wallet's local state.
 
-**When certificate verification fails** for an `https://` node, the message gets a hint at TLS:
+That message comes from the result of the last connection check, which the core makes when the
+connection is set and on each `isConnectedToDaemon()` (read in the core's code). A node that goes
+away after that check gives other messages, such as "Failed to connect to daemon" from
+`getDaemonHeight()`. Call `isConnectedToDaemon()` to refresh the state.
+
+**For an `https://` node** the message gets a hint at TLS. The library adds it to every "Wallet is
+not connected to daemon" of an `https://` URI, whatever the cause. The cause can be an untrusted
+certificate, but also a node that is down or a wrong port:
 
 ```text
 Wallet is not connected to daemon: the node is an https node; its certificate may not be trusted (see ZephyrTls and the user guide, chapter 6)
 ```
 
 Releases up to `2.3.0-sec.2-java.4` print "chapter 6" in that message. The section it means is
-[TLS to a node](#tls-to-a-node) in this chapter. The native log says "SSL certificate is not in the
-allowed list, connection dropped" ([The native log](09-errors.md#the-native-log)).
+[TLS to a node](#tls-to-a-node) in this chapter. When the certificate is the cause, the native log
+says "SSL certificate is not in the allowed list, connection dropped"
+([The native log](09-errors.md#the-native-log)).

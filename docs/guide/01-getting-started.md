@@ -126,7 +126,7 @@ version. A developer build made on a newer host has that host's glibc as its flo
 | `ZephyrWalletListener` | `zephyr.wallet.model` | the callbacks for sync progress, blocks, balances and outputs |
 | `ZephyrAssets`, `ZephyrBalance` | `zephyr.wallet.model` | the asset names and a balance per asset |
 | `ZephyrTxConfig`, `ZephyrTxWallet` | `zephyr.wallet.model` | what to send, and the transaction that comes back |
-| `ZephyrError` | `zephyr.common` | the exception most calls throw |
+| `ZephyrError` | `zephyr.common` | the library's exception; some calls let the core's `java.lang.Exception` through instead |
 | `ZephyrUtils` | `zephyr.common` | the native library, address checks, amount helpers |
 | `ZephyrTls` | `zephyr.common` | the root certificates the native wallet trusts |
 

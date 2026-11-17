@@ -31,7 +31,8 @@ public class GuideWallets {
         .setNetworkType(ZephyrNetworkType.MAINNET)
         .setServerUri("http://node.example.invalid:17767"));
     String mnemonic = wallet.getMnemonic();  // 25 words; show it to the user once, then forget it
-    wallet.close(true);
+    wallet.save();
+    wallet.close();
     return mnemonic;
   }
 
@@ -103,13 +104,14 @@ public class GuideWallets {
     wallet.save();  // writes to the new files from now on
   }
 
-  // sync, use and close the wallet; close(true) saves first
+  // sync, use, save and close the wallet
   static void useAndClose(ZephyrWalletFull wallet) {
     try {
       wallet.sync();
       System.out.println(wallet.getBalance());
+      wallet.save();     // reports a failure; close(true) would not
     } finally {
-      wallet.close(true);
+      wallet.close();
     }
   }
 
