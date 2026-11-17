@@ -1,11 +1,13 @@
 """A converter for exactly the Markdown subset the guide (docs/guide/) uses, for the site build
 (site/build_site.py). It knows ATX headings, paragraphs, fenced code blocks, bullet and numbered
 lists (nested by indentation), pipe tables, inline code, links, bold and emphasis with asterisks,
-and backslash escapes. Anything else (raw HTML, character references, block quotes, rules, images,
-indented code, reference links, bare URLs, underscore emphasis, setext headings, hard line breaks,
-numbered lists that do not start at 1, headings whose anchor GitHub would derive differently) is an
-error naming the file and the line, so the build fails instead of emitting something GitHub would
-render differently.
+backslash escapes, and callouts in GitHub's alert syntax: a block quote whose first line is
+"> [!NOTE]", "> [!WARNING]" or "> [!CAUTION]" and whose next line starts with a bold title, holding
+paragraphs only. Anything else (raw HTML, character references, any other block quote, rules,
+images, indented code, reference links, bare URLs, underscore emphasis, setext headings, hard line
+breaks, numbered lists that do not start at 1, headings whose anchor GitHub would derive
+differently) is an error naming the file and the line, so the build fails instead of emitting
+something GitHub would render differently.
 
 Python 3 standard library only. The module is loaded by its path (site/build_site.py runs under
 python3 -I, which does not put the script's directory on the module path).
@@ -178,11 +180,15 @@ def inline_html(tokens, resolve_link):
 # ------------------------------------------------------------------ blocks
 
 LIST_ITEM = re.compile(r"^( *)([-*]|\d+\.) +(.*)$")
+# GitHub's alert types the guide uses, and the house style's callout kind each becomes
+CALLOUT_KINDS = {"NOTE": "info", "WARNING": "warning", "CAUTION": "danger"}
+CALLOUT_START = re.compile(r"^> \[!([A-Z]+)\]$")
 
 
 def parse(src, file):
     """Parse a document into blocks: heading {level, inline, text, id, line}, paragraph {inline},
-    code {lang, info, text, line}, list {ordered, items: [{blocks}]}, table {head, rows, line}."""
+    code {lang, info, text, line}, list {ordered, items: [{blocks}]}, table {head, rows, line},
+    callout {kind, alert, title, blocks: [paragraph], line}."""
     lines = src.replace("\r\n", "\n").split("\n")
     blocks = []
     ids = {}
@@ -198,7 +204,8 @@ def parse(src, file):
 
     def check_block_start(line, n):
         if re.match(r"^ {0,3}>", line):
-            fail(n, "block quotes are not supported")
+            fail(n, "block quotes are not supported (a callout starts after a blank line with > [!NOTE], "
+                    "> [!WARNING] or > [!CAUTION])")
         if re.match(r"^ {0,3}([-*_])( *\1){2,} *$", line):
             fail(n, "horizontal rules are not supported")
         if re.match(r"^ {0,3}<[A-Za-z!/]", line):
@@ -288,6 +295,61 @@ def parse(src, file):
         cells.append("".join(cur).strip())
         return cells
 
+    # A callout: "> [!NOTE]" (or WARNING, CAUTION) after a blank line, then lines that start with
+    # "> " holding paragraphs separated by lines that are only ">", the first paragraph starting with
+    # a bold title; it ends at a blank line. Nothing but paragraphs goes inside.
+    def parse_callout(start):
+        m = CALLOUT_START.match(lines[start])
+        if not m or m.group(1) not in CALLOUT_KINDS:
+            fail(start, "block quotes are not supported; a callout's first line is exactly > [!NOTE], "
+                        "> [!WARNING] or > [!CAUTION]")
+        n = start + 1
+        if n >= len(lines) or not lines[n].startswith("> **"):
+            fail(n if n < len(lines) else start, "a callout's second line starts with its bold title (> **Title.** ...)")
+        paras = []
+        cur = []
+        while n < len(lines) and lines[n].startswith(">"):
+            text = lines[n]
+            if text == ">":
+                if cur:
+                    paras.append(cur)
+                cur = []
+            elif text.startswith("> "):
+                body = text[2:]
+                if (CALLOUT_START.match(text) or re.match(r"^ *(>|```|~~~|#{1,6} |\||<[A-Za-z!/])", body)
+                        or LIST_ITEM.match(body) or re.match(r"^ {4,}\S", body)
+                        or re.match(r"^ {0,3}([-*_])( *\1){2,} *$", body)):
+                    fail(n, "a callout holds paragraphs only")
+                if body.startswith(" "):
+                    fail(n, "a callout's line has one space after >")
+                cur.append((body, n))
+            else:
+                fail(n, "a callout's line starts with > and a space, or is only >")
+            n += 1
+        if cur:
+            paras.append(cur)
+        if n < len(lines) and lines[n].strip() != "":
+            fail(n, "a callout ends with a blank line")
+        blocks_in = []
+        for k, para in enumerate(paras):
+            inline = parse_inline(" ".join(t for t, _ in para), file, para[0][1] + 1)
+            if k == 0:
+                if not inline or inline[0]["t"] != "strong" or (len(inline) > 1 and not (
+                        inline[1]["t"] == "text" and re.match(r"\s", inline[1]["v"]))):
+                    fail(para[0][1], "a callout's second line starts with its bold title (> **Title.** ...)")
+                title = inline[0]["children"]
+                rest = inline[1:]
+                if rest:
+                    rest = [dict(rest[0], v=rest[0]["v"].lstrip())] + rest[1:]
+                    if rest[0]["v"] == "":
+                        rest = rest[1:]
+                if rest:
+                    blocks_in.append({"type": "paragraph", "inline": rest, "line": para[0][1] + 1})
+            else:
+                blocks_in.append({"type": "paragraph", "inline": inline, "line": para[0][1] + 1})
+        return {"type": "callout", "kind": CALLOUT_KINDS[m.group(1)], "alert": m.group(1), "title": title,
+                "blocks": blocks_in, "line": start + 1}, n
+
     # a line ending in two spaces or a backslash is a hard line break on GitHub; the converter has none
     fenced = False
     for n, line in enumerate(lines):
@@ -303,6 +365,10 @@ def parse(src, file):
         line = lines[i]
         if line.strip() == "":
             i += 1
+            continue
+        if line.startswith(">"):
+            block, i = parse_callout(i)
+            blocks.append(block)
             continue
         check_block_start(line, i)
         if re.match(r"^ {4,}\S", line):
@@ -394,6 +460,9 @@ def links(blocks):
         for b in bs:
             if b["type"] in ("heading", "paragraph"):
                 walk_inline(b["inline"], b["line"])
+            elif b["type"] == "callout":
+                walk_inline(b["title"], b["line"])
+                walk(b["blocks"])
             elif b["type"] == "list":
                 for it in b["items"]:
                     walk(it["blocks"])

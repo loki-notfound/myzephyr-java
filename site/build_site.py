@@ -11,6 +11,12 @@ an anchor into a Markdown file must name one of its headings); a link to the Jav
 project's Pages (https://loki-notfound.github.io/myzephyr-java/javadoc/...) becomes a relative
 link into javadoc/. The converter (site/markdown.py) fails on any Markdown it does not know.
 
+A code block takes its language and nothing else, with one exception: a Java block whose info
+string is "java examples/<Class>.java" quotes that compiled example (the file must exist in
+src/test/java/examples/) and is labelled "Java, compiled". A callout (GitHub's alert syntax)
+becomes the house style's lt-callout box, info for NOTE, warning for WARNING, danger for CAUTION,
+with its bold title as lt-callout-title; a page has at most two.
+
 The footer names the version of pom.xml and the commit the site was built from, with the
 commit's date in UTC, and "with local changes" when docs/guide/ or site/ differ from it. Without
 git, or in a tree that is not the top of its own repository (an unpacked git archive), it says
@@ -60,6 +66,10 @@ ASSETS = ["content.css", "print.css", "site.css", "favicon.svg", "favicon-32.png
           "STYLE-VERSION", "NOTICE.txt", "LICENSE-style.txt", "TRADEMARKS.txt"]
 CODE_LABELS = {"java": "Java", "kotlin": "Kotlin", "groovy": "Groovy", "sh": "Shell", "toml": "TOML", "xml": "XML",
                "text": "Text"}
+# the one info string allowed beyond a language: a Java block that quotes a compiled example
+NAMED_EXAMPLE = re.compile(r"^java examples/([A-Z][A-Za-z0-9]*)\.java$")
+EXAMPLES = os.path.join(ROOT, "src", "test", "java", "examples")
+MAX_CALLOUTS = 2
 GROUP_PATH = "io/github/loki-notfound"
 GROUP_ID = GROUP_PATH.replace("/", ".")
 SCHEME = re.compile(r"^(\d+)\.(\d+)\.(\d+)-sec\.(\d+)-java\.(\d+)$")
@@ -159,6 +169,9 @@ def guide_pages():
                 if b["level"] > level + 1:
                     raise BuildError(f"{where}:{b['line']}: heading level {b['level']} after {level}")
                 level = b["level"]
+        callouts = [b for b in blocks if b["type"] == "callout"]
+        if len(callouts) > MAX_CALLOUTS:
+            raise BuildError(f"{where}:{callouts[MAX_CALLOUTS]['line']}: more than {MAX_CALLOUTS} callouts on one page")
         out = "guide/index.html" if rel == "README.md" else "guide/" + rel[:-3] + ".html"
         pages.append({"rel": rel, "out": out, "blocks": blocks, "title": h1[0]["text"],
                       "ids": {b["id"] for b in blocks if b["type"] == "heading"}})
@@ -266,8 +279,18 @@ def guide_body(page, by_rel):
             if label is None:
                 raise BuildError(f"{where}:{b['line']}: unknown code language {b['lang']}")
             if b["info"] != b["lang"]:
-                raise BuildError(f"{where}:{b['line']}: a code block takes only its language, not \"{b['info']}\"")
+                named = NAMED_EXAMPLE.match(b["info"])
+                if not named:
+                    raise BuildError(f"{where}:{b['line']}: a code block takes only its language, or "
+                                     f"\"java examples/<Class>.java\", not \"{b['info']}\"")
+                if not os.path.isfile(os.path.join(EXAMPLES, named.group(1) + ".java")):
+                    raise BuildError(f"{where}:{b['line']}: no src/test/java/examples/{named.group(1)}.java")
+                label = "Java, compiled"
             return code_block_html(label, b["text"])
+        if t == "callout":
+            inner = "".join(block_html(x) + "\n" for x in b["blocks"])
+            return (f'<div class="lt-callout lt-callout-{b["kind"]}" role="note">\n'
+                    f'<p class="lt-callout-title">{md.inline_html(b["title"], resolve_link)}</p>\n{inner}</div>')
         raise BuildError("unknown block")
 
     return "\n".join(block_html(b) for b in page["blocks"])

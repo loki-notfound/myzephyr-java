@@ -5,9 +5,12 @@ and maven/) is well-formed (no unclosed or mismatched tag), starts with the doct
 levels, unique ids, a skip link to #main, no lateo family bar, no script, no style element or
 attribute, no event handler attribute, no element the site does not use, no javascript: URL, no
 absolute or protocol-relative path, no http:// at all (code excepted) and https:// only as the
-target of a link (<a href>); every relative link and every anchor resolves; the stylesheets load
-nothing from elsewhere. A link into javadoc/ or maven/ is checked when that directory exists in the
-site and accepted when it does not (the guide-only build).
+target of a link (<a href>); every callout is a div of class "lt-callout" plus exactly one of
+"lt-callout-info", "lt-callout-warning" or "lt-callout-danger", with role="note", whose first
+element is its title, a p of class "lt-callout-title", and a guide page has at most two; every
+relative link and every anchor resolves; the stylesheets load nothing from elsewhere. A link into
+javadoc/ or maven/ is checked when that directory exists in the site and accepted when it does
+not (the guide-only build).
 
 Usage: python3 -I site/check_site.py --site <dir>
 Python 3 standard library only; exit status 0 when every check passes, 1 otherwise.
@@ -30,6 +33,8 @@ URL_ATTRS = {"href", "src", "srcset", "action", "poster", "data", "formaction", 
              "manifest", "ping"}
 # directories of the release site that this checker does not check page by page
 FOREIGN = ("javadoc", "maven")
+CALLOUT_KINDS = {"lt-callout-info", "lt-callout-warning", "lt-callout-danger"}
+MAX_CALLOUTS = 2
 
 
 class Page(html.parser.HTMLParser):
@@ -46,6 +51,8 @@ class Page(html.parser.HTMLParser):
         self.text_outside_code = []
         self.skip_link = False
         self.policy = False
+        self.callouts = 0
+        self.callout_title_due = None  # the line of a callout whose title has not come yet
 
     def where(self):
         return f"line {self.getpos()[0]}"
@@ -61,6 +68,22 @@ class Page(html.parser.HTMLParser):
         self._tag(tag, attrs)
 
     def _tag(self, tag, attrs):
+        classes = next(((v or "").split() for n, v in attrs if n == "class"), [])
+        if self.callout_title_due is not None:
+            if not (tag == "p" and classes == ["lt-callout-title"]):
+                self.problems.append(f"line {self.callout_title_due}: a callout whose first element is not its "
+                                     "title (p class=\"lt-callout-title\")")
+            self.callout_title_due = None
+        elif "lt-callout-title" in classes:
+            self.problems.append(f"{self.where()}: a callout title outside a callout")
+        if any(c == "lt-callout" or c.startswith("lt-callout-") for c in classes) and "lt-callout-title" not in classes:
+            role = next((v for n, v in attrs if n == "role"), None)
+            if (tag != "div" or len(classes) != 2 or classes[0] != "lt-callout" or classes[1] not in CALLOUT_KINDS
+                    or role != "note"):
+                self.problems.append(f"{self.where()}: a callout that is not <div class=\"lt-callout lt-callout-info|"
+                                     f"warning|danger\" role=\"note\">")
+            self.callouts += 1
+            self.callout_title_due = self.getpos()[0]
         a = {}
         for name, value in attrs:
             value = "" if value is None else value
@@ -119,6 +142,8 @@ class Page(html.parser.HTMLParser):
 
     def close_page(self):
         self.close()
+        if self.callout_title_due is not None:
+            self.problems.append(f"line {self.callout_title_due}: a callout without a title")
         for tag, line in self.stack:
             self.problems.append(f"<{tag}> of line {line} is never closed")
 
@@ -216,6 +241,8 @@ def main(argv):
             fail(f, "duplicate ids: " + ", ".join(dup))
         if not p.skip_link or "main" not in p.ids:
             fail(f, "no skip link to #main")
+        if f.startswith("guide/") and p.callouts > MAX_CALLOUTS:
+            fail(f, f"{p.callouts} callouts (at most {MAX_CALLOUTS} on a guide page)")
         h1 = sum(1 for level, _ in p.headings if level == 1)
         if h1 != 1:
             fail(f, f"{h1} level-1 headings")
