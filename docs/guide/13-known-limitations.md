@@ -88,7 +88,7 @@ Status words:
 **Where it has run.** The `x86_64` library ran on the Android emulator as a release check. It ran
 on API 24 and on API 35 with 16 KB pages, in debug builds (so under ART's CheckJNI). There:
 
-- the library loads and validates addresses natively, and an offline wallet works;
+- the native library loads, and an offline wallet works;
 - a wallet restored from its mnemonic syncs against a mainnet node and opens again from its bytes;
 - `ZephyrDaemonRpc` reads the node (on API 24 with desugaring);
 - `https://` to a mainnet node with a publicly signed certificate works without setup (the shipped
