@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -13,9 +14,14 @@ import java.math.BigDecimal;
 import java.lang.reflect.Method;
 import java.math.BigInteger;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import zephyr.common.ZephyrRpcConnection;
+import zephyr.common.ZephyrRpcError;
 import zephyr.daemon.ZephyrDaemonRpc;
 import zephyr.daemon.model.ZephyrBlockHeader;
 import zephyr.daemon.model.ZephyrOutput;
@@ -359,5 +365,42 @@ public class TestZephyrModel {
     assertEquals(header, copy);
     assertEquals(header.hashCode(), copy.hashCode());
     assertNotSame(header.getPricingRecord(), copy.getPricingRecord());
+  }
+
+  // 13. ZephyrRpcError.toString() prints no password, seed or private key; getRpcParams() keeps them
+  @Test
+  public void testRpcErrorRedactsSecrets() {
+    Map<String, Object> nested = new HashMap<>();
+    nested.put("Password", "secret-nested");
+    nested.put("label", "kept-nested");
+    Map<String, Object> params = new LinkedHashMap<>();
+    params.put("filename", "kept-file");
+    params.put("password", "secret-1");
+    params.put("OLD_PASSWORD", "secret-2");
+    params.put("new_password", "secret-3");
+    params.put("seed", "secret-word01 word02");
+    params.put("seed_offset", "secret-4");
+    params.put("spendkey", "secret-0000example0000hash0000placeholder");
+    params.put("viewkey", "secret-0000example0000view0000placeholder");
+    params.put("tx_key", "secret-0000example0000txkey0000placeholder");
+    params.put("nested", nested);
+    params.put("list", Arrays.asList(Collections.singletonMap("password", "secret-in-list"), "kept-in-list"));
+    params.put("array", new Object[] {Collections.singletonMap("new_password", "secret-in-array")});
+    params.put("username", "kept-user");
+    ZephyrRpcError e = new ZephyrRpcError("Invalid password", -1, "open_wallet", params);
+    String text = e.toString();
+    assertFalse(text.contains("secret-"), text);
+    assertTrue(text.startsWith("-1: Invalid password\nRPC request: 'open_wallet' with params: {\"filename\":\"kept-file\",\"password\":\"<redacted>\",\"OLD_PASSWORD\":\"<redacted>\","), text);
+    for (String kept : new String[] {"kept-file", "kept-nested", "kept-in-list", "kept-user", "\"Password\":\"<redacted>\"", "\"seed\":\"<redacted>\"", "\"tx_key\":\"<redacted>\""}) {
+      assertTrue(text.contains(kept), kept + " missing in " + text);
+    }
+    // the parameters themselves are unchanged
+    assertSame(params, e.getRpcParams());
+    assertEquals("secret-1", params.get("password"));
+    assertEquals("secret-nested", nested.get("Password"));
+    assertEquals("secret-in-list", ((Map<?, ?>) ((List<?>) params.get("list")).get(0)).get("password"));
+    // an HTTP error carries no request; a request without parameters prints null
+    assertEquals("500: 500 Internal Server Error", new ZephyrRpcError("500 Internal Server Error", 500, null, null).toString());
+    assertEquals("-13: No wallet file\nRPC request: 'close_wallet' with params: null", new ZephyrRpcError("No wallet file", -13, "close_wallet", null).toString());
   }
 }

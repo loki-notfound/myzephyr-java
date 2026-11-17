@@ -133,6 +133,10 @@ wait for pending funds to unlock." Keep the core's message for the log.
 > parameters, and its `setDaemonConnection` the node's login password. Log `getMessage()` and
 > `getCode()` instead.
 
+Releases after `2.3.0-sec.2-java.4` print the values of `password`, `old_password`, `new_password`,
+`seed`, `seed_offset`, `spendkey`, `viewkey` and `tx_key` as `<redacted>` in `toString()`, while
+`getRpcParams()` still holds them.
+
 `toString()` also reaches a log without an explicit call: through `printStackTrace()`, through
 `"" + e`, and through the throwable output of most loggers. Never log the mnemonic, the private keys
 or the wallet password. For a `ZephyrError` without a code, `getMessage()` and `toString()` are the

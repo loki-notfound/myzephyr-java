@@ -49,7 +49,7 @@ Status words:
 | `close(true)` does not catch a failing save in native code | read in the code; not run | [Closing](02-wallets.md#closing) |
 | at `FINE` and from `setLogLevel(2)` the library logs transaction keys, passwords and mnemonics | read in the source | [Logging safely](09-errors.md#logging-safely) |
 | `ZephyrUtils.toAtomicUnits(double)` throws below 0.001 and from 10^7, and truncates silently | specified Java behaviour; run on 2026-11-17 | [Amounts](05-assets-and-balances.md#amounts) |
-| `ZephyrRpcError.toString()` prints the request parameters, which can hold passwords | open | [Logging safely](09-errors.md#logging-safely) |
+| `ZephyrRpcError.toString()` prints the request parameters, which can hold passwords | open in `2.3.0-sec.2-java.4`; later releases redact them | [Logging safely](09-errors.md#logging-safely) |
 | the RPC classes are a first pass: `ZephyrWalletRpc` serves the base coin only | planned work | [ZephyrWalletRpc](11-the-rpc-classes.md#zephyrwalletrpc) |
 | the RPC classes need API 26, or core library desugaring on API 24 and 25 | by design of the HTTP client | [The RPC classes below API 26](10-android.md#the-rpc-classes-below-api-26) |
 | the areas inherited from monero-java listed in chapter 1 | not tested | [What zephyr-java does and does not do](01-getting-started.md#what-zephyr-java-does-and-does-not-do) |
