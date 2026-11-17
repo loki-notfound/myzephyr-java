@@ -49,8 +49,8 @@ would produce, and it is the authoritative answer. Observed on 2026-11-17 with `
 | ZRS → ZPH | `Reserve ratio not satisfied. New reserve ratio would be 1.848989637479 which is less than the minimum 4.0` |
 
 The two messages differ in their wording ("Spot reserve ratio not satisfied" against "Reserve
-ratio not satisfied"). Both arrive as the same `ZephyrError` with a `null` code as "not enough
-money", so only the text tells them apart, and it can change with the core
+ratio not satisfied"). Both arrive as the same `ZephyrError` with a `null` code, like "not enough
+money". Only the text tells them apart, and it can change with the core
 ([The messages a wallet meets](09-errors.md#the-messages-a-wallet-meets)). For a conversion the core checked
 the decimal places first, then the ratio, then the funds. An amount of one atomic unit gave the
 decimal-places message for every conversion pair ([Building a conversion](#building-a-conversion)).
@@ -96,9 +96,10 @@ with the full precision of the core's `double`.
 > version 4 they are set to 0, and the mainnet test runs (hard fork 11) reported 0 every time. The
 > moving average that matters for the conversion rules is `reserveRatioMa`, which is populated.
 
-Two more edge cases come from the same code. When no ZSD circulates, both ratios are 0 (not
-infinite). When the core cannot get the pricing record of the tip, it returns before computing,
-and every value except `hfVersion` stays 0.
+Two more edge cases come from the same code. When no ZSD circulates, both ratios and the two yield
+values are 0 (not infinite). When the core cannot get the pricing record of the tip, it returns
+before computing, and every value except `hfVersion` stays 0. Without a node that happens without
+an exception. Treat a ratio of 0 as unknown, not as a ratio.
 
 An example from the mainnet test run, at wallet height 902,123, hard fork 11 (amounts shown in
 whole units here):
@@ -182,16 +183,25 @@ static BigInteger roundDownForConversion(BigInteger amount) {
 }
 ```
 
-How old a pricing record may be when the chain includes the conversion has not been established
-for zephyr-java.
+**A conversion's pricing record must be recent** (read in the code; not run). The chain accepts a
+conversion only while its pricing record is at most 10 blocks below the current height, about
+20 min at the two-minute block target. The node checks it when the transaction enters the pool,
+when a block is assembled and when a block is validated. The pool also drops a waiting conversion
+once its record has become too old. For an app: build a conversion right after a sync, relay it
+promptly, and rebuild a quote the user has not confirmed within a few minutes. A wallet that is
+more than about 10 blocks behind builds conversions the node refuses.
 
 ## Fees of a conversion
 
 A conversion pays its fee in the source asset, like a transfer: a ZPH → ZRS mint pays in ZPH. On
 the mainnet test run a 50 ZPH mint with `createTxs` paid 0.0004574 ZPH. A mint with
 `sweepUnlocked` paid 0.0005346 ZPH, because the unconvertible residue went into the fee
-([Converting everything at once](#converting-everything-at-once)). How the core computes the fee
-of a conversion whose source is not ZPH has not been established for zephyr-java.
+([Converting everything at once](#converting-everything-at-once)).
+
+For a conversion from another asset the wallet computes the fee in ZPH and converts it into the
+source asset (read in the core's code; not run). It uses a moving-average price of the pricing
+record: ZSD at `stable_ma`, ZRS at `reserve_ma`, and ZYS through ZSD and `yield_price`. The node checks
+it back the same way.
 
 ### How the mint amount is computed (ZPH → ZRS)
 

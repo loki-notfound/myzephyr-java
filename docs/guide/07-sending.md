@@ -76,8 +76,11 @@ ZRS. On the mainnet test run a 10 ZPH transfer paid 0.000308 ZPH and a ZRS sweep
 The fee of a conversion is in [Fees of a conversion](08-conversions-and-the-reserve.md#fees-of-a-conversion).
 
 `setPriority` takes a `ZephyrTxPriority`: `DEFAULT`, `UNIMPORTANT`, `NORMAL` or `ELEVATED`. The
-mainnet sends of this project used the default. Which fee tier `DEFAULT` selects in the Zephyr
-core has not been established for zephyr-java. The other priorities, and `setFee`,
+mainnet sends of this project used the default. With `DEFAULT` the core chooses (read in the
+core's code; not run). It takes the low tier, as `UNIMPORTANT`, when the pool has no backlog and the
+recent blocks are not full. Otherwise it takes the normal tier, as `NORMAL`. So the fee of the same send can
+differ from one moment to the next; show the fee of the built transaction, not an estimate. The
+other priorities, and `setFee`,
 `setUnlockHeight`, `setPaymentId` and `setCanSplit`, are inherited from monero-java; not tested
 against Zephyr.
 
@@ -127,11 +130,13 @@ return wallet.sweepUnlocked(new ZephyrTxConfig()
     .setAccountIndex(0));  // always set the account index
 ```
 
-**`sweepUnlocked` without an account index sweeps too much.** The core builds the list of
-subaddresses to sweep with one iterator and tests another. Without an account index it therefore
-sweeps every subaddress of a funded account. With one subaddress, or with `setAccountIndex(...)`,
-this does not matter. Always set the account index. *Status:* core, read in the code; a candidate
-for the backports.
+**`sweepUnlocked` without an account index sweeps every account.** Without an account index the
+core sweeps every account that has an unlocked balance in the source asset, one sweep per account.
+With an account index and no subaddress list it sweeps the whole account. Always set the account
+index. *Status:* core, read in the code. The core's list of subaddresses has an iterator slip (it
+tests one iterator and uses another), which adds subaddresses without funds. As far as the code
+shows it has no effect on the amounts, because only unlocked outputs of the source asset are
+spent.
 
 **`sweepOutput` validates with `ZEPH`.** Sweeping one output by key image validates the
 destination with a hard-coded `ZEPH` asset and builds the transaction without an asset. Since

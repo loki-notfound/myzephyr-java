@@ -53,4 +53,5 @@ marked "with the released JAR" used `zephyr-java-2.3.0-sec.2-java.4.jar` and its
 library. None of those runs was made on Android. One run is an observation,
 not a guarantee: a run that found no failure proves no safety.
 
-Where a fact is not known, the guide says so.
+Statements marked "read in the code" come from the source of this library or of the pinned core,
+not from a run. Where a fact is not known, the guide says so.

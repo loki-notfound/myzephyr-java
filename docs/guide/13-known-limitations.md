@@ -24,7 +24,11 @@ Status words:
 | `changePassword` fails for a wallet opened from bytes | core; confirmed on mainnet | [The password](02-wallets.md#the-password) |
 | `save()` and `close(true)` write nothing for a wallet without a path, and report no error | core, read in the code | [Wallet bytes](02-wallets.md#wallet-bytes) |
 | `sweepOutput` validates with `ZEPH` and is most likely unusable | core, read in the code; not tested | [Sweeping](07-sending.md#sweeping) |
-| `sweepUnlocked` without an account index sweeps every subaddress | core, read in the code; a candidate for the backports | [Sweeping](07-sending.md#sweeping) |
+| `sweepUnlocked` without an account index sweeps every account with an unlocked balance in the source asset | core, read in the code | [Sweeping](07-sending.md#sweeping) |
+| every node is treated as trusted (monero's trusted-daemon mode), and its error text can reach exception messages | core, read in the code | [A remote node](03-connecting-to-a-node.md#a-remote-node) |
+| `sync()` against a node that is still syncing returns 0 blocks without an error | core, read in the code; not run | [Syncing](03-connecting-to-a-node.md#syncing) |
+| background syncing reports no errors to the app | core, read in the code | [Background sync](03-connecting-to-a-node.md#background-sync) |
+| a conversion's pricing record must be at most 10 blocks old when the chain includes it | network rule, read in the code | [Building a conversion](08-conversions-and-the-reserve.md#building-a-conversion) |
 | testnet and stagenet never reach the V2 rules | core network tables | [Network types](02-wallets.md#network-types) |
 | no certificate pinning; the host name must match; the Network Security Configuration does not apply | needs the core | [What TLS cannot do](03-connecting-to-a-node.md#what-tls-cannot-do) |
 

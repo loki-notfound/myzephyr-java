@@ -142,14 +142,24 @@ the right name. The app's Network Security Configuration does not apply to the n
 > holds data back shows the wallet an old state. The wallet runs in your process and keeps its
 > keys there. Run your own node to remove the trade-off.
 
-What else a node can learn from the core's requests has not been established for zephyr-java.
-Whether the core treats the node as trusted (monero's "trusted daemon" setting) is not documented
-for this library either.
+**The core treats every node as trusted** (monero's trusted-daemon mode; read in the core's code).
+It sets the node as trusted for every connection, so wallet2's precautions for an untrusted node
+are off. For example, the node's own error text is passed into exception messages instead of a
+neutral "daemon error". For an app this means that a node you do not run gets more trust than
+monero's wallet would give it. Prefer your own node, and treat text in error messages as text from
+the node. What else a node can learn from the core's requests has not been established for
+zephyr-java.
 
 ## Syncing
 
 `sync()` fetches the blocks since the wallet's height, scans them for the wallet's outputs and
 returns when the wallet is at the tip. It blocks, so call it on a worker thread.
+
+**A node that is itself still syncing gives an empty sync.** The core syncs only when the node
+reports that it is synced, that is when `getDaemonHeight()` is at least `getDaemonMaxPeerHeight()`.
+Otherwise `sync()` returns at once with 0 blocks fetched and no error, and the wallet stays where it
+was (read in the core's code; not run). Check `isDaemonSynced()` before you trust a sync, and show
+the user that the node is behind.
 `sync(listener)` adds a listener for that sync only:
 
 ```java examples/GuideNode.java
@@ -162,7 +172,8 @@ ZephyrSyncResult result = wallet.sync(new ZephyrWalletListener() {
 long fetched = result.getNumBlocksFetched();
 ```
 
-`sync(startHeight)` starts at another height instead of the last synced block.
+`sync(startHeight)` starts at another height instead of the last synced block. A start below the
+restore height also lowers the restore height (read in the core's code).
 
 Progress is reported once per block fetched. A wallet that is already at the tip fetches nothing
 and gets **no** progress call; do not wait for one. The same holds for a new random wallet, which
@@ -185,6 +196,12 @@ wallet.startSyncing(30000L);
 
 Background syncing runs on threads of the core. Its callbacks, and closing a wallet while it
 syncs, follow the rules of [Threads and listeners](04-threads-and-listeners.md).
+
+**Background syncing reports no errors to the app.** In the core's code, a refresh that fails is
+printed on the process's standard output, and the next period tries again. The line starts with
+"monero_wallet_full failed to background synchronize: ". A node that is down or not synced makes the
+background sync do nothing, silently. Compare `getHeight()` with `getDaemonHeight()`, or call
+`isConnectedToDaemon()`, to notice a sync that has stalled.
 
 ## Heights
 
@@ -214,8 +231,8 @@ What the table shows:
 
 During the first sync of a restored wallet, `getHeight()` can be far below the restore height
 while the core fetches block hashes. Observed on 2026-11-17: 79,979 for a restore height of
-902,102. A node that is itself still syncing was not available, so the difference between
-`isDaemonSynced()` and `getDaemonMaxPeerHeight()` in that case was not seen.
+902,102. A node that is itself still syncing was not available in the runs; what the core's code
+does then is in [Syncing](#syncing).
 `setRestoreHeight(height)` changes the restore height of an open wallet.
 
 ## When the node cannot be reached
@@ -224,8 +241,8 @@ while the core fetches block hashes. Observed on 2026-11-17: 79,979 for a restor
 `getDaemonHeight()` and the like) throws a `ZephyrError` "Wallet is not connected to daemon". The
 balance methods still work: they read the wallet's local state.
 
-That message comes from the result of the last connection check, which the core makes when the
-connection is set and on each `isConnectedToDaemon()` (read in the core's code). A node that goes
+That message comes from the result of the last connection check (read in the core's code). The
+core makes that check when the connection is set and on each `isConnectedToDaemon()`. A node that goes
 away after that check gives other messages, such as "Failed to connect to daemon" from
 `getDaemonHeight()`. Call `isConnectedToDaemon()` to refresh the state.
 
