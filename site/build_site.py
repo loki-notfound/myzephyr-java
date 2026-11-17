@@ -327,7 +327,8 @@ dependencies {{
     parts = [
         heading_html(1, "zephyr-java", "zephyr-java"),
         "<p class=\"lead\">Java bindings for the Zephyr Protocol wallet core, for Android (AAR) and for desktop "
-        "and server JVMs (JAR), built from the security-hardened forks of zephyr-backports. "
+        "and server JVMs (JAR), built from the forks of zephyr-backports: ZephyrProtocol's Zephyr 2.3.0 plus "
+        "Monero security fixes. "
         f"Version {esc(version)}.</p>",
         '<div class="lt-callout lt-callout-info" role="note">\n'
         '<p class="lt-callout-title">Not affiliated with ZephyrProtocol.</p>\n'
