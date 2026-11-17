@@ -19,9 +19,6 @@ connection still opens: it shows the state of its last sync, but cannot sync or 
 `setProxyUri` routes the core's connection through a proxy (inherited from monero-java, meant for
 Tor); it has not been tested with Zephyr.
 
-A URI without a port gets the scheme's default (443 or 80), and `getDaemonConnection()` reports it
-with the port.
-
 **The port.** A URI without a port gets the scheme's default (443 for `https://`, 80 for
 `http://`); `getDaemonConnection()` then reports the URI with the port. (In `java.1` to `java.3`
 the core connected to port 0 and blocked for minutes.) A scheme written in another case
@@ -63,11 +60,6 @@ be verified there. Other devices were not measured. `java.4` fixes this in the b
 On the desktop JVM nothing changes unless the application calls `ZephyrTls` itself: the Linux
 library uses OpenSSL's default store (`/etc/ssl`), and `SSL_CERT_FILE` or `SSL_CERT_DIR` in the
 environment override it, as before.
-
-On Android the native wallet trusts the root certificates shipped in the library by default;
-`ZephyrTls` changes that ([TLS to a node](#tls-to-a-node)). On the desktop JVM nothing
-changes unless the application calls `ZephyrTls` itself: OpenSSL's default store (`/etc/ssl`) and
-`SSL_CERT_FILE` or `SSL_CERT_DIR` in the environment apply.
 
 ### Trusting other certificates
 
@@ -116,14 +108,11 @@ roots with each zephyr-java release.
 ### What TLS cannot do
 
 **What it cannot do.** There is no certificate pinning. A certificate whose host name does not
-match the URI is refused (the core checks the name), so a self-signed certificate needs the right
-name. The app's Network Security Configuration does not apply to the native wallet.
+match the URI is refused (the core checks the name and passes no SSL options through), so a
+self-signed certificate needs the right name. The app's Network Security Configuration does not
+apply to the native wallet. *Status:* pinning and own SSL options need the core.
 
 ## When the node cannot be reached
-
-When verification fails, `isConnectedToDaemon()` is false and calls that need the node throw "Wallet
-is not connected to daemon" with a hint at TLS; the reason is in the native log, which on Android
-does not reach logcat ([chapter 10](10-android.md#logs)).
 
 **When verification fails**, `isConnectedToDaemon()` returns false, and a call that needs the node
 (`sync()`, `getDaemonHeight()` and the like) throws "Wallet is not connected to daemon: the node is

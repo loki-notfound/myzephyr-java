@@ -10,7 +10,8 @@ Two rules hold for every wallet call:
 - **Calls block.** `sync()`, `createTxs()`, `getTxs()` and the other wallet methods do their work
   on the calling thread and return when the core is done. A first sync of a restored wallet can
   take minutes, and building a transaction asks the node for decoy outputs. Never call them from
-  a thread that must stay responsive, such as Android's main thread.
+  a thread that must stay responsive, such as Android's main thread: a sync or a send on the main
+  thread freezes the app. Use an executor or a coroutine dispatcher for I/O.
 - **Listener callbacks come in on a native thread.** The core delivers notifications from its
   own notification thread, which the JNI bridge attaches to the JVM for the call. Your listener
   therefore runs on a thread you did not create. Hand the event over to your own thread
@@ -54,10 +55,16 @@ monero-java that overrides it fails to compile instead of silently never being c
 
 ## Outputs in the pool carry no asset
 
-Second, **the asset of an unconfirmed output is empty.** When an incoming payment is seen in the
-pool, `onOutputReceived` arrives with `getAssetType()` equal to `""`, because the core's callback
-for pool payments carries no asset. The notification for the same output once it is in a block
-carries the asset (from the core's code; the mainnet test run did not get to observe it). Use
-`onBalancesChanged` or `getTxs()` for the asset of a pending payment. The outputs that
-`getOutputs()` returns carry no asset at all; [chapter 6](06-history.md#getoutputs-reports-no-asset) shows how to take it from the output's
+**The asset of an unconfirmed output notification is empty.** `onOutputReceived` for a payment
+seen in the pool arrives with `getAssetType()` equal to `""`: `wallet2`'s callback for pool
+payments has no asset parameter, and zephyr-cpp passes an empty string. The notification at
+confirmation goes through a callback that carries the asset (from the core's code; the mainnet
+test run did not get to observe it). Use `onBalancesChanged` (which names
+the asset) or `getTxs()` (which reports the right asset for the same pool transfer). The official
+Zephyr wallets do the same and leave `onOutputReceived` unused. *Status:* core behaviour, not a
+security matter, so it stays; documented in the Javadoc of `onOutputReceived`.
+Observed on mainnet on 2026-11-07.
+
+The outputs that `getOutputs()` returns carry no asset at all;
+[chapter 6](06-history.md#getoutputs-reports-no-asset) shows how to take it from the output's
 transaction.

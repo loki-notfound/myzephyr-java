@@ -5,9 +5,16 @@ through one of its static methods and ends with `close()`. This chapter goes thr
 a wallet: creating or restoring it, opening it from files or from bytes, connecting it to a node,
 syncing, listening, saving and closing.
 
+## Network types
+
 Every example uses mainnet. Zephyr's testnet and stagenet exist in the code, but in the pinned
-tree their hard-fork tables stop long before the V2 assets, so they do not behave like mainnet
-(see [chapter 13](13-known-limitations.md)).
+tree their hard-fork tables stop long before the V2 assets, so they do not behave like mainnet.
+
+**Testnet and stagenet do not reach the V2 rules.** In the pinned Zephyr tree the hard-fork tables
+of testnet and stagenet stop at hard fork 3 (height 100), and the V2 asset names are not allowed
+before hard fork 8. A wallet on those networks never sees ZPH, ZSD, ZRS or ZYS. Development and
+tests that need the current rules run on mainnet with small amounts. *Status:* the state of the
+core's network tables.
 
 ## Creating a new wallet
 
@@ -83,6 +90,9 @@ A wallet opened this way has no path, so `save()` has nowhere to write: call `ge
 store the result whenever you would otherwise save. `changePassword` does not work for such a
 wallet; [The password](#the-password) has the details.
 
+The keys array is encrypted with the wallet password, and the cache array, which holds the synced
+history, with a key derived from it; the files are encrypted the same way.
+
 ## The password
 
 **`changePassword` fails for a wallet opened from bytes.** On a wallet opened with
@@ -99,7 +109,8 @@ wallet from its mnemonic under the new password (which costs a re-sync).
 `close(true)` saves first. After `close` the object must not be used again; `isClosed()`
 returns `true`. Save before your process can be stopped: a cache that was not saved
 only costs a re-sync of the blocks since the last save, but transaction notes and the secret keys
-of sent transactions exist only in the cache.
+of sent transactions exist only in the cache. With bytes, store again after each sync and after
+each send, since there is no `save()` to a file.
 
 ```java
 try {

@@ -172,11 +172,7 @@ work:
   `<name>.keys` and `<name>` there on `save()`.
 - **Bytes:** create the wallet without a path, take `wallet.getData()` (keys and cache) and store
   the two arrays yourself; open later with `ZephyrWalletFull.openWalletData(...)`. This suits an
-  encrypted database. The keys array is encrypted with the wallet password, and the cache array,
-  which holds the synced history, with a key derived from it; the files are encrypted the same way.
-
-With bytes, store again after each sync and after each send, since there is no `save()` to a file.
-`changePassword` does not work on a wallet opened from bytes ([chapter 2](02-wallets.md#the-password)).
+  encrypted database.
 
 ## Backup
 
@@ -203,11 +199,8 @@ A wallet is expensive to open and must be closed exactly once, so it belongs to 
 outlives an Activity: a ViewModel, a bound service, or an application-wide holder. Close it (after
 storing it) when that owner ends.
 
-Two rules from [chapter 4](04-threads-and-listeners.md#threads) matter more on Android:
-
-- **No wallet call on the main thread.** Every call blocks until the core is done; a sync or a send
-  on the main thread freezes the app. Use an executor or a coroutine dispatcher for I/O.
-- **Callbacks arrive on a native thread.** Post to the main thread before you touch views:
+**Callbacks arrive on a native thread** ([chapter 4](04-threads-and-listeners.md#threads)). Post to
+the main thread before you touch views:
 
 ```java
 Handler main = new Handler(Looper.getMainLooper());

@@ -49,12 +49,6 @@ mint 0.0004574 ZPH and a ZRS sweep 0.0004456 ZRS.
 
 `sweepUnlocked` sends everything unlocked from an account (or chosen subaddresses) to one address.
 
-Set the account index: without one, the core's subaddress selection for a sweep has a slip that
-sweeps every subaddress of a funded account.
-
-`sweepOutput` (one output by key image) is a different path and does not work for V2 assets; see
-[Sweeping](#sweeping).
-
 **`sweepOutput` validates with `ZEPH`.** Sweeping one output by key image validates the
 destination with a hard-coded `ZEPH` asset and builds the transaction without an asset. Since
 hard fork 11 no `ZEPH` output is valid, so `sweepOutput` is most likely unusable on mainnet. The

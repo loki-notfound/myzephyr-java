@@ -105,9 +105,8 @@ Zephyr core, not Monero's 12. Keccak-256 and hex are the library's own code (`Ke
 `GenUtils`), so there is no dependency on Bouncy Castle or Apache commons-codec.
 
 **The RPC classes are a first pass.** `ZephyrWalletRpc` talks to `zephyr-wallet-rpc` for the base
-coin only and rejects the per-asset calls, reserve info and supply with a clear message. Its
-`isClosed()` understands zephyr-wallet-rpc's error code -13. Its ZMQ listener needs jeromq, which
-the AAR does not bring ([chapter 11](11-the-rpc-classes.md#dependencies)).
+coin only and rejects the per-asset calls, reserve info and supply with a clear message
+([chapter 11](11-the-rpc-classes.md)).
 
 ## Both libraries in one program
 

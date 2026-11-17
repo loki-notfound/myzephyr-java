@@ -116,8 +116,9 @@ Two builds from the same commit give the same files:
   are the same from **any** checkout directory. Verified: the x86_64 library and its debug file
   were equal across two checkout paths.
 - The Android natives are reproducible at the **same** build path only: NDK r18b's clang 7 cannot
-  rewrite `__FILE__`, so about 700 source paths per library keep the build directory. Release
-  builds therefore run at a fixed path, as F-Droid does. Verified: `arm64-v8a` was equal on a
+  rewrite `__FILE__`, so about 700 source paths per library keep the build directory (source file
+  names in error messages, and the location of lambdas in function names). They leak nothing
+  beyond that directory name. Release builds therefore run at a fixed path, as F-Droid does. Verified: `arm64-v8a` was equal on a
   rebuild at the same path.
 - The JARs and the AAR were equal across clean builds. Stripping is deterministic, and the debug
   symbols are packed into a tar with fixed order, times and owners.
@@ -168,7 +169,10 @@ second build:
 
 Every release file comes from one environment: the pinned `debian:12` image, with its packages
 (compilers, OpenJDK 17, Maven) from the Debian snapshot `20261107T000000Z`, the checkout at `/work`
-and `umask 022`, in CI and locally alike. The natives are built in it, and so is the packaging:
+and `umask 022`, in CI and locally alike. The image installs its packages from
+`snapshot.debian.org` (recorded in the manifest as `toolchain.debian_snapshot`), so both builds use
+the same compilers and binutils. The source paths that NDK r18b leaves in the Android libraries
+read `/work/...` on both sides, and the libraries match. The natives are built in it, and so is the packaging:
 CI's `package` job runs `bin/package_release.sh` in that image, and locally
 `bin/package_release_container.sh` does the same with the Android SDK mounted read-only. The jar
 entries and the tar archives carry normalised modes (`-rw-r--r--`, `-rwxr-xr-x` for the natives,
@@ -194,12 +198,6 @@ ANDROID_HOME=/path/to/android-sdk bin/build_release.sh
    archives with the release's. `manifest.json` itself records the build environment (compilers,
    glibc, JDK, Maven, the SDK packages, the container), so its hash matches only a build in the
    same environment.
-
-Every native of a release is built in the pinned `debian:12` image with the checkout at `/work`,
-in CI and locally alike, so the source paths that NDK r18b leaves in the Android libraries read
-`/work/...` on both sides and the libraries match. The image installs its packages from the Debian
-snapshot `20261107T000000Z` (`snapshot.debian.org`, recorded in the manifest as
-`toolchain.debian_snapshot`), so both builds use the same compilers and binutils.
 
 The stripped libraries carry a `gnu_debuglink` to their debug files, which ship in
 `debug-symbols-<version>.tar.gz`, so a crash report from a release can be symbolised without
