@@ -37,8 +37,8 @@ these areas is inherited from monero-java; not tested against Zephyr:
 - the proxy of `setProxyUri`;
 - seed offsets and mnemonic languages (`setSeedOffset`, `setLanguage`);
 - creating accounts and subaddresses and setting their labels;
-- several destinations in one transaction, and the fee, unlock height, payment ID and split
-  settings of `ZephyrTxConfig`;
+- several destinations in one transaction, and the priority, fee, unlock height, payment ID and
+  split settings of `ZephyrTxConfig`;
 - transaction proofs, spend proofs, reserve proofs and message signatures;
 - the calls of `ZephyrDaemonRpc` other than the node's information and block headers.
 

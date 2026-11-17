@@ -64,7 +64,7 @@ static String formatShort(BigInteger atomicUnits) {
 ```
 
 Write the asset's ticker after the number (`1.50 ZPH`). Before a send, show the amount and the fee
-with all 12 decimals ([Create, then relay](07-sending.md#create-then-relay)).
+with all 12 decimals ([What to show before you relay](07-sending.md#what-to-show-before-you-relay)).
 
 **Do not use `ZephyrUtils.toAtomicUnits(double)` for user input.** It is the only conversion from
 coins that `ZephyrUtils` has, and it builds the amount from the `double`'s text (`"" + amount`). It
