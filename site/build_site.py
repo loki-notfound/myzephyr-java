@@ -368,7 +368,7 @@ dependencies {{
         f'<p class="lt-fingerprint"><code>{FINGERPRINT}</code></p>',
         f'<p>whose public key is <a href="{REPO_URL}/blob/main/KEYS.asc">KEYS.asc</a> in the repository.</p>',
         h2("donations", "Donations"),
-        "<p>If zephyr-java is useful to you, donations are welcome at this ZEPH address:</p>",
+        "<p>If zephyr-java is useful to you, donations are welcome at this Zephyr address:</p>",
         f'<pre class="addr"><code>{DONATION_ADDRESS}</code></pre>',
     ]
     return "\n".join(parts)

@@ -154,8 +154,9 @@ Two keys are involved:
 - **The maintainer key** `31DA 39AB 43E0 CA67 F1F3  A661 BA2A FF22 DF8A 4A13` signs the zephyr-java
   release tags and `SHA256SUMS`. It is [`KEYS.asc`](../../KEYS.asc) in this repository.
 - **The zephyr-backports release key** `FB39 94F0 997C A6F0 43D7  2491 9EFF 03F5 27D2 40A1` signs the
-  core's tags. The build scripts verify them with `git verify-tag` when the tag is present. Without
-  gpg or without the key they print a warning and build anyway; a bad signature stops the build.
+  core's tags. It is `keys/zephyr-backports.asc` in the zephyr-backports repository. The build
+  scripts verify the tags with `git verify-tag` when the tag is present. Without gpg or without the
+  key they print a warning and build anyway; a bad signature stops the build.
 
 To check a release you downloaded:
 
