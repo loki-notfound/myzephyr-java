@@ -71,32 +71,36 @@ zephyr-java:
 | — | `BigInteger getBalance(String assetType, Integer accountIdx)` |
 
 The unlocked balance has the same four shapes, and `ZephyrAccount` and `ZephyrSubaddress` hold a
-`ZephyrBalance` instead of a `BigInteger`. [Chapter 5](05-assets-and-balances.md) explains them.
+`ZephyrBalance` instead of a `BigInteger`. [Assets, accounts and balances](05-assets-and-balances.md)
+explains them.
 
 **The listener names the asset.** `onBalancesChanged(BigInteger, BigInteger)` became
 `onBalancesChanged(BigInteger, BigInteger, String assetType)`. The old method still exists in
 `ZephyrWalletListener` but is `final` and deprecated, so a ported listener that overrides it does
 not compile, rather than compiling and never being called. The listener's outputs carry the asset
-in `getAssetType()` (empty for unconfirmed outputs, [chapter 4](04-threads-and-listeners.md#outputs-in-the-pool-carry-no-asset)).
+in `getAssetType()`, which is empty for unconfirmed outputs
+([Outputs in the pool carry no asset](04-threads-and-listeners.md#outputs-in-the-pool-carry-no-asset)).
 
 **Every send names a currency pair.** A `ZephyrTxConfig` without `setSourceCurrency` and
 `setDestinationCurrency` fails with "Must specify source currency", a plain transfer included.
-The compiler does not find this one; [chapter 8](08-conversions-and-the-reserve.md#the-ten-pairs)
-has the pairs.
+The compiler does not find this one; [The ten pairs](08-conversions-and-the-reserve.md#the-ten-pairs)
+lists the pairs.
 
 **New calls.** `getReserveInfo()` and `getCirculatingSupply()` on the wallet
-([chapter 8](08-conversions-and-the-reserve.md#reserve-info)), `ZephyrAssets` with the asset names, and the pricing record
-on daemon block headers.
+([Reserve info](08-conversions-and-the-reserve.md#reserve-info)), `ZephyrAssets` with the asset
+names, `getOutputAssetType` for the asset of an output, and the pricing record on daemon block
+headers.
 
 **Two results differ without a compile error.** Code that works in monero-java compiles and runs,
 but reads something the Zephyr core does not deliver:
 
-- `checkTxKey` (and `checkTxProof`): monero-java returns the received amount; in zephyr-java's
+- `checkTxKey` (and `checkTxProof`): monero-java returns the received amount. In zephyr-java's
   full wallet the amount is 0, and the amount comes from the transaction in `getTxs(hash)`
-  ([chapter 6](06-history.md#checktxkey-returns-amount-0)).
-- `getOutputs()`: monero-java's outputs have no asset concept; zephyr-java's outputs have an
-  `assetType` field, but `getOutputs()` leaves it `null`, and the asset comes from the output's
-  transaction ([chapter 6](06-history.md#getoutputs-reports-no-asset)).
+  ([checkTxKey returns amount 0](06-history.md#checktxkey-returns-amount-0)).
+- `getOutputs()`: monero-java's outputs have no asset concept. zephyr-java's outputs have an
+  `assetType` field, but `getOutputs()` leaves it `null`. The asset comes from the output's
+  transaction, through `getOutputAssetType(output)`
+  ([getOutputs() reports no asset](06-history.md#getoutputs-reports-no-asset)).
 
 **Addresses and constants.** Address decoding stays pure Java (no native library needed) but
 knows Zephyr's prefixes, which are multi-byte varints: mainnet addresses start with `ZEPHYR`.
@@ -104,9 +108,10 @@ knows Zephyr's prefixes, which are multi-byte varints: mainnet addresses start w
 Zephyr core, not Monero's 12. Keccak-256 and hex are the library's own code (`Keccak256`,
 `GenUtils`), so there is no dependency on Bouncy Castle or Apache commons-codec.
 
-**The RPC classes are a first pass.** `ZephyrWalletRpc` talks to `zephyr-wallet-rpc` for the base
-coin only and rejects the per-asset calls, reserve info and supply with a clear message
-([chapter 11](11-the-rpc-classes.md)).
+**Amounts.** `ZephyrUtils.toAtomicUnits(double)` converts through a `double` and fails or truncates
+for some values; use `BigDecimal` ([Amounts](05-assets-and-balances.md#amounts)).
+
+**The RPC classes are a first pass**, for the base coin only ([The RPC classes](11-the-rpc-classes.md)).
 
 ## Both libraries in one program
 
@@ -118,8 +123,8 @@ supports both coins needs both.
   `libmonero-java.so`), and zephyr-java's exports only JNI symbols. The one name both libraries
   export is `JNI_OnLoad`, which the JVM looks up per library, so it is no conflict.
 - **Tested.** The coexistence test loads monero-java 0.8.65 from Maven Central and zephyr-java in
-  one JVM, validates a Zephyr address in Java and natively and a Monero address with
-  monero-java, and checks that the two dynamic symbol sets share exactly `{JNI_OnLoad}` and no
+  one JVM. It validates a Zephyr address in Java and natively and a Monero address with
+  monero-java. It checks that the two dynamic symbol sets share exactly `{JNI_OnLoad}` and no
   `Java_*` name.
 
 **Jackson decides the versions.** monero-java 0.8.65 needs Jackson 2.15 or newer (it uses
@@ -127,7 +132,7 @@ supports both coins needs both.
 whole program, normally the highest; with Maven's nearest-wins rule you may have to pin it
 yourself. The coexistence test runs both libraries on Jackson 2.21.7, which shows that zephyr-java
 works on the 2.21 line. On Android, Jackson 2.14 and newer need minSdk 26
-([chapter 10](10-android.md#the-dependency)).
+([Jackson on API 24 and 25](10-android.md#jackson-on-api-24-and-25)).
 
 The coexistence test lives in `src/test/java/test/TestCoexistence.java` and runs with
 `mvn -Pcoexistence test`; the default build does not compile it, because it needs monero-java on
