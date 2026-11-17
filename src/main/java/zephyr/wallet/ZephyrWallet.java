@@ -825,7 +825,7 @@ public interface ZephyrWallet {
    * <p>Zephyr: in the full wallet ({@link ZephyrWalletFull}) the outputs carry no asset
    * ({@link ZephyrOutputWallet#getAssetType()} is {@code null}): the core keeps an output's asset
    * but does not serialize it. {@link #getOutputAssetType(ZephyrOutputWallet)} takes the asset from
-   * the output's transaction. See the user guide, {@code docs/guide/08-known-limitations.md}, section "getOutputs() reports no asset".</p>
+   * the output's transaction. See the user guide, {@code docs/guide/06-history.md}, section "getOutputs() reports no asset".</p>
    * 
    * @return all wallet outputs
    */
@@ -854,7 +854,7 @@ public interface ZephyrWallet {
    * <p>Zephyr: in the full wallet ({@link ZephyrWalletFull}) the outputs carry no asset
    * ({@link ZephyrOutputWallet#getAssetType()} is {@code null}): the core keeps an output's asset
    * but does not serialize it. {@link #getOutputAssetType(ZephyrOutputWallet)} takes the asset from
-   * the output's transaction. See the user guide, {@code docs/guide/08-known-limitations.md}, section "getOutputs() reports no asset".</p>
+   * the output's transaction. See the user guide, {@code docs/guide/06-history.md}, section "getOutputs() reports no asset".</p>
    * 
    * @param query specifies attributes of outputs to get
    * @return the queried outputs
@@ -880,7 +880,7 @@ public interface ZephyrWallet {
    * several outputs at one subaddress, or whose change equals the converted amount, the converted
    * outputs read as the source asset. One {@code getTxs} call per output; cache by transaction hash
    * when looking up many outputs. Tested with the full wallet ({@link ZephyrWalletFull}). See the user
-   * guide, {@code docs/guide/08-known-limitations.md}, section "getOutputs() reports no asset".</p>
+   * guide, {@code docs/guide/06-history.md}, section "getOutputs() reports no asset".</p>
    * 
    * @param output an output of this wallet, with its transaction hash, account and subaddress index
    * @return the asset name (see {@link zephyr.wallet.model.ZephyrAssets}), or {@code null} if the
@@ -1189,7 +1189,7 @@ public interface ZephyrWallet {
    * since hard fork 11 (height 536,000) no output is {@code ZEPH}. {@link ZephyrCheckTx#isGood()} and
    * the confirmations are right. Read the amount from {@link #getTxs(String...)} instead: the
    * receiver's incoming transfers, or the sender's outgoing destinations, each with its asset. See
-   * the user guide, {@code docs/guide/08-known-limitations.md}, section "checkTxKey returns amount 0".</p>
+   * the user guide, {@code docs/guide/06-history.md}, section "checkTxKey returns amount 0".</p>
    * 
    * @param txHash specifies the transaction to check
    * @param txKey is the transaction's secret key
@@ -1224,7 +1224,7 @@ public interface ZephyrWallet {
    * for every current transaction, from the same core code as {@link #checkTxKey}: the core reads
    * the amount of the asset {@code ZEPH} only, which no output has carried since hard fork 11.
    * {@link ZephyrCheckTx#isGood()} and the confirmations are right. Read the amount from
-   * {@link #getTxs(String...)} instead. See the user guide, {@code docs/guide/08-known-limitations.md}, section "checkTxKey returns amount 0".</p>
+   * {@link #getTxs(String...)} instead. See the user guide, {@code docs/guide/06-history.md}, section "checkTxKey returns amount 0".</p>
    * 
    * @param txHash specifies the transaction to prove
    * @param address is the destination public address of the transaction

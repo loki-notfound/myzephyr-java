@@ -159,7 +159,7 @@ The RPC classes need java.time: Android 8.0 (API 26) or newer, or core library d
 ```
 
 Releases up to `2.3.0-sec.2-java.4` print "chapter 6" in that message; the section it means is
-this one.
+this one. Later releases name this section instead.
 
 An app with minSdk 24 or 25 that uses the RPC classes enables core library desugaring in the app
 module:

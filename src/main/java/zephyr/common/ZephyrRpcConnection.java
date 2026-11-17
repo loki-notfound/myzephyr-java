@@ -617,7 +617,7 @@ public class ZephyrRpcConnection {
       String msg = e.getMessage();
       if (msg == null || !(msg.contains("java/time") || msg.contains("java.time")
           || msg.contains("org.apache.hc.core5.util.Deadline") || msg.contains("org/apache/hc/core5/util/Deadline"))) throw e;
-      ZephyrError err = new ZephyrError("The RPC classes need java.time: Android 8.0 (API 26) or newer, or core library desugaring in the app (user guide, chapter 6)");
+      ZephyrError err = new ZephyrError("The RPC classes need java.time: Android 8.0 (API 26) or newer, or core library desugaring in the app (user guide, \"The RPC classes below API 26\")");
       err.initCause(e);
       throw err;
     }

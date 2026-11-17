@@ -393,7 +393,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   }
   
   private static final String NOT_CONNECTED = "Wallet is not connected to daemon";
-  private static final String TLS_HINT = ": the node is an https node; its certificate may not be trusted (see ZephyrTls and the user guide, chapter 6)";
+  private static final String TLS_HINT = ": the node is an https node; its certificate may not be trusted (see ZephyrTls and the user guide, \"TLS to a node\")";
   
   /**
    * The error of a call that needs the daemon: the core's "Wallet is not connected to daemon" gets

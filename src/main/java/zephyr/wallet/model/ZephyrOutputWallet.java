@@ -215,7 +215,7 @@ public class ZephyrOutputWallet extends ZephyrOutput {
    * {@code ZephyrWalletRpc} it is {@code null} as well for now (the RPC client does not read the
    * asset yet). The wallet's {@code getOutputAssetType(output)} takes the asset from the output's
    * transaction. The outputs of the listener callbacks carry the asset, except for an output seen in
-   * the pool ({@code ""}). See the user guide, {@code docs/guide/08-known-limitations.md}, section "getOutputs() reports no asset".</p>
+   * the pool ({@code ""}). See the user guide, {@code docs/guide/06-history.md}, section "getOutputs() reports no asset".</p>
    * 
    * @return the asset name (see {@link ZephyrAssets}), null if not known
    */

@@ -255,6 +255,6 @@ Wallet is not connected to daemon: the node is an https node; its certificate ma
 ```
 
 Releases up to `2.3.0-sec.2-java.4` print "chapter 6" in that message. The section it means is
-[TLS to a node](#tls-to-a-node) in this chapter. When the certificate is the cause, the native log
-says "SSL certificate is not in the allowed list, connection dropped"
-([The native log](09-errors.md#the-native-log)).
+[TLS to a node](#tls-to-a-node) in this chapter, and later releases name that section instead.
+When the certificate is the cause, the native log says "SSL certificate is not in the allowed list,
+connection dropped" ([The native log](09-errors.md#the-native-log)).

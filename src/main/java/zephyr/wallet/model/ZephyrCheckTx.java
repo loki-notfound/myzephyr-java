@@ -36,7 +36,7 @@ public class ZephyrCheckTx extends ZephyrCheck {
    * Read the amount from the wallet's {@code getTxs(hash)}: the receiver's incoming transfers or the
    * sender's outgoing destinations, each with its asset. Through {@code ZephyrWalletRpc} this is
    * {@code null} for now (the RPC client does not read the per-asset amounts yet). See the user
-   * guide, {@code docs/guide/08-known-limitations.md}, section "checkTxKey returns amount 0".</p>
+   * guide, {@code docs/guide/06-history.md}, section "checkTxKey returns amount 0".</p>
    * 
    * @return the received amount in atomic units, 0 for current transactions (see above)
    */

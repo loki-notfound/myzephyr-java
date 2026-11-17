@@ -672,7 +672,7 @@ public class TestZephyrIntegration {
         assertFalse(connected, "connected to the https node with an empty CA file");
         ZephyrError e = assertThrows(ZephyrError.class, () -> w.sync());
         log("TLS with an empty CA file: sync() threw: " + e.getMessage());
-        assertEquals("Wallet is not connected to daemon: the node is an https node; its certificate may not be trusted (see ZephyrTls and the user guide, chapter 6)", e.getMessage());
+        assertEquals("Wallet is not connected to daemon: the node is an https node; its certificate may not be trusted (see ZephyrTls and the user guide, \"TLS to a node\")", e.getMessage());
       } finally {
         w.close();
         walletClosed();
