@@ -2,7 +2,8 @@
 
 One section per release, newest first. Tags are `v<zephyr version>-sec.<N>-java.<M>`; the Maven
 version is the tag without the `v`. Changes to the Java API are listed under "Breaking changes".
-A release's date is the date of its signed tag and of its GitHub release.
+A release's date is the date of its signed tag and of its GitHub release. Chapter numbers of the
+user guide in a release's section refer to the guide of that release.
 
 **Not affiliated with ZephyrProtocol.** An independent project. Report Zephyr vulnerabilities to the
 ZephyrProtocol team, not here.
@@ -330,7 +331,7 @@ The pure test suite has 30 tests. Conversions other than ZPH → ZRS are not tes
 
 ### Known limitations
 
-Guide chapter 8, [Known limitations](docs/guide/08-known-limitations.md), lists them with their
+Guide chapter 8, [Known limitations](https://github.com/loki-notfound/myzephyr-java/blob/v2.3.0-sec.2-java.1/docs/guide/08-known-limitations.md), lists them with their
 status. The ones a wallet app meets first: `getOutputs()` reports no asset; the asset of an
 unconfirmed output notification is empty; `checkTxKey` returns amount 0; on Android, TLS to a node
 needs the app's help (the native wallet does not use Android's certificate store).

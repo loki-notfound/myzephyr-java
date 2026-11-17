@@ -1,4 +1,4 @@
-# 7. Coming from monero-java
+# 12. Coming from monero-java
 
 zephyr-java is derived from [monero-java](https://github.com/woodser/monero-java) at commit
 `53a54543` (2023-07-10), the API era that matches the Zephyr core. If you know monero-java, or
@@ -71,21 +71,21 @@ zephyr-java:
 | — | `BigInteger getBalance(String assetType, Integer accountIdx)` |
 
 The unlocked balance has the same four shapes, and `ZephyrAccount` and `ZephyrSubaddress` hold a
-`ZephyrBalance` instead of a `BigInteger`. [Chapter 3](03-assets-and-balances.md) explains them.
+`ZephyrBalance` instead of a `BigInteger`. [Chapter 5](05-assets-and-balances.md) explains them.
 
 **The listener names the asset.** `onBalancesChanged(BigInteger, BigInteger)` became
 `onBalancesChanged(BigInteger, BigInteger, String assetType)`. The old method still exists in
 `ZephyrWalletListener` but is `final` and deprecated, so a ported listener that overrides it does
 not compile, rather than compiling and never being called. The listener's outputs carry the asset
-in `getAssetType()` (empty for unconfirmed outputs, [chapter 2](02-wallets.md#the-listener)).
+in `getAssetType()` (empty for unconfirmed outputs, [chapter 4](04-threads-and-listeners.md#outputs-in-the-pool-carry-no-asset)).
 
 **Every send names a currency pair.** A `ZephyrTxConfig` without `setSourceCurrency` and
 `setDestinationCurrency` fails with "Must specify source currency", a plain transfer included.
-The compiler does not find this one; [chapter 4](04-sending-and-converting.md)
+The compiler does not find this one; [chapter 8](08-conversions-and-the-reserve.md#the-ten-pairs)
 has the pairs.
 
 **New calls.** `getReserveInfo()` and `getCirculatingSupply()` on the wallet
-([chapter 5](05-reserve-and-supply.md)), `ZephyrAssets` with the asset names, and the pricing record
+([chapter 8](08-conversions-and-the-reserve.md#reserve-info)), `ZephyrAssets` with the asset names, and the pricing record
 on daemon block headers.
 
 **Two results differ without a compile error.** Code that works in monero-java compiles and runs,
@@ -93,10 +93,10 @@ but reads something the Zephyr core does not deliver:
 
 - `checkTxKey` (and `checkTxProof`): monero-java returns the received amount; in zephyr-java's
   full wallet the amount is 0, and the amount comes from the transaction in `getTxs(hash)`
-  ([chapter 8](08-known-limitations.md#checktxkey-returns-amount-0)).
+  ([chapter 6](06-history.md#checktxkey-returns-amount-0)).
 - `getOutputs()`: monero-java's outputs have no asset concept; zephyr-java's outputs have an
   `assetType` field, but `getOutputs()` leaves it `null`, and the asset comes from the output's
-  transaction ([chapter 8](08-known-limitations.md#getoutputs-reports-no-asset)).
+  transaction ([chapter 6](06-history.md#getoutputs-reports-no-asset)).
 
 **Addresses and constants.** Address decoding stays pure Java (no native library needed) but
 knows Zephyr's prefixes, which are multi-byte varints: mainnet addresses start with `ZEPHYR`.
@@ -107,7 +107,7 @@ Zephyr core, not Monero's 12. Keccak-256 and hex are the library's own code (`Ke
 **The RPC classes are a first pass.** `ZephyrWalletRpc` talks to `zephyr-wallet-rpc` for the base
 coin only and rejects the per-asset calls, reserve info and supply with a clear message. Its
 `isClosed()` understands zephyr-wallet-rpc's error code -13. Its ZMQ listener needs jeromq, which
-the AAR does not bring ([chapter 6](06-android.md#the-dependency)).
+the AAR does not bring ([chapter 11](11-the-rpc-classes.md#dependencies)).
 
 ## Both libraries in one program
 
@@ -128,7 +128,7 @@ supports both coins needs both.
 whole program, normally the highest; with Maven's nearest-wins rule you may have to pin it
 yourself. The coexistence test runs both libraries on Jackson 2.21.7, which shows that zephyr-java
 works on the 2.21 line. On Android, Jackson 2.14 and newer need minSdk 26
-([chapter 6](06-android.md#the-dependency)).
+([chapter 10](10-android.md#the-dependency)).
 
 The coexistence test lives in `src/test/java/test/TestCoexistence.java` and runs with
 `mvn -Pcoexistence test`; the default build does not compile it, because it needs monero-java on

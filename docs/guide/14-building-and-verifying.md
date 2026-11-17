@@ -1,4 +1,4 @@
-# 9. Building from source and verifying releases
+# 14. Building and verifying
 
 Every zephyr-java release is built from pinned sources with scripts in this repository, and every
 release can be rebuilt and compared. This chapter describes the pins, the build-layer patches,

@@ -7,7 +7,7 @@ syncing, listening, saving and closing.
 
 Every example uses mainnet. Zephyr's testnet and stagenet exist in the code, but in the pinned
 tree their hard-fork tables stop long before the V2 assets, so they do not behave like mainnet
-(see [chapter 8](08-known-limitations.md)).
+(see [chapter 13](13-known-limitations.md)).
 
 ## Creating a new wallet
 
@@ -81,83 +81,17 @@ ZephyrWalletFull wallet = ZephyrWalletFull.openWalletData(password, ZephyrNetwor
 
 A wallet opened this way has no path, so `save()` has nowhere to write: call `getData()` again and
 store the result whenever you would otherwise save. `changePassword` does not work for such a
-wallet; [chapter 8](08-known-limitations.md) has the details.
+wallet; [The password](#the-password) has the details.
 
-## The node connection
+## The password
 
-The core talks to a Zephyr node (`zephyrd`) over the node's RPC port. Set the connection when you
-create or open the wallet, or later:
-
-```java
-wallet.setDaemonConnection(new ZephyrRpcConnection("http://node.example:17767", user, pass));
-boolean connected = wallet.isConnectedToDaemon();
-```
-
-The user name and password are only for nodes that require RPC login. 17767 is the default RPC
-port of a mainnet node. A wallet without a
-connection still opens: it shows the state of its last sync, but cannot sync or send.
-`setProxyUri` routes the core's connection through a proxy (inherited from monero-java, meant for
-Tor); it has not been tested with Zephyr.
-
-An `http://` URI sends everything in clear text, which is fine for a node you run yourself on a
-network you trust. An `https://` URI makes the core verify the node's certificate and its host
-name. On Android the native wallet trusts the root certificates shipped in the library by default;
-`ZephyrTls` changes that ([chapter 6](06-android.md#tls-to-a-node)). On the desktop JVM nothing
-changes unless the application calls `ZephyrTls` itself: OpenSSL's default store (`/etc/ssl`)
-and `SSL_CERT_FILE` or `SSL_CERT_DIR` in the environment apply. A URI without a port gets the
-scheme's default (443 or 80), and `getDaemonConnection()` reports it with the port. When
-verification fails, `isConnectedToDaemon()` is false and calls that need the node throw "Wallet is
-not connected to daemon" with a hint at TLS; the reason is in the native log, which on Android
-does not reach logcat ([chapter 6](06-android.md#logs)).
-
-## Syncing
-
-`sync()` fetches the blocks since the wallet's height and returns when the wallet is at the tip.
-It blocks, so call it on a worker thread. `sync(listener)` adds a listener for that sync only.
-
-```java
-ZephyrSyncResult result = wallet.sync(new ZephyrWalletListener() {
-  @Override
-  public void onSyncProgress(long height, long startHeight, long endHeight, double percentDone, String message) {
-    progress.post(percentDone);   // 0.0 to 1.0
-  }
-});
-long fetched = result.getNumBlocksFetched();
-```
-
-Progress is reported once per block fetched. A wallet that is already at the tip fetches nothing
-and gets **no** progress call; do not wait for one. The same holds for a new random wallet, which
-starts at the node's height.
-
-`startSyncing()` keeps the wallet in sync in the background, every 10 seconds by default
-(`startSyncing(periodInMs)` sets another period); `stopSyncing()` ends it. Listeners added with
-`addListener` receive the events of background syncs too.
-
-## The listener
-
-`ZephyrWalletListener` has five callbacks; override the ones you need:
-
-| Callback | When | What it carries |
-|---|---|---|
-| `onSyncProgress(height, startHeight, endHeight, percentDone, message)` | once per fetched block during a sync | the block, the range, a fraction 0.0 to 1.0 |
-| `onNewBlock(height)` | once per fetched block | the block's height |
-| `onBalancesChanged(balance, unlockedBalance, assetType)` | once per asset whose balance changed | the new balance and unlocked balance of that asset |
-| `onOutputReceived(output)` | an output for the wallet appeared, in the pool or in a block | amount, account, subaddress, tx hash, height, `assetType` |
-| `onOutputSpent(output)` | an output of the wallet was spent in a block | the same fields, with the asset |
-
-Two Zephyr details matter here. First, `onBalancesChanged` names the asset; monero-java's
-two-argument version still exists but is `final` and deprecated, so a listener ported from
-monero-java that overrides it fails to compile instead of silently never being called. Second,
-**the asset of an unconfirmed output is empty.** When an incoming payment is seen in the pool,
-`onOutputReceived` arrives with `getAssetType()` equal to `""`, because the core's callback for
-pool payments carries no asset. The notification for the same output once it is in a block
-carries the asset (from the core's code; the mainnet test run did not get to observe it). Use
-`onBalancesChanged` or `getTxs()` for the asset of a pending payment. The outputs that
-`getOutputs()` returns carry no asset at all; [chapter 8](08-known-limitations.md#getoutputs-reports-no-asset)
-shows how to take it from the output's transaction.
-
-The callbacks run on a native thread; keep them short and never call the wallet from inside one
-([chapter 1](01-getting-started.md#threads)).
+**`changePassword` fails for a wallet opened from bytes.** On a wallet opened with
+`openWalletData` (or created without a path), `changePassword` throws
+`failed to read file ".keys"`: the core verifies the old password against the keys file on disk,
+which such a wallet does not have. The same call on a wallet with files is not affected. No stray
+file is written. *Status:* core behaviour (the core took only half of a later monero-cpp fix),
+confirmed on mainnet. Apps that store bytes can keep the password stable, or restore the
+wallet from its mnemonic under the new password (which costs a re-sync).
 
 ## Saving and closing
 

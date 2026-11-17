@@ -74,7 +74,7 @@ cannot fix this for the app.
 
 The app declares the `INTERNET` permission to reach a node. On API 24 and 25 the RPC classes also
 need core library desugaring in the app; the native wallet does not.
-[Chapter 6 of the user guide](docs/guide/06-android.md) has the Groovy and version catalog forms,
+[Chapter 10 of the user guide](docs/guide/10-android.md) has the Groovy and version catalog forms,
 the desugaring lines, ABIs and sizes, backup, logs and a first test.
 
 Desktop and server (Maven), the JAR with the Linux natives:
@@ -192,20 +192,20 @@ pairs, the fees and the locks.
   only, so for every current transaction the amount is 0 while `isGood()` and the confirmations are
   right. Workaround: read the amount per asset from `getTxs(hash)`, the receiver's incoming
   transfers or the sender's destinations
-  ([guide](docs/guide/08-known-limitations.md#checktxkey-returns-amount-0)).
+  ([guide](docs/guide/06-history.md#checktxkey-returns-amount-0)).
 - **`getOutputs()` reports no asset.** The core does not serialize an output's asset, so
   `getAssetType()` of every output is `null`. Workaround: take the asset from the output's
   transaction in `getTxs(hash)`
-  ([guide](docs/guide/08-known-limitations.md#getoutputs-reports-no-asset)).
+  ([guide](docs/guide/06-history.md#getoutputs-reports-no-asset)).
 - **TLS to a node: no pinning, and the host name must match.** On Android the native wallet trusts
   the root certificates shipped in the library by default; `ZephyrTls` adds the system store, user
-  certificates or an own CA ([guide](docs/guide/06-android.md#tls-to-a-node)). In `java.1` to
+  certificates or an own CA ([guide](docs/guide/03-connecting-to-a-node.md#tls-to-a-node)). In `java.1` to
   `java.3` the documented `SSL_CERT_FILE`/`SSL_CERT_DIR` setting had no effect on the Android
   images it was measured on (the emulator, API 24 and API 35; other devices were not measured), so
   `https://` nodes could not be verified there; fixed in `java.4`. On the JVM the variables worked
   and still work when `ZephyrTls` is not used.
 
-[Chapter 8 of the guide](docs/guide/08-known-limitations.md) has the full list, with code.
+[Chapter 13 of the guide](docs/guide/13-known-limitations.md) has the full list, with code.
 
 ## Documentation
 
@@ -213,13 +213,18 @@ pairs, the fees and the locks.
   Markdown in the repository, [docs/guide](docs/guide/README.md):
   [1 Getting started](docs/guide/01-getting-started.md),
   [2 Wallets](docs/guide/02-wallets.md),
-  [3 Assets and balances](docs/guide/03-assets-and-balances.md),
-  [4 Sending and converting](docs/guide/04-sending-and-converting.md),
-  [5 Reserve info and circulating supply](docs/guide/05-reserve-and-supply.md),
-  [6 Android](docs/guide/06-android.md),
-  [7 Coming from monero-java](docs/guide/07-coming-from-monero-java.md),
-  [8 Known limitations](docs/guide/08-known-limitations.md),
-  [9 Building and verifying](docs/guide/09-building-and-verifying.md).
+  [3 Connecting to a node](docs/guide/03-connecting-to-a-node.md),
+  [4 Threads and listeners](docs/guide/04-threads-and-listeners.md),
+  [5 Assets, accounts and balances](docs/guide/05-assets-and-balances.md),
+  [6 History](docs/guide/06-history.md),
+  [7 Sending](docs/guide/07-sending.md),
+  [8 Conversions and the reserve](docs/guide/08-conversions-and-the-reserve.md),
+  [9 Errors and exceptions](docs/guide/09-errors.md),
+  [10 Android](docs/guide/10-android.md),
+  [11 The RPC classes](docs/guide/11-the-rpc-classes.md),
+  [12 Coming from monero-java](docs/guide/12-coming-from-monero-java.md),
+  [13 Known limitations](docs/guide/13-known-limitations.md),
+  [14 Building and verifying](docs/guide/14-building-and-verifying.md).
 - Javadoc: on this project's GitHub Pages (the current release), and as the `-javadoc.jar` of
   every release; `mvn javadoc:javadoc` builds it from a checkout.
 - Releases: <https://github.com/loki-notfound/myzephyr-java/releases>.
@@ -249,7 +254,7 @@ git submodule update --init external/zephyr-cpp
 
 `manifest.json` records the backports tags and shas, the zephyr-java commit and its
 `SOURCE_DATE_EPOCH`, every depends package with its sha256, the build-layer patches, the shipped
-root certificates, the toolchain versions and the sha256 of every artifact. Chapter 9 of the
+root certificates, the toolchain versions and the sha256 of every artifact. Chapter 14 of the
 guide has the details and the steps to reproduce a release.
 
 ## Verifying a release

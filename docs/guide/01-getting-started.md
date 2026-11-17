@@ -12,7 +12,7 @@ There are two artifacts with the same Java classes:
 - **The JAR**, for desktop and server JVMs on Linux. It carries the native library for Linux
   `x86_64` and `arm64` as resources, so nothing else has to be installed.
 - **The AAR**, for Android apps. It carries the native library for `arm64-v8a`, `armeabi-v7a` and
-  `x86_64` under `jni/<abi>/`, and the R8 rules every app needs. [Chapter 6](06-android.md) is
+  `x86_64` under `jni/<abi>/`, and the R8 rules every app needs. [Chapter 10](10-android.md) is
   about Android.
 
 The coordinates and the repository are in the [README](../../README.md#coordinates).
@@ -47,37 +47,6 @@ RHEL 10. On an older system the library fails to load with a message about a mis
 version. A developer build made on a newer host has that host's glibc as its floor (on Debian 13,
 2.38).
 
-## Threads
-
-Two rules hold for every wallet call:
-
-- **Calls block.** `sync()`, `createTxs()`, `getTxs()` and the other wallet methods do their work
-  on the calling thread and return when the core is done. A first sync of a restored wallet can
-  take minutes, and building a transaction asks the node for decoy outputs. Never call them from
-  a thread that must stay responsive, such as Android's main thread.
-- **Listener callbacks come in on a native thread.** The core delivers notifications from its
-  own notification thread, which the JNI bridge attaches to the JVM for the call. Your listener
-  therefore runs on a thread you did not create. Hand the event over to your own thread
-  (an executor, Android's main looper) and return quickly.
-
-The second rule has a consequence that is easy to miss. During a sync, the core hands each new
-block's notifications to its notification thread and **waits for them to finish** before it goes
-on. A listener that does slow work, or that calls back into the same wallet and waits, stalls the
-sync. Keep callbacks short and never call the wallet from inside one; queue the work instead.
-
-```java
-ExecutorService events = Executors.newSingleThreadExecutor();
-wallet.addListener(new ZephyrWalletListener() {
-  @Override
-  public void onBalancesChanged(BigInteger balance, BigInteger unlockedBalance, String assetType) {
-    events.submit(() -> showBalance(assetType, balance, unlockedBalance));  // return at once
-  }
-});
-```
-
-Background syncing (`startSyncing()`) runs on a thread of the core as well; the same rules apply
-to the callbacks it triggers. [Chapter 2](02-wallets.md) has the details of syncing.
-
 ## A first program
 
 The [README's quick start](../../README.md#quick-start) is a complete program: it opens or
@@ -85,25 +54,20 @@ creates a wallet, syncs it with a progress listener, prints the balance of every
 request, builds a transfer without relaying it. It is compiled with the test sources of this
 repository (`src/test/java/examples/QuickStart.java`), so it always matches the API.
 
-The rest of this guide:
-
-- [2 Wallets](02-wallets.md): create, restore, open, connect, sync, listen, save and close.
-- [3 Assets and balances](03-assets-and-balances.md): the assets and the balance API.
-- [4 Sending and converting](04-sending-and-converting.md): transfers, conversions, fees.
-- [5 Reserve info and circulating supply](05-reserve-and-supply.md).
-- [6 Android](06-android.md).
-- [7 Coming from monero-java](07-coming-from-monero-java.md).
-- [8 Known limitations](08-known-limitations.md).
-- [9 Building from source and verifying releases](09-building-and-verifying.md).
-
-## Amounts
-
-Every amount in the API is a `BigInteger` in atomic units: 10^12 atomic units are one coin, for
-every asset (ZPH, ZSD, ZRS, ZYS alike). `ZephyrUtils.toAtomicUnits(double)` and
-`ZephyrUtils.fromAtomicUnits(BigInteger)` convert, but they go through `double`; for user input
-and display, `BigDecimal` is exact:
+Before you build the wallet into the app, check that the library loads and works on your devices.
+`src/test/java/examples/GuideFirstProgram.java` is plain Java, compiled with this project's tests:
 
 ```java
-BigInteger atomic = new BigDecimal("1.5").movePointRight(12).toBigIntegerExact();
-String shown = new BigDecimal(atomic, 12).toPlainString();  // "1.500000000000"
+// loads the native library, creates an offline wallet in memory and returns its primary address
+public static String smokeTest() {
+  ZephyrUtils.loadNativeLibrary();
+  ZephyrWalletFull wallet = ZephyrWalletFull.createWallet(new ZephyrWalletConfig()
+      .setNetworkType(ZephyrNetworkType.MAINNET)
+      .setPassword("smoke-test"));  // no path and no node: nothing touches storage or the network
+  try {
+    return wallet.getPrimaryAddress();
+  } finally {
+    wallet.close();
+  }
+}
 ```

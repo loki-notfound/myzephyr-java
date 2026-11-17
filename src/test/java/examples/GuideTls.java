@@ -2,31 +2,14 @@ package examples;
 
 import java.io.File;
 import zephyr.common.ZephyrTls;
-import zephyr.common.ZephyrUtils;
-import zephyr.daemon.model.ZephyrNetworkType;
-import zephyr.wallet.ZephyrWalletFull;
-import zephyr.wallet.model.ZephyrWalletConfig;
 
 /**
- * The code of chapter 6 of the user guide (docs/guide/06-android.md): the first smoke test and the
- * TLS configurations, compiled with the tests so that the guide's code keeps matching the API.
- * Plain Java, no Android classes: an app passes its own directories (getFilesDir()) and calls the
- * methods off the main thread. The tests do not run them.
+ * The TLS configurations of the user guide (docs/guide/03-connecting-to-a-node.md, section "TLS to a
+ * node"), compiled with the tests so that the guide's code keeps matching the API. Plain Java, no
+ * Android classes: an app passes its own directories (getFilesDir()) and calls the methods off the
+ * main thread. The tests do not run them.
  */
-public class GuideChapter6 {
-
-  // loads the native library, creates an offline wallet in memory and returns its primary address
-  public static String smokeTest() {
-    ZephyrUtils.loadNativeLibrary();
-    ZephyrWalletFull wallet = ZephyrWalletFull.createWallet(new ZephyrWalletConfig()
-        .setNetworkType(ZephyrNetworkType.MAINNET)
-        .setPassword("smoke-test"));  // no path and no node: nothing touches storage or the network
-    try {
-      return wallet.getPrimaryAddress();
-    } finally {
-      wallet.close();
-    }
-  }
+public class GuideTls {
 
   // TLS: a node whose certificate comes from your own CA, or a self-signed node certificate whose
   // name matches the node's host name: trust it in addition to the shipped root certificates

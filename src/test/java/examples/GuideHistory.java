@@ -17,10 +17,11 @@ import zephyr.wallet.model.ZephyrOutputWallet;
 import zephyr.wallet.model.ZephyrTxWallet;
 
 /**
- * The workarounds of chapter 8 of the user guide (docs/guide/08-known-limitations.md), compiled
- * with the tests so that the guide's code keeps matching the API. The tests do not run it.
+ * The workarounds of the user guide's history chapter (docs/guide/06-history.md, sections
+ * "checkTxKey returns amount 0" and "getOutputs() reports no asset"), compiled with the tests so
+ * that the guide's code keeps matching the API. The tests do not run it.
  */
-public class GuideChapter8 {
+public class GuideHistory {
 
   // checkTxKey returns amount 0: the receiver checks the key, then reads the amount from its own history
   static Map<String, BigInteger> receivedPerAsset(ZephyrWallet wallet, String txHash, String txKey, String address, long minConfirmations) {

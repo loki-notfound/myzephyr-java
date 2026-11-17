@@ -1,4 +1,4 @@
-# 3. Assets and balances
+# 5. Assets, accounts and balances
 
 A Zephyr wallet holds several assets at once, so every balance in zephyr-java is a balance **per
 asset**. This chapter names the assets, shows the four shapes of the balance API and explains
@@ -27,6 +27,18 @@ shows the four V2 assets; the V1 entries matter only for the history.
 In the API the asset is always an open `String`, never an enum. The core may report names this
 library has no constant for, and they pass through unchanged. Amounts are `BigInteger` atomic
 units, 10^12 per coin, the same for every asset.
+
+## Amounts
+
+Every amount in the API is a `BigInteger` in atomic units: 10^12 atomic units are one coin, for
+every asset (ZPH, ZSD, ZRS, ZYS alike). `ZephyrUtils.toAtomicUnits(double)` and
+`ZephyrUtils.fromAtomicUnits(BigInteger)` convert, but they go through `double`; for user input
+and display, `BigDecimal` is exact:
+
+```java
+BigInteger atomic = new BigDecimal("1.5").movePointRight(12).toBigIntegerExact();
+String shown = new BigDecimal(atomic, 12).toPlainString();  // "1.500000000000"
+```
 
 ## ZephyrBalance
 
@@ -91,7 +103,7 @@ The **balance** counts everything the wallet owns, including funds that are not 
   on the mainnet test run the waits until the change of a transfer and the output of a conversion
   were spendable were 982, 1,203 and 1,684 seconds.
 - **Converted funds** follow the same rule: the ZRS from a mint was spendable 10 blocks after the
-  mint was mined. [Chapter 4](04-sending-and-converting.md) covers conversions.
+  mint was mined. [Chapter 8](08-conversions-and-the-reserve.md) covers conversions.
 
 Funds in the pool (sent to you but not yet in a block) count in the balance, not in the unlocked
 balance. On the mainnet test run a receiving wallet showed `onBalancesChanged` with
@@ -111,4 +123,4 @@ Two ways work together:
 
 The listener's numbers are the wallet-level amounts of that asset, like `getBalance().get(asset)`.
 Do not use the asset of `onOutputReceived` for a pending payment: it is empty in the pool
-([chapter 2](02-wallets.md#the-listener)).
+([chapter 4](04-threads-and-listeners.md#outputs-in-the-pool-carry-no-asset)).
