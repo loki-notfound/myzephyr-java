@@ -245,7 +245,9 @@ released JAR, such a `close()` crashed the process in 4 of 4 runs. With backgrou
 | `getPrivateViewKey()`, `getPublicViewKey()` | the view keys |
 | `getPrivateSpendKey()`, `getPublicSpendKey()` | the spend keys; the private one is `null` for a view-only wallet (observed on 2026-11-17) |
 
-Mainnet addresses start with `ZEPHYR`. Check an address the user enters before you send to it:
+On mainnet, primary addresses start with `ZEPHYR`, subaddresses with `ZEPHs` and integrated
+addresses with `ZEPHii` (the prefixes of the pinned core). Check an address the user enters with
+`isValidAddress`, not by its prefix, before you send to it:
 
 ```java examples/GuideWallets.java
 return ZephyrUtils.isValidAddress(recipient, ZephyrNetworkType.MAINNET);

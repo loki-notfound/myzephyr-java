@@ -103,7 +103,8 @@ but reads something the Zephyr core does not deliver:
   ([getOutputs() reports no asset](06-history.md#getoutputs-reports-no-asset)).
 
 **Addresses and constants.** Address decoding stays pure Java (no native library needed) but
-knows Zephyr's prefixes, which are multi-byte varints: mainnet addresses start with `ZEPHYR`.
+knows Zephyr's prefixes, which are multi-byte varints: on mainnet, primary addresses start with
+`ZEPHYR`, subaddresses with `ZEPHs` and integrated addresses with `ZEPHii`.
 `ZephyrNetworkType` carries Zephyr's codes. `ZephyrUtils.RING_SIZE` is 16, the network rule of the
 Zephyr core, not Monero's 12. Keccak-256 and hex are the library's own code (`Keccak256`,
 `GenUtils`), so there is no dependency on Bouncy Castle or Apache commons-codec.

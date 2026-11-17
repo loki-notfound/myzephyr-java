@@ -169,6 +169,6 @@ public static void main(String[] args) {
 }
 ```
 
-A mainnet address (it starts with `ZEPHYR`) means that the library loaded and the core created a
+A mainnet primary address (it starts with `ZEPHYR`) means that the library loaded and the core created a
 wallet. On Android, call `smokeTest()` off the main thread
 ([A first test on a device](10-android.md#a-first-test-on-a-device)).

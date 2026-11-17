@@ -33,8 +33,8 @@ neither, so on mainnet only the ten pairs above work.
 The ratio rules depend on the state of the reserve, which changes with the price. A reserve ratio
 of 4.0 (400.00%) is the floor for `MINT_STABLE` and `REDEEM_RESERVE`, and 8.0 (800.00%) the
 ceiling for `MINT_RESERVE`. On 2026-11-06 the reserve ratio was 2.64, so `MINT_STABLE` and
-`REDEEM_RESERVE` were refused; `MINT_RESERVE`, `REDEEM_STABLE` and the yield pairs could be
-built. On 2026-11-17 it was 1.849 (moving average 1.986), and the core refused the same two
+`REDEEM_RESERVE` were refused; `MINT_RESERVE`, `REDEEM_STABLE` and the yield pairs were allowed by
+the ratio rules. On 2026-11-17 it was 1.849 (moving average 1.986), and the core refused the same two
 pairs by their ratio.
 
 The chain checks the ratio **after** the conversion, with the conversion's own amounts added. A

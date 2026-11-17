@@ -94,7 +94,8 @@ Castle and no Apache commons-codec. jeromq is compile-only
 > that runs on Android below API 26. Gradle does not report a conflict when your app or another
 > library asks for Jackson 2.14 or newer. The app then fails at run time on API 24 and 25.
 
-Earlier 2.13 releases call `Method.getParameterCount()`, which API 24 and 25 lack. Gradle resolves
+Within the 2.13 line, releases before 2.13.5 call `Method.getParameterCount()`, which Android has
+only from API 26. Gradle resolves
 the highest version for the whole app, zephyr-java included, and the build succeeds. On API 26 and
 newer that is fine: zephyr-java was tested on Jackson 2.21.7 on the JVM, in the coexistence test.
 Check what the app really gets:
@@ -222,11 +223,14 @@ backup can open the wallet.
 
 **How to keep wallet data out.** Whether wallet data belongs in a backup is the app's choice:
 
-- `android:allowBackup="false"` in the manifest turns the cloud backup off; for an app that targets
-  Android 12 or newer it does not stop a device-to-device transfer;
-- `android:dataExtractionRules` (Android 12 and newer) and `android:fullBackupContent` (Android 11
-  and lower) include or exclude single files and directories. They do so for the cloud backup and
-  the device-to-device transfer separately;
+- `android:allowBackup="false"` in the manifest turns the cloud backup off. For an app that targets
+  Android 12 or newer, on devices of some manufacturers, it does not stop a device-to-device
+  transfer;
+- `android:dataExtractionRules` (Android 12 and newer, for apps that target it) includes or
+  excludes single files and directories, for the cloud backup and the device-to-device transfer
+  separately;
+- `android:fullBackupContent` (Android 11 and lower) includes or excludes them with one set of
+  rules; a rule can require a device-to-device transfer or client-side encryption;
 - files in `context.getNoBackupFilesDir()` are never backed up.
 
 ## Lifecycle and threads
@@ -280,7 +284,7 @@ the main thread and log the result:
 new Thread(() -> Log.i("zephyr", "smoke test: " + GuideFirstProgram.smokeTest())).start();
 ```
 
-A mainnet address (it starts with `ZEPHYR`) in logcat means that the device loaded the library of
+A mainnet primary address (it starts with `ZEPHYR`) in logcat means that the device loaded the library of
 its ABI and the core created a wallet.
 
 ## The shipped R8 rules

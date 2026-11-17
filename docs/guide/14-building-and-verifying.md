@@ -264,5 +264,5 @@ builds and checks the site too (job `java`).
 The look comes from the lateo house style, `@lateo/style` 0.1.0. `site/assets/` holds unchanged
 copies of its stylesheets `content.css` and `print.css` (BSD 3-Clause, `LICENSE-style.txt`) and of
 its favicons; `STYLE-VERSION` names the version. `site/assets/site.css` is this repository's own,
-under its MIT licence. The lateo name and the favicons are under neither licence: `NOTICE.txt` and
-`TRADEMARKS.txt` state the terms.
+under its MIT licence. The lateo name and the favicons are under neither licence: `site/assets/NOTICE.txt` and
+`site/assets/TRADEMARKS.txt` state the terms.
