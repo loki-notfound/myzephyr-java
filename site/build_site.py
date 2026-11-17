@@ -226,7 +226,12 @@ def guide_body(page, by_rel):
 
     def resolve_link(href):
         if href.startswith(PAGES_URL + "/javadoc/"):
-            return rel_link(page["out"], href[len(PAGES_URL) + 1:])
+            # a directory of the Javadoc is linked through its index.html: the site is also read
+            # from files, and the checker resolves every link to a file
+            path, hashmark, frag = href[len(PAGES_URL) + 1:].partition("#")
+            if path.endswith("/"):
+                path += "index.html"
+            return rel_link(page["out"], path) + hashmark + frag
         if href.startswith("https://"):
             return href
         if re.match(r"^[a-z][a-z0-9+.-]*:", href, re.I) or href.startswith("/"):
