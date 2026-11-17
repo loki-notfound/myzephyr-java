@@ -34,6 +34,8 @@ Status words:
 |---|---|---|
 | `close()` from another thread during `sync()` crashes the process | observed on 2026-11-17 with the released JAR, 4 of 4 runs; open | [Closing a wallet that syncs](04-threads-and-listeners.md#closing-a-wallet-that-syncs) |
 | `close()` while background syncing scans leaves a native thread attached; the JVM does not exit, also with `stopSyncing()` right before | observed on 2026-11-17 with the released JAR, 3 of 3 and 2 of 2 runs; open | [Closing a wallet that syncs](04-threads-and-listeners.md#closing-a-wallet-that-syncs) |
+| no call reports whether a background scan is still running; `stopSyncing()` lets the batch in progress finish | read in the code; open | [Closing a wallet that syncs](04-threads-and-listeners.md#closing-a-wallet-that-syncs) |
+| `onOutputReceived` and `onOutputSpent` repeat at confirmation and unlock; the spent notification at unlock is a summary | by design, in the Javadoc and the core's code | [The five callbacks](04-threads-and-listeners.md#the-five-callbacks) |
 | an exception from a callback during background syncing leaves a native thread attached; the JVM does not exit | observed on 2026-11-17 with the released JAR, 3 of 3 runs; open | [An exception thrown in a callback](04-threads-and-listeners.md#an-exception-thrown-in-a-callback) |
 | an exception from a callback during `sync()` is printed and swallowed, and skips the rest of that block's notifications | observed on 2026-11-17 | [An exception thrown in a callback](04-threads-and-listeners.md#an-exception-thrown-in-a-callback) |
 | calls from several threads on one wallet are not known to be safe | not established | [Calls from several threads](04-threads-and-listeners.md#calls-from-several-threads) |

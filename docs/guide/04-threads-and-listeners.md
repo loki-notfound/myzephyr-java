@@ -59,8 +59,14 @@ of the core as well; the same rules apply to the callbacks it triggers.
 | `onSyncProgress(height, startHeight, endHeight, percentDone, message)` | once per fetched block during a sync | the block, the range, a fraction 0.0 to 1.0 |
 | `onNewBlock(height)` | once per fetched block | the block's height |
 | `onBalancesChanged(balance, unlockedBalance, assetType)` | once per asset whose balance changed | the new balance and unlocked balance of that asset |
-| `onOutputReceived(output)` | an output for the wallet appeared, in the pool or in a block | amount, account, subaddress, tx hash, height, `assetType` |
-| `onOutputSpent(output)` | an output of the wallet was spent in a block | the same fields, with the asset |
+| `onOutputReceived(output)` | an output for the wallet appeared in the pool, in a block, and again when it unlocked | amount, account, subaddress, tx hash, height, `assetType` |
+| `onOutputSpent(output)` | an output of the wallet was spent in a block, and again when that transaction unlocked | the same fields, with the asset |
+
+**The output callbacks repeat.** By its Javadoc, `onOutputReceived` comes three times for one
+output (in the pool, confirmed, unlocked) and `onOutputSpent` twice (confirmed, unlocked). In the
+core's code, the spent notification at unlock is one summary input whose amount is the outgoing
+amount plus the fee, not the real inputs. Count each output once, keyed by transaction hash and
+output, and do not add up the notifications.
 
 `onBalancesChanged` names the asset. monero-java's two-argument version still exists but is
 `final` and deprecated. A listener ported from monero-java that overrides it fails to compile
@@ -75,8 +81,7 @@ confirmation goes through a callback that carries the asset (from the core's cod
 test run did not get to observe it).
 
 Use `onBalancesChanged` (which names the asset) or `getTxs()` (which reports the right asset for
-the same pool transfer). ZephyrProtocol's own Zephyr wallets do the same and leave
-`onOutputReceived` unused. *Status:* core behaviour, not a security matter, so it stays;
+the same pool transfer). *Status:* core behaviour, not a security matter, so it stays;
 documented in the Javadoc of `onOutputReceived`. Observed on mainnet on 2026-11-07.
 
 The outputs that `getOutputs()` returns carry no asset at all;
@@ -142,8 +147,8 @@ shut down.
 
 > [!CAUTION]
 > **Never close a wallet while it syncs.** Observed on 2026-11-17 with the released JAR: a
-> `close()` during a `sync()` on another thread crashed the process in 4 of 4 runs. Let `sync()` return, and let background syncing finish its scan, before you call
-> `close()`.
+> `close()` during a `sync()` on another thread crashed the process in 4 of 4 runs. Let `sync()`
+> return, and let background syncing finish its scan, before you call `close()`.
 
 What the runs of 2026-11-17 with the released JAR showed:
 
@@ -163,11 +168,17 @@ What the runs of 2026-11-17 with the released JAR showed:
 Clean in those runs:
 
 - `close()` after `sync()` had returned;
-- `close()` while background syncing was idle at the node's height;
-- `close()` 3 s after `stopSyncing()`, in 4 of 4 runs, two of them during a busy scan.
+- `close()` 3 s after `stopSyncing()`, in 4 of 4 runs. In the two runs during a busy scan, the scan
+  stopped far below the node's height (at about 904,100 and 903,101, with the node near 909,840).
 
-The 3 s are what was run, not a safe interval. How long a scan goes on after `stopSyncing()`
-depends on the batch and the node.
+The 3 s are what was run, not a safe interval. In one earlier run with the developer build,
+`close()` while background syncing was idle at the node's height was clean as well.
+
+What the code shows (read in the code, not run): `stopSyncing()` only clears a flag. The core's
+refresh checks that flag once per batch of blocks, so the batch in progress still runs. A refresh
+that starts at the same moment can even run in full. Java's `close()` marks the wallet closed
+before the core stops and joins its sync thread. So the callbacks of a batch still in progress
+fail with "Wallet is closed", as the runs above showed.
 
 Not shown by those runs: a close that coincides with a background refresh of a synced wallet when
 a new block arrives. That the crash is always a segmentation fault is not shown either. A crash
@@ -178,12 +189,30 @@ easy: when every call goes through the same single-thread executor, `close()` ca
 `sync()` runs:
 
 ```java examples/GuideThreads.java
-return walletThread.submit(() -> wallet.close(true));  // runs after a sync() submitted earlier has returned
+return walletThread.submit(() -> {
+  wallet.save();   // runs after a sync() submitted earlier has returned
+  wallet.close();
+});
 ```
 
-For background syncing, call `stopSyncing()` first, and close only when the scan has stopped. The
-wallet is then at the node's height, and callbacks no longer arrive. No interval is known that is safe in
-every case.
+**For background syncing there is no clean signal.** `2.3.0-sec.2-java.4` has no call that reports
+whether a scan is still running, and a stopped scan can end far below the node's height. The most
+defensible workaround the facts support: call `stopSyncing()`, wait until no callback has arrived
+for a while, then save and close. A listener added before `startSyncing()` notes the time of the
+last callback:
+
+```java examples/GuideThreads.java
+wallet.stopSyncing();  // returns at once; the batch in progress goes on
+while (System.currentTimeMillis() - lastCallbackMillis.get() < quietMillis) {
+  Thread.sleep(100);   // no call reports whether a scan still runs, so wait for quiet
+}
+wallet.save();
+wallet.close();
+```
+
+No quiet interval is known to be safe. A scan can pause between batches while it fetches blocks
+from the node, so a short interval can still meet a running batch. This is a workaround, not a
+guarantee.
 
 ## Calls from several threads
 
@@ -209,7 +238,8 @@ For `2.3.0-sec.2-java.4`, none of these was established:
 - in particular, writes (`createTxs`, `setTxNote`, `save`, `moveTo`, creating accounts) next to
   other calls, and `close()` next to reads;
 - what a listener that keeps throwing does, and whether a throw skips other listeners;
-- how long a scan continues after `stopSyncing()`, and so when a `close()` after it is safe;
+- a reliable way to know that a background scan has stopped, and so when a `close()` after
+  `stopSyncing()` is safe;
 - what a `close()` during a background refresh of a synced wallet does;
 - how any of this behaves on Android (ART, and CheckJNI in debuggable apps).
 

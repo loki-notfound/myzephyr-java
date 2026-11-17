@@ -4,6 +4,7 @@ import java.math.BigInteger;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicLong;
 import zephyr.wallet.ZephyrWalletFull;
 import zephyr.wallet.model.ZephyrWalletListener;
 
@@ -41,7 +42,32 @@ public class GuideThreads {
   // one thread per wallet: every call goes through it, so close() never runs during sync();
   // background syncing must have been stopped, and its scan finished, before
   static Future<?> closeOnWalletThread(ExecutorService walletThread, ZephyrWalletFull wallet) {
-    return walletThread.submit(() -> wallet.close(true));  // runs after a sync() submitted earlier has returned
+    return walletThread.submit(() -> {
+      wallet.save();   // runs after a sync() submitted earlier has returned
+      wallet.close();
+    });
+  }
+
+  // a listener that notes when the last callback came; add it before startSyncing()
+  static AtomicLong watchCallbacks(ZephyrWalletFull wallet) {
+    AtomicLong lastCallbackMillis = new AtomicLong(System.currentTimeMillis());
+    wallet.addListener(new ZephyrWalletListener() {
+      @Override
+      public void onNewBlock(long height) {
+        lastCallbackMillis.set(System.currentTimeMillis());
+      }
+    });
+    return lastCallbackMillis;
+  }
+
+  // background syncing, a workaround: stop it, wait until no callback has come for a while, then close
+  static void stopAndClose(ZephyrWalletFull wallet, AtomicLong lastCallbackMillis, long quietMillis) throws InterruptedException {
+    wallet.stopSyncing();  // returns at once; the batch in progress goes on
+    while (System.currentTimeMillis() - lastCallbackMillis.get() < quietMillis) {
+      Thread.sleep(100);   // no call reports whether a scan still runs, so wait for quiet
+    }
+    wallet.save();
+    wallet.close();
   }
 
   private static void showBalance(String assetType, BigInteger balance, BigInteger unlockedBalance) {
