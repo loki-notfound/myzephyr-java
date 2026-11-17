@@ -48,8 +48,9 @@ Those runs took place from 2026-11-06 to 2026-11-10, during the work on the rele
 `2.3.0-sec.2-java.4`. Each such statement names its date where it matters.
 
 Statements marked "observed on 2026-11-17" come from runs against a mainnet node on Linux `x86_64`
-(Debian 13, OpenJDK 21). They used a developer build of the `2.3.0-sec.2-java.4` sources, not the
-library of the released JAR. None of those runs was made on Android. One run is an observation,
+(Debian 13, OpenJDK 21). Most used a developer build of the `2.3.0-sec.2-java.4` sources. Those
+marked "with the released JAR" used `zephyr-java-2.3.0-sec.2-java.4.jar` and its own native
+library. None of those runs was made on Android. One run is an observation,
 not a guarantee: a run that found no failure proves no safety.
 
 Where a fact is not known, the guide says so.

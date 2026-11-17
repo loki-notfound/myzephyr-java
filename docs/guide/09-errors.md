@@ -36,8 +36,8 @@ rethrow it as a `ZephyrError`, so an `OutOfMemoryError` passes through unchanged
 
 **Three calls do not wrap.** `openWallet` from a path, `openWalletData` and `createWallet` for a
 random wallet or one from a mnemonic pass the core's failure on as it comes (read in the source).
-Observed on 2026-11-17: `openWallet` with a wrong password threw `java.lang.Exception` with the
-message "invalid password", not a `ZephyrError`. Catch `Exception` around these calls
+Observed on 2026-11-17, also with the released JAR: `openWallet` with a wrong password threw
+`java.lang.Exception` with the message "invalid password", not a `ZephyrError`. Catch `Exception` around these calls
 ([Opening wallet files](02-wallets.md#opening-wallet-files)). The other failures of those calls
 were not observed.
 
@@ -127,6 +127,7 @@ it in the app's private storage, out of backups and crash reports, and switch it
 per scanned block: about 1.1 MB for 7,700 blocks. The line was "wait should have been called
 before waiter dtor - waiting now". Without a listener there were 4 such lines.
 
-These runs used a developer build of the `2.3.0-sec.2-java.4` sources on Linux. Levels above 1 were
-not tried. On Android, `configureNativeLogging` has not been tried; nothing the core logs appears
+These runs used a developer build of the `2.3.0-sec.2-java.4` sources on Linux. A level-0 log of the
+released JAR held the same lines on 2026-11-17: the primary address, the wallet path, and the
+amounts and hashes of the outputs. Levels above 1 were not tried. On Android, `configureNativeLogging` has not been tried; nothing the core logs appears
 in logcat ([Logs](10-android.md#logs)).

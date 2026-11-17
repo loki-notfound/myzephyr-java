@@ -128,8 +128,8 @@ if (ZephyrWalletFull.walletExists(path)) {
 The network type must match the one the wallet was created with. A path without a wallet throws
 a `ZephyrError` "Wallet does not exist at path: " with the path.
 
-**A wrong password is not a `ZephyrError`.** Observed on 2026-11-17: `openWallet` with a wrong
-password threw `java.lang.Exception` with the message "invalid password". A `catch (ZephyrError
+**A wrong password is not a `ZephyrError`.** Observed on 2026-11-17, also with the released JAR:
+`openWallet` with a wrong password threw `java.lang.Exception` with the message "invalid password". A `catch (ZephyrError
 e)` does not catch it; catch `Exception` around `openWallet`
 ([Errors and exceptions](09-errors.md)).
 
@@ -223,8 +223,9 @@ try {
 }
 ```
 
-Never call `close()` while another thread may be inside `sync()`, and end background syncing
-before you close. Observed on 2026-11-17, closing during a sync crashed the JVM
+Never call `close()` while another thread may be inside `sync()`. Observed on 2026-11-17 with the
+released JAR, such a `close()` crashed the process in 4 of 4 runs. With background syncing,
+`stopSyncing()` alone is not enough: let its scan stop before you close
 ([Closing a wallet that syncs](04-threads-and-listeners.md#closing-a-wallet-that-syncs)).
 
 ## Addresses and keys

@@ -38,12 +38,10 @@ public class GuideThreads {
     });
   }
 
-  // one thread per wallet: every call goes through it, so close() never runs during sync()
+  // one thread per wallet: every call goes through it, so close() never runs during sync();
+  // background syncing must have been stopped, and its scan finished, before
   static Future<?> closeOnWalletThread(ExecutorService walletThread, ZephyrWalletFull wallet) {
-    return walletThread.submit(() -> {
-      wallet.stopSyncing();  // first end background syncing
-      wallet.close(true);    // runs after a sync() submitted earlier has returned
-    });
+    return walletThread.submit(() -> wallet.close(true));  // runs after a sync() submitted earlier has returned
   }
 
   private static void showBalance(String assetType, BigInteger balance, BigInteger unlockedBalance) {

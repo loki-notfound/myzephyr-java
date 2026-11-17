@@ -6,7 +6,7 @@ syncs, calls from several threads, and what is not known.
 
 The blocks marked "Java, compiled" in this chapter come from
 `src/test/java/examples/GuideThreads.java`. Statements marked "observed on 2026-11-17" come from
-runs on Linux `x86_64`, not on Android
+runs on Linux `x86_64`, some with the released JAR, none on Android
 ([Where the statements come from](README.md#where-the-statements-come-from)).
 
 ## Calls block
@@ -85,28 +85,32 @@ The outputs that `getOutputs()` returns carry no asset at all;
 ## An exception thrown in a callback
 
 > [!CAUTION]
-> **Catch every exception inside a callback.** Observed on 2026-11-17: an exception that left a
-> callback during background syncing left a native thread attached to the JVM. The JVM then did
-> not exit when `main` returned. Wrap the body of every callback in `try` and `catch`.
+> **Catch every exception inside a callback.** Observed on 2026-11-17 with the released JAR, in 3
+> of 3 runs: an exception that left a callback during background syncing left a native thread
+> attached to the JVM. The JVM then never exited. Wrap the body of every callback in `try` and
+> `catch`.
 
 What the runs of 2026-11-17 showed, for a listener that threw a `RuntimeException` from
 `onSyncProgress`, `onNewBlock` or `onBalancesChanged` once:
 
 - **During a foreground `sync()`** the exception did not reach the caller. `sync()` returned
   normally, the scan finished, and later callbacks kept arriving. The exception's stack trace was
-  printed to stderr ("Exception in thread "main" ..."), and the JVM exited normally.
+  printed to stderr ("Exception in thread "main" ..."), and the JVM exited normally. These runs
+  used the developer build.
 - **During background syncing** the sync was not stopped either: it reached the node's height and
   later callbacks arrived. But the native thread that delivered the failing callback stayed
-  attached to the JVM as a non-daemon thread after `stopSyncing()` and `close()`. In all four such
-  runs the JVM did not exit when `main` returned.
+  attached to the JVM as a non-daemon thread, through `stopSyncing()` and `close()`. The JVM never
+  exited when `main` returned. That happened in 3 of 3 runs with the released JAR, one per callback
+  type, and in 4 of 4 with the developer build. From the throw on, every later callback came on that same
+  thread.
 - **The rest of that block's notifications was skipped.** A throw from `onNewBlock` cost that
   block's `onSyncProgress`. A throw from `onBalancesChanged` left the core's remembered balance
   unchanged, so the change was reported once more.
 - A throw from `onBalancesChanged` raised during an incoming output also printed "Error processing
   confirmed output received: " with the message on stdout.
-- With `-Xcheck:jni` the JVM printed one warning per run and no fatal error. The warning was "WARNING
-  in native method: JNI call made without checking exceptions when required to from
-  CallObjectMethodV".
+- With `-Xcheck:jni` (developer build) the JVM printed one warning per run and no fatal error. The
+  warning was "WARNING in native method: JNI call made without checking exceptions when required
+  to from CallObjectMethodV".
 
 When the native log is switched on, it records the message after "Exception occurred in Java: "
 and "Exception in threadpool job: " ([The native log](09-errors.md#the-native-log)).
@@ -137,42 +141,49 @@ shut down.
 ## Closing a wallet that syncs
 
 > [!CAUTION]
-> **Never close a wallet while it syncs.** Observed on 2026-11-17: `close()` from a second thread
-> while another thread was inside `sync()` crashed the JVM in 4 of 4 runs. Call `stopSyncing()`,
-> let any running `sync()` return, then call `close()`.
+> **Never close a wallet while it syncs.** Observed on 2026-11-17 with the released JAR: a
+> `close()` during a `sync()` on another thread crashed the process in 4 of 4 runs. Let `sync()` return, and let background syncing finish its scan, before you call
+> `close()`.
 
-What the runs of 2026-11-17 showed:
+What the runs of 2026-11-17 with the released JAR showed:
 
-- **During a foreground `sync()`**, `close()` from a second thread aborted the process (exit code
-  134, SIGABRT). It did so right after the first callback and halfway through a scan alike. The JVM writes
-  no `hs_err` file for an abort. The last line was:
+- **During a foreground `sync()`**, `close()` from a second thread returned after a few
+  milliseconds. The process then died with a segmentation fault in the native wallet code (exit
+  status 134). That happened right after the first callback and halfway through a scan alike. The crash point
+  differed in each run. A developer build of the same sources aborted with an assertion instead.
+- **While background syncing was scanning**, `close()` returned (after 58 to 142 ms) in 3 of 3
+  runs. While it waited, the callbacks delivered meanwhile failed in the Java bridge with a
+  `ZephyrError` "Wallet is closed". Each failure printed `Exception in thread "Thread-<n>" Wallet
+  is closed` on stderr, hundreds of times per run. The JVM did not crash, but a native thread stayed
+  attached and the JVM never exited.
+- **`stopSyncing()` right before `close()` did not help** during a busy scan (2 of 2 runs hung in
+  the same way). `stopSyncing()` returns at once, but the batch of blocks in progress is still
+  processed. 401 and 1,980 callbacks arrived in the 3 s after it returned.
 
-```text
-java: /usr/include/boost/thread/pthread/mutex.hpp:56: boost::mutex::~mutex(): Assertion `!posix::pthread_mutex_destroy(&m)' failed.
-```
+Clean in those runs:
 
-- **While background syncing was scanning**, `close()` returned (in 208 ms and 87 ms), but the core
-  kept delivering callbacks. Each one failed in the Java bridge with a `ZephyrError` "Wallet is
-  closed". Each failure printed `Exception in thread "Thread-<n>" Wallet is closed` on stderr: 989
-  and 329 times in the two runs. The JVM did not crash, but a native thread stayed attached and the JVM did not exit.
-- **While background syncing was idle**, `close()` returned at once and the JVM exited normally.
-  The wallet was synced and no new block arrived in 7 s. A `close()` after a finished scan
-  behaved the same.
+- `close()` after `sync()` had returned;
+- `close()` while background syncing was idle at the node's height;
+- `close()` 3 s after `stopSyncing()`, in 4 of 4 runs, two of them during a busy scan.
 
-Not shown by those runs: a close that coincides with a background refresh of a synced wallet,
-which may behave like the scanning case. Whether `stopSyncing()` waits for a refresh that is
-running was not tried either. So the rule above is the best advice known, not a tested
-guarantee.
+The 3 s are what was run, not a safe interval. How long a scan goes on after `stopSyncing()`
+depends on the batch and the node.
 
-One thread per wallet makes the foreground part of the rule easy. When every call to the wallet
-goes through the same single-thread executor, `close()` cannot run while `sync()` runs:
+Not shown by those runs: a close that coincides with a background refresh of a synced wallet when
+a new block arrives. That the crash is always a segmentation fault is not shown either. A crash
+point that differs per run can also corrupt memory without a crash.
+
+So, for a foreground sync, let `sync()` return before `close()`. One thread per wallet makes that
+easy: when every call goes through the same single-thread executor, `close()` cannot run while
+`sync()` runs:
 
 ```java examples/GuideThreads.java
-return walletThread.submit(() -> {
-  wallet.stopSyncing();  // first end background syncing
-  wallet.close(true);    // runs after a sync() submitted earlier has returned
-});
+return walletThread.submit(() -> wallet.close(true));  // runs after a sync() submitted earlier has returned
 ```
+
+For background syncing, call `stopSyncing()` first, and close only when the scan has stopped. The
+wallet is then at the node's height, and callbacks no longer arrive. No interval is known that is safe in
+every case.
 
 ## Calls from several threads
 
@@ -198,7 +209,7 @@ For `2.3.0-sec.2-java.4`, none of these was established:
 - in particular, writes (`createTxs`, `setTxNote`, `save`, `moveTo`, creating accounts) next to
   other calls, and `close()` next to reads;
 - what a listener that keeps throwing does, and whether a throw skips other listeners;
-- whether `stopSyncing()` waits for a background refresh that is running;
+- how long a scan continues after `stopSyncing()`, and so when a `close()` after it is safe;
 - what a `close()` during a background refresh of a synced wallet does;
 - how any of this behaves on Android (ART, and CheckJNI in debuggable apps).
 
