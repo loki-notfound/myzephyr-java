@@ -2,11 +2,9 @@ package examples;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import zephyr.wallet.ZephyrWallet;
 import zephyr.wallet.model.ZephyrCheckTx;
 import zephyr.wallet.model.ZephyrDestination;
@@ -14,12 +12,15 @@ import zephyr.wallet.model.ZephyrIncomingTransfer;
 import zephyr.wallet.model.ZephyrOutgoingTransfer;
 import zephyr.wallet.model.ZephyrOutputQuery;
 import zephyr.wallet.model.ZephyrOutputWallet;
+import zephyr.wallet.model.ZephyrTransfer;
+import zephyr.wallet.model.ZephyrTransferQuery;
+import zephyr.wallet.model.ZephyrTxQuery;
 import zephyr.wallet.model.ZephyrTxWallet;
 
 /**
- * The workarounds of the user guide's history chapter (docs/guide/06-history.md, sections
- * "checkTxKey returns amount 0" and "getOutputs() reports no asset"), compiled with the tests so
- * that the guide's code keeps matching the API. The tests do not run it.
+ * The history of the user guide (docs/guide/06-history.md): queries, notes and the workarounds of
+ * the sections "checkTxKey returns amount 0" and "getOutputs() reports no asset", compiled with
+ * the tests so that the guide's code keeps matching the API. The tests do not run it.
  */
 public class GuideHistory {
 
@@ -52,32 +53,46 @@ public class GuideHistory {
     return sent;
   }
 
-  // getOutputs() reports no asset: take it from the output's transaction (the rule of ZephyrWallet.getOutputAssetType, for earlier releases)
-  static String assetOf(ZephyrWallet wallet, ZephyrOutputWallet output) {
-    List<ZephyrTxWallet> txs = wallet.getTxs(Arrays.asList(output.getTx().getHash()), new ArrayList<String>());
-    if (txs.isEmpty()) return null;  // the transaction is not in the wallet
-    ZephyrTxWallet tx = txs.get(0);
-    ZephyrOutgoingTransfer outgoing = tx.getOutgoingTransfer();
-    boolean spentFromThisAccount = outgoing != null && output.getAccountIndex().equals(outgoing.getAccountIndex());
-    if (tx.getIncomingTransfers() != null) {
-      for (ZephyrIncomingTransfer transfer : tx.getIncomingTransfers()) {
-        if (!output.getAccountIndex().equals(transfer.getAccountIndex())) continue;
-        if (!output.getSubaddressIndex().equals(transfer.getSubaddressIndex())) continue;
-        if (!spentFromThisAccount) return transfer.getAssetType();  // a received transaction: one asset per subaddress
-        if (!Objects.equals(transfer.getAssetType(), outgoing.getAssetType()) && transfer.getAmount().equals(output.getAmount())) {
-          return transfer.getAssetType();  // the converted output of a conversion to this account
-        }
-      }
-    }
-    return spentFromThisAccount ? outgoing.getAssetType() : null;  // change and same-asset sends to this account: the source asset
-  }
-
-  // coin control per asset: the unspent outputs of one asset
+  // getOutputs() reports no asset: coin control per asset, the unspent outputs of one asset
   static List<ZephyrOutputWallet> unspentOutputs(ZephyrWallet wallet, String asset) {
     List<ZephyrOutputWallet> outputs = new ArrayList<>();
     for (ZephyrOutputWallet output : wallet.getOutputs(new ZephyrOutputQuery().setIsSpent(false))) {
-      if (asset.equals(assetOf(wallet, output))) outputs.add(output);
+      if (asset.equals(wallet.getOutputAssetType(output))) outputs.add(output);  // one getTxs call per output
     }
     return outputs;
+  }
+
+  // the incoming transfers of one asset; the queries have no asset filter, so the app filters
+  static BigInteger receivedInAsset(ZephyrWallet wallet, String asset) {
+    BigInteger total = BigInteger.ZERO;
+    for (ZephyrTransfer transfer : wallet.getTransfers(new ZephyrTransferQuery().setIsIncoming(true))) {
+      if (asset.equals(transfer.getAssetType())) total = total.add(transfer.getAmount());
+    }
+    return total;
+  }
+
+  // the confirmed outgoing transactions between two heights
+  static List<ZephyrTxWallet> sentBetween(ZephyrWallet wallet, long fromHeight, long toHeight) {
+    return wallet.getTxs(new ZephyrTxQuery()
+        .setIsOutgoing(true)
+        .setIsConfirmed(true)
+        .setMinHeight(fromHeight)
+        .setMaxHeight(toHeight));
+  }
+
+  // transactions by hash; the hashes the wallet does not know are collected instead of thrown
+  static List<ZephyrTxWallet> knownTxs(ZephyrWallet wallet, List<String> hashes) {
+    List<String> missing = new ArrayList<>();
+    List<ZephyrTxWallet> txs = wallet.getTxs(hashes, missing);  // getTxs(hash) alone throws for a missing hash
+    if (!missing.isEmpty()) System.out.println("not in the wallet: " + missing);
+    return txs;
+  }
+
+  // a note for a transaction; it lives in the wallet's cache until the wallet is saved
+  static void noteAndKey(ZephyrWallet wallet, String txHash) {
+    wallet.setTxNote(txHash, "rent, November");
+    String note = wallet.getTxNote(txHash);
+    String txKey = wallet.getTxKey(txHash);  // the secret key of a transaction this wallet sent
+    System.out.println(note + " " + (txKey != null));
   }
 }
