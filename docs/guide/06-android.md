@@ -89,7 +89,7 @@ build succeeds. On API 26 and newer that is fine (zephyr-java was tested on Jack
 JVM, the coexistence test); on API 24 and 25 the app then fails at run time. Check what the app
 really gets:
 
-```
+```sh
 ./gradlew :app:dependencies --configuration releaseRuntimeClasspath | grep jackson
 ```
 

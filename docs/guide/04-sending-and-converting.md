@@ -103,7 +103,7 @@ Four rules come from the core:
 The chain's formula for `MINT_RESERVE` takes the reserve coin price `P = max(reserve, reserve_ma)`
 from the pricing record (the price of one ZRS in ZPH, times 10^12) and computes, in integers:
 
-```
+```text
 rate     = 10^24 / P                       (ZRS per ZPH, times 10^12)
 rate     = rate - rate / 100               (the 1 % conversion fee)
 rate     = rate - rate mod 10^4
