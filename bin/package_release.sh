@@ -28,14 +28,17 @@
 #  4. dist/<version>/                the artifacts under release names, the debug symbols as a
 #                                    reproducible tar.gz
 #  5. bin/make_maven_repo.sh         dist/<version>/maven/, the static Maven repository
-#  6. bin/make_site.sh               dist/<version>/site/, the GitHub Pages content, with the
-#                                    repository as site/maven/ (the only copy: the top-level
-#                                    maven/ is removed afterwards)
+#  6. bin/make_site.sh               dist/<version>/site/, the GitHub Pages content: the index,
+#                                    the user guide and its assets (site/build_site.py), the
+#                                    Javadoc, and the repository as site/maven/ (the only copy:
+#                                    the top-level maven/ is removed afterwards), checked by
+#                                    site/check_site.py
 #     bin/merge_previous_release.sh  the previous release's Maven repository (bin/previous-release.env,
 #                                    its sha256-checked site archive, downloaded or PREV_SITE_ARCHIVE)
 #                                    merged into site/maven/, every artifactId's maven-metadata.xml
-#                                    listing all versions, the older releases on the index; skipped
-#                                    when there is no bin/previous-release.env (a first release)
+#                                    listing all versions, the index written anew with the older
+#                                    releases (site/build_site.py --maven); skipped when there is
+#                                    no bin/previous-release.env (a first release)
 #  7. site-<version>.tar.gz          the site as one reproducible archive, a release asset
 #                                    (reproducible: sorted names, mtime SOURCE_DATE_EPOCH,
 #                                    numeric owner 0, no atime/ctime pax records, gzip -n

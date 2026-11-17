@@ -204,3 +204,35 @@ snapshot `20261107T000000Z` (`snapshot.debian.org`, recorded in the manifest as
 The stripped libraries carry a `gnu_debuglink` to their debug files, which ship in
 `debug-symbols-<version>.tar.gz`, so a crash report from a release can be symbolised without
 rebuilding.
+
+## The guide and its site
+
+This guide is the Markdown in `docs/guide/`, readable on GitHub as it is. It is also a static site
+on the project's GitHub Pages, `https://loki-notfound.github.io/myzephyr-java/guide/`. Two scripts
+build and check it, with Python 3 and its standard library only:
+
+```sh
+bin/build_site.sh
+bin/check_site.sh
+```
+
+`bin/build_site.sh` writes the landing page, one page per guide file and the assets to
+`build/site/` (`site/build_site.py`). Its Markdown converter (`site/markdown.py`) knows exactly the
+Markdown this guide uses and fails on anything else, so a page never differs from what GitHub
+shows. With `--maven <site>/maven` the landing page lists the older releases found in a published
+Maven repository, the same section a release's site has. `bin/check_site.sh` checks the result
+(`site/check_site.py`): a page for every guide file, the page policy
+`default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'` in every
+page, no script, no style attribute, no external resource or absolute path, well-formed pages, and
+every relative link and anchor resolves. The pages carry no JavaScript. The footer names the
+version and the commit with its date, so the same commit gives the same site.
+
+`bin/make_site.sh` builds the same pages into a release's site, next to the Javadoc and the Maven
+repository, so the site archive of a release carries the guide of its commit. Every CI run builds
+and checks the site too (job `java`).
+
+The look comes from the lateo house style, `@lateo/style` 0.1.0. `site/assets/` holds unchanged
+copies of its stylesheets `content.css` and `print.css` (BSD 3-Clause, `LICENSE-style.txt`) and of
+its favicons; `STYLE-VERSION` names the version. `site/assets/site.css` is this repository's own,
+under its MIT licence. The lateo name and the favicons are under neither licence: `NOTICE.txt` and
+`TRADEMARKS.txt` state the terms.

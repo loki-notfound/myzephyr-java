@@ -23,9 +23,11 @@
 #     <latest> and <release> the newest (this version for the artifactIds this build publishes),
 #     <lastUpdated> from SOURCE_DATE_EPOCH; its .md5, .sha1, .sha256 (and .sha512 where Gradle
 #     wrote one) rewritten; then every checksum file of the repository is checked
-#  5. index.html gets a section "Older releases" before "Documentation": each older version
-#     with its Maven coordinates and release page, and the note that javadoc/ is this version's
-#     only (an older version's Javadoc is its -javadoc.jar)
+#  5. index.html is written anew by site/build_site.py --index-only --maven site/maven, with a
+#     section "Older releases" before "Documentation": each older version with its Maven
+#     coordinates and release page, and the note that javadoc/ is this version's only (an older
+#     version's Javadoc is its -javadoc.jar); bin/build_site.sh --maven lists them with the same
+#     code. Then the whole site is checked again (site/check_site.py)
 # Versions must follow the release scheme <x>.<y>.<z>-sec.<N>-java.<M> (docs: RELEASES.md §2);
 # they are ordered by their numbers, which is Maven's and Gradle's order for this scheme.
 #
@@ -101,7 +103,7 @@ mkdir "$WORK/prev"
 tar -xzf "$ARCHIVE" -C "$WORK/prev" --no-same-owner
 [ -d "$WORK/prev/site/maven" ] || { echo "the site archive of $PREV_VERSION has no site/maven/" >&2; exit 1; }
 
-# 3 to 5
+# 3 and 4
 python3 -I - "$WORK/prev/site/maven" "$SITE" "$VERSION" "$PREV_VERSION" <<'PY'
 import filecmp
 import hashlib
@@ -231,39 +233,10 @@ for dirpath, _, files in os.walk(REPO):
                         fail(f"wrong {path}")
                 checked += 1
 print(f"  {copied} files copied byte for byte, {checked} checksum files checked")
-
-# 5: index.html, the older releases
-older = {}
-for aid in sorted(set(prev_ids) | set(new_ids)):
-    for v in version_dirs(os.path.join(REPO, GROUP_PATH, aid)):
-        if v != VERSION:
-            older.setdefault(v, []).append(aid)
-items = []
-for v in sorted(older, key=order, reverse=True):
-    # the Android artifact first, as in the sections above
-    coords = ", ".join(f"<code>{GROUP_ID}:{aid}:{v}</code>"
-                       for aid in sorted(older[v], key=lambda a: (not a.endswith("-android"), a)))
-    items.append(f'<li>{v} (<a href="https://github.com/loki-notfound/myzephyr-java/releases/tag/v{v}">'
-                 f"release</a>): {coords}</li>")
-section = f"""<h2>Older releases</h2>
-<p>The Maven repository keeps every release, so a build can stay on an older version with the same
-repository line. The <a href="javadoc/index.html">Javadoc</a> on this site is that of version
-{VERSION} only; an older version's Javadoc is its <code>zephyr-java-&lt;version&gt;-javadoc.jar</code>,
-in the repository and among the files of its release.</p>
-<ul>
-{chr(10).join(items)}
-</ul>
-
-"""
-index = os.path.join(SITE, "index.html")
-with open(index, encoding="utf-8") as f:
-    html = f.read()
-anchor = "<h2>Documentation</h2>\n"
-if html.count(anchor) != 1 or "<h2>Older releases</h2>" in html:
-    fail(f"{index}: expected one '<h2>Documentation</h2>' line and no 'Older releases' section yet")
-with open(index, "w", encoding="utf-8", newline="\n") as f:
-    f.write(html.replace(anchor, section + anchor))
-print(f"  index.html: {len(items)} older release(s) listed")
 PY
+
+# 5: index.html anew, with the older releases of the merged repository, then the site checked
+python3 -I site/build_site.py --index-only --maven "$SITE/maven" --out "$SITE"
+python3 -I site/check_site.py --site "$SITE"
 
 echo "merged the Maven repository of $PREV_VERSION into ${SITE#"$ROOT"/}/maven"

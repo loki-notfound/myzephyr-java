@@ -28,7 +28,7 @@ defaults:
 jobs:
   java:
     # the developer build (bin/build_libzephyr_java.sh) against the distribution's libraries,
-    # then the pure test suites (mvn test, 30 tests)
+    # then the pure test suites (mvn test, 30 tests) and the guide site (bin/build_site.sh)
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
@@ -69,6 +69,11 @@ jobs:
         run: bin/build_libzephyr_java.sh
       - name: Pure tests
         run: mvn -q test
+      - name: Guide site
+        # the guide-only site (index, guide pages, assets) built and checked with python3 alone
+        run: |
+          bin/build_site.sh
+          bin/check_site.sh
       - uses: actions/upload-artifact@v7
         # the surefire reports and the JVM's crash log, to diagnose a failed or crashed test run
         if: failure()

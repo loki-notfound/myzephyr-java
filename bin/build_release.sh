@@ -30,9 +30,9 @@
 #                                    AAR (artifactId zephyr-java-android) with its sources jar and
 #                                    POM; dist/<version>/ with the debug symbols as a reproducible
 #                                    tar.gz; the static Maven repository (bin/make_maven_repo.sh),
-#                                    the Pages site (bin/make_site.sh) and its archive
-#                                    site-<version>.tar.gz (with the previous releases' Maven
-#                                    repository merged in, bin/merge_previous_release.sh),
+#                                    the Pages site with the user guide (bin/make_site.sh) and its
+#                                    archive site-<version>.tar.gz (with the previous releases'
+#                                    Maven repository merged in, bin/merge_previous_release.sh),
 #                                    manifest.json and SHA256SUMS over the release assets
 #                                    (bin/make_manifest.sh)
 # bin/check_versions.sh runs first: the pom version, VERSION_NAME and RELEASE_TAG (when set)

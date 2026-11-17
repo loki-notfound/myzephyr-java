@@ -209,7 +209,8 @@ pairs, the fees and the locks.
 
 ## Documentation
 
-- [User guide](docs/guide/README.md):
+- User guide: [on the project's site](https://loki-notfound.github.io/myzephyr-java/guide/), and as
+  Markdown in the repository, [docs/guide](docs/guide/README.md):
   [1 Getting started](docs/guide/01-getting-started.md),
   [2 Wallets](docs/guide/02-wallets.md),
   [3 Assets and balances](docs/guide/03-assets-and-balances.md),
