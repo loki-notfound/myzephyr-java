@@ -208,7 +208,10 @@ public class ClosingChild {
     assertCallbackThreadsEnded(listener.threads);
   }
 
-  /** N4a: close() from main while another thread is inside a foreground sync(). */
+  /**
+   * N4a: close() from main while another thread is inside a foreground sync(); the sync, cut short,
+   * ends with ZephyrError("Wallet is closed").
+   */
   private static void n4a(String path) throws Exception {
     ZephyrWalletFull wallet = open(path);
     Counting listener = new Counting("none");
@@ -235,7 +238,8 @@ public class ClosingChild {
     syncer.join(WAIT_MS);
     if (syncer.isAlive()) fail("the syncer did not end");
     String result = outcome.get();
-    if (!"returned".equals(result) && !"ZephyrError: Wallet is closed".equals(result)) fail("sync() ended with " + result);
+    // the sync was cut short at its first block: it must not return a result that looks complete
+    if (!"ZephyrError: Wallet is closed".equals(result)) fail("sync() cut short by close() ended with " + result);
     log("after close: " + listener.counts());
     threads("end");
   }

@@ -947,6 +947,13 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     }
   }
   
+  /**
+   * {@inheritDoc}
+   *
+   * <p>A sync that {@code close()} cuts short (it ends the core's refresh at its next batch of
+   * blocks) throws ZephyrError("Wallet is closed"), never a result that looks complete. Throws
+   * ZephyrError when called from inside a listener callback.</p>
+   */
   @Override
   public ZephyrSyncResult sync(Long startHeight, ZephyrWalletListenerI listener) {
     refuseInCallback("sync()");
@@ -958,10 +965,11 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       if (listener != null) addListener(listener);
     
       // sync wallet and handle exception; close() from another thread ends the sync at the core's
-      // next batch of blocks (it returns, or ends in this one "Wallet is closed")
+      // next batch of blocks, and the sync then ends in this one "Wallet is closed"
       beginRefresh();
       try {
         Object[] results = syncJni(startHeight);
+        if (isClosed) throw new ZephyrError("Wallet is closed"); // cut short: not a complete result
         return new ZephyrSyncResult((long) results[0], (boolean) results[1]);
       } catch (Exception e) {
         if (isClosed) throw new ZephyrError("Wallet is closed");
