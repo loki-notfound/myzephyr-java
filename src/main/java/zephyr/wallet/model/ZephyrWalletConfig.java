@@ -360,10 +360,10 @@ public class ZephyrWalletConfig {
   }
   
   /**
-   * Sets whether the wallet RPC server saves its current wallet before it opens or creates another;
-   * only {@code ZephyrWalletRpc} uses it. {@code ZephyrWalletFull.createWallet} refuses a
-   * configuration in which it is set at all, {@code ZephyrWalletFull.openWallet} one in which it is
-   * true.
+   * Sets whether a wallet RPC server should save its current wallet before it opens or creates
+   * another. Inherited from monero-java, where only the wallet RPC client used it; zephyr-java has
+   * no such client. {@code ZephyrWalletFull.createWallet} refuses a configuration in which it is set
+   * at all, {@code ZephyrWalletFull.openWallet} one in which it is true.
    *
    * @param saveCurrent is true to save the current wallet
    * @return this configuration for chaining
