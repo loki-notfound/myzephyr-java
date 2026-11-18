@@ -52,22 +52,25 @@ static const char* JNI_LISTENER_HANDLE = "jniListenerHandle";
 
 // ----------------------------- COMMON HELPERS -------------------------------
 
+static jclass class_ZephyrError; // zephyr.common.ZephyrError, looked up once in JNI_OnLoad
+
+// Turns the C++ exception being handled into a pending Java exception: OutOfMemoryError for
+// std::bad_alloc, zephyr.common.ZephyrError (unchecked, the library's own type) for everything
+// else, with the exception's message. A Java exception that is pending already is kept.
 // Based on: https://stackoverflow.com/questions/2054598/how-to-catch-jni-java-exception/2125673#2125673
 void rethrow_cpp_exception_as_java_exception(JNIEnv* env) {
   try {
     throw;  // throw exception to determine and handle type
   } catch (const std::bad_alloc& e) {
+    if (env->ExceptionCheck()) return;
     jclass jc = env->FindClass("java/lang/OutOfMemoryError");
     if (jc) env->ThrowNew(jc, e.what());
-  } catch (const std::ios_base::failure& e) {
-    jclass jc = env->FindClass("java/io/IOException");
-    if (jc) env->ThrowNew(jc, e.what());
   } catch (const std::exception& e) {
-    jclass jc = env->FindClass("java/lang/Exception");
-    if (jc) env->ThrowNew(jc, e.what());
+    if (env->ExceptionCheck()) return;
+    env->ThrowNew(class_ZephyrError, e.what());
   } catch (...) {
-    jclass jc = env->FindClass("java/lang/Exception");
-    if (jc) env->ThrowNew(jc, "Unidentfied C++ exception");
+    if (env->ExceptionCheck()) return;
+    env->ThrowNew(class_ZephyrError, "Unidentfied C++ exception");
   }
 }
 
@@ -162,6 +165,10 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *jvm, void *reserved) {
 //  class_TransactionInfo = static_cast<jclass>(env->NewGlobalRef(env->FindClass("com/m2049r/xmrwallet/model/TransactionInfo")));
 //  class_Transfer = static_cast<jclass>(env->NewGlobalRef(env->FindClass("com/m2049r/xmrwallet/model/Transfer")));
   class_WalletListener = static_cast<jclass>(env->NewGlobalRef(env->FindClass("zephyr/wallet/ZephyrWalletFull$WalletJniListener")));
+  jclass zephyr_error = env->FindClass("zephyr/common/ZephyrError");
+  if (env->ExceptionCheck() || zephyr_error == nullptr) return JNI_ERR; // NoClassDefFoundError pending: the library does not load
+  class_ZephyrError = static_cast<jclass>(env->NewGlobalRef(zephyr_error));
+  env->DeleteLocalRef(zephyr_error);
 //  class_Ledger = static_cast<jclass>(env->NewGlobalRef(env->FindClass("com/m2049r/xmrwallet/ledger/Ledger")));
   return JNI_VERSION_1_6;
 }
