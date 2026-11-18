@@ -15,31 +15,60 @@ public class ZephyrDestination {
   private BigInteger amount;
   private String assetType;
   
+  /**
+   * Creates an empty destination.
+   */
   public ZephyrDestination() {
     // nothing to construct
   }
   
+  /**
+   * Creates a destination to the given address without an amount, as a sweep takes it.
+   *
+   * @param address is the recipient's address
+   */
   public ZephyrDestination(String address) {
     super();
     this.address = address;
   }
   
+  /**
+   * Creates a destination to the given address with an amount.
+   *
+   * @param address is the recipient's address
+   * @param amount is the amount in atomic units of the source currency of the send
+   */
   public ZephyrDestination(String address, BigInteger amount) {
     super();
     this.address = address;
     this.amount = amount;
   }
   
+  /**
+   * Creates a copy of the given destination.
+   *
+   * @param destination is the destination to copy
+   */
   public ZephyrDestination(ZephyrDestination destination) {
     this.address = destination.address;
     this.amount = destination.amount;
     this.assetType = destination.assetType;
   }
 
+  /**
+   * Returns the recipient's address.
+   *
+   * @return the address, null if not set
+   */
   public String getAddress() {
     return address;
   }
   
+  /**
+   * Sets the recipient's address.
+   *
+   * @param address is the address
+   */
   public void setAddress(String address) {
     this.address = address;
   }
@@ -90,6 +119,11 @@ public class ZephyrDestination {
     this.assetType = assetType;
   }
   
+  /**
+   * Returns a copy of this destination.
+   *
+   * @return the copy
+   */
   public ZephyrDestination copy() {
     return new ZephyrDestination(this);
   }
@@ -98,6 +132,12 @@ public class ZephyrDestination {
     return toString(0);
   }
   
+  /**
+   * Returns the address, amount and asset of this destination that are set, one per line, indented.
+   *
+   * @param indent is the indentation in levels of two spaces
+   * @return the description
+   */
   public String toString(int indent) {
     StringBuilder sb = new StringBuilder();
     sb.append(GenUtils.kvLine("Address", this.getAddress(), indent));

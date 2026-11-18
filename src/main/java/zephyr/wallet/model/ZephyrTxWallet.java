@@ -34,10 +34,19 @@ public class ZephyrTxWallet extends ZephyrTx {
   private Integer numDummyOutputs;
   private String extraHex;  // TODO: refactor ZephyrTx to only use extra as hex string
   
+  /**
+   * Creates an empty wallet transaction; every field is null.
+   */
   public ZephyrTxWallet() {
     // nothing to initialize
   }
   
+  /**
+   * Creates a deep copy of the given transaction, its transfers, inputs and outputs included. The
+   * copy refers to the same transaction set and has no block, so its {@link #getHeight()} is null.
+   *
+   * @param tx is the transaction to copy
+   */
   public ZephyrTxWallet(final ZephyrTxWallet tx) {
     super(tx);
     this.txSet = tx.txSet;
@@ -65,36 +74,83 @@ public class ZephyrTxWallet extends ZephyrTx {
     return new ZephyrTxWallet(this);
   }
   
+  /**
+   * Returns the transaction set this transaction belongs to. The transactions that
+   * {@code createTxs} or a sweep returns share one set, which carries the unsigned or multisig hex
+   * when the wallet produced one.
+   *
+   * @return the set, null for the transactions of {@code getTxs}
+   */
   @JsonBackReference("tx_set")
   public ZephyrTxSet getTxSet() {
     return txSet;
   }
   
+  /**
+   * Sets the transaction set this transaction belongs to.
+   *
+   * @param txSet is the set
+   * @return this transaction for chaining
+   */
   public ZephyrTxWallet setTxSet(ZephyrTxSet txSet) {
     this.txSet = txSet;
     return this;
   }
   
+  /**
+   * Returns whether the transaction brought funds to the wallet, that is, whether it has an
+   * incoming transfer. A transaction can be incoming and outgoing at once, for example a conversion
+   * to one of the wallet's own addresses. On a transaction that {@code createTxs} or a sweep
+   * returns it is null, even when a conversion carries an incoming transfer.
+   *
+   * @return true or false for the transactions of {@code getTxs}, null if unknown
+   */
   @JsonProperty("isIncoming")
   public Boolean isIncoming() {
     return isIncoming;
   }
   
+  /**
+   * Sets whether the transaction brought funds to the wallet.
+   *
+   * @param isIncoming is true if incoming
+   * @return this transaction for chaining
+   */
   public ZephyrTxWallet setIsIncoming(Boolean isIncoming) {
     this.isIncoming = isIncoming;
     return this;
   }
   
+  /**
+   * Returns whether the wallet spent funds in the transaction, that is, whether it has an outgoing
+   * transfer.
+   *
+   * @return true or false for the transactions of {@code getTxs}, true on the transactions that
+   * {@code createTxs} and the sweeps return, null if unknown
+   */
   @JsonProperty("isOutgoing")
   public Boolean isOutgoing() {
     return isOutgoing;
   }
   
+  /**
+   * Sets whether the wallet spent funds in the transaction.
+   *
+   * @param isOutgoing is true if outgoing
+   * @return this transaction for chaining
+   */
   public ZephyrTxWallet setIsOutgoing(Boolean isOutgoing) {
     this.isOutgoing = isOutgoing;
     return this;
   }
   
+  /**
+   * Returns the sum of the amounts of the incoming transfers, in atomic units. The sum names no
+   * asset; read {@link #getIncomingTransfers()} instead, where each transfer has its asset. See the
+   * user guide, {@code docs/guide/06-history.md}, section "Transactions and transfers".
+   *
+   * @return the sum, null if the transaction has no incoming transfers
+   */
   public BigInteger getIncomingAmount() {
     if (getIncomingTransfers() == null) return null;
     BigInteger incomingAmt = BigInteger.valueOf(0);
@@ -102,15 +158,35 @@ public class ZephyrTxWallet extends ZephyrTx {
     return incomingAmt;
   }
   
+  /**
+   * Returns the amount of the outgoing transfer: what the wallet sent, without fee and change, in
+   * atomic units of the source asset ({@code getOutgoingTransfer().getAssetType()}). For a
+   * conversion it is the source amount.
+   *
+   * @return the amount, null if the transaction has no outgoing transfer
+   */
   public BigInteger getOutgoingAmount() {
     return getOutgoingTransfer() != null ? getOutgoingTransfer().getAmount() : null;
   }
   
+  /**
+   * Returns the transfers of the transaction: the outgoing transfer first, if there is one, then
+   * the incoming transfers.
+   *
+   * @return the transfers, empty if there are none
+   */
   @JsonIgnore
   public List<ZephyrTransfer> getTransfers() {
     return getTransfers(null);
   }
   
+  /**
+   * Returns the transfers of the transaction that meet the given query, the outgoing transfer
+   * first.
+   *
+   * @param query is the transfer query, null for every transfer
+   * @return the transfers that meet the query
+   */
   public List<ZephyrTransfer> getTransfers(ZephyrTransferQuery query) {
     List<ZephyrTransfer> transfers = new ArrayList<ZephyrTransfer>();
     if (getOutgoingTransfer() != null && (query == null || query.meetsCriteria(getOutgoingTransfer()))) transfers.add(getOutgoingTransfer());
@@ -122,6 +198,13 @@ public class ZephyrTxWallet extends ZephyrTx {
     return transfers;
   }
   
+  /**
+   * Returns the transfers that meet the given query, like
+   * {@link #getTransfers(ZephyrTransferQuery)}, and removes the others from this transaction.
+   *
+   * @param query is the transfer query, null for every transfer
+   * @return the transfers that remain
+   */
   public List<ZephyrTransfer> filterTransfers(ZephyrTransferQuery query) {
     List<ZephyrTransfer> transfers = new ArrayList<ZephyrTransfer>();
     
@@ -143,21 +226,49 @@ public class ZephyrTxWallet extends ZephyrTx {
     return transfers;
   }
   
+  /**
+   * Returns the incoming transfers: one per subaddress and asset that received funds in this
+   * transaction, each with its amount and asset. On a conversion that {@code createTxs} or
+   * {@code sweepUnlocked} returns, one incoming transfer carries the converted amount in the
+   * destination currency before anything is relayed; it has no account or subaddress index, which
+   * the transactions of {@code getTxs} carry once the conversion is confirmed. See the user guide,
+   * {@code docs/guide/06-history.md}, section "Conversions in the history".
+   *
+   * @return the incoming transfers, null if there are none
+   */
   @JsonManagedReference
   public List<ZephyrIncomingTransfer> getIncomingTransfers() {
     return incomingTransfers;
   }
   
+  /**
+   * Sets the incoming transfers.
+   *
+   * @param incomingTransfers are the incoming transfers, null for none
+   * @return this transaction for chaining
+   */
   public ZephyrTxWallet setIncomingTransfers(List<ZephyrIncomingTransfer> incomingTransfers) {
     this.incomingTransfers = incomingTransfers;
     return this;
   }
   
+  /**
+   * Returns the outgoing transfer: the funds the wallet spent in this transaction. A transaction
+   * has at most one.
+   *
+   * @return the outgoing transfer, null if the wallet spent nothing in this transaction
+   */
   @JsonManagedReference
   public ZephyrOutgoingTransfer getOutgoingTransfer() {
     return outgoingTransfer;
   }
   
+  /**
+   * Sets the outgoing transfer.
+   *
+   * @param outgoingTransfer is the outgoing transfer, null for none
+   * @return this transaction for chaining
+   */
   public ZephyrTxWallet setOutgoingTransfer(ZephyrOutgoingTransfer outgoingTransfer) {
     this.outgoingTransfer = outgoingTransfer;
     return this;
@@ -206,6 +317,12 @@ public class ZephyrTxWallet extends ZephyrTx {
     return getInputsWallet(null);
   }
   
+  /**
+   * Returns the inputs that meet the given query, as wallet outputs.
+   *
+   * @param query is the output query, null for every input
+   * @return the inputs that meet the query, empty if there are none
+   */
   public List<ZephyrOutputWallet> getInputsWallet(ZephyrOutputQuery query) {
     List<ZephyrOutputWallet> inputsWallet = new ArrayList<ZephyrOutputWallet>();
     List<ZephyrOutput> inputs = getInputs();
@@ -259,6 +376,12 @@ public class ZephyrTxWallet extends ZephyrTx {
     return getOutputsWallet(null);
   }
   
+  /**
+   * Returns the outputs that meet the given query, as wallet outputs.
+   *
+   * @param query is the output query, null for every output
+   * @return the outputs that meet the query, empty if there are none
+   */
   public List<ZephyrOutputWallet> getOutputsWallet(ZephyrOutputQuery query) {
     List<ZephyrOutputWallet> outputsWallet = new ArrayList<ZephyrOutputWallet>();
     List<ZephyrOutput> outputs = getOutputs();
@@ -269,6 +392,12 @@ public class ZephyrTxWallet extends ZephyrTx {
     return outputsWallet;
   }
   
+  /**
+   * Returns the outputs that meet the given query and removes the others from this transaction.
+   *
+   * @param query is the output query, null for every output
+   * @return the outputs that remain
+   */
   public List<ZephyrOutputWallet> filterOutputsWallet(ZephyrOutputQuery query) {
     List<ZephyrOutputWallet> outputs = new ArrayList<ZephyrOutputWallet>();
     if (getOutputs() != null) {
@@ -283,74 +412,174 @@ public class ZephyrTxWallet extends ZephyrTx {
     return outputs;
   }
   
+  /**
+   * Returns the note the wallet keeps for this transaction ({@code setTxNote}). Notes exist only in
+   * the wallet's cache: a wallet restored from its mnemonic has none.
+   *
+   * @return the note, null if there is none
+   */
   public String getNote() {
     return note;
   }
   
+  /**
+   * Sets the note of this transaction object (it does not change the wallet; {@code setTxNote}
+   * does).
+   *
+   * @param note is the note
+   * @return this transaction for chaining
+   */
   public ZephyrTxWallet setNote(String note) {
     this.note = note;
     return this;
   }
   
+  /**
+   * Returns whether the funds this transaction brought to the wallet (received funds, or change)
+   * are still locked: true in the pool and until 10 blocks after the block that contains the
+   * transaction (later if its unlock height says so), then false. See the user guide,
+   * {@code docs/guide/05-assets-and-balances.md}, section "Locked and unlocked".
+   *
+   * @return true while locked, null if unknown
+   */
   @JsonProperty("isLocked")
   public Boolean isLocked() {
     return isLocked;
   }
   
+  /**
+   * Sets whether the transaction's funds are locked.
+   *
+   * @param isLocked is true while locked
+   * @return this transaction for chaining
+   */
   public ZephyrTxWallet setIsLocked(Boolean isLocked) {
     this.isLocked = isLocked;
     return this;
   }
 
+  /**
+   * Returns the sum of the amounts of the inputs, in atomic units of the source asset. Only
+   * {@code describeTxSet} fills it, from an unsigned or multisig transaction set.
+   *
+   * @return the sum, null if not known
+   */
   public BigInteger getInputSum() {
     return inputSum;
   }
 
+  /**
+   * Sets the sum of the amounts of the inputs.
+   *
+   * @param inputSum is the sum in atomic units
+   * @return this transaction for chaining
+   */
   public ZephyrTxWallet setInputSum(BigInteger inputSum) {
     this.inputSum = inputSum;
     return this;
   }
 
+  /**
+   * Returns the sum of the amounts of the outputs, change included, in atomic units. Only
+   * {@code describeTxSet} fills it, from an unsigned or multisig transaction set.
+   *
+   * @return the sum, null if not known
+   */
   public BigInteger getOutputSum() {
     return outputSum;
   }
 
+  /**
+   * Sets the sum of the amounts of the outputs.
+   *
+   * @param outputSum is the sum in atomic units
+   * @return this transaction for chaining
+   */
   public ZephyrTxWallet setOutputSum(BigInteger outputSum) {
     this.outputSum = outputSum;
     return this;
   }
 
+  /**
+   * Returns the address that receives the change. Only {@code describeTxSet} fills it, from an
+   * unsigned or multisig transaction set.
+   *
+   * @return the change address, null if not known or if there is no change
+   */
   public String getChangeAddress() {
     return changeAddress;
   }
 
+  /**
+   * Sets the address that receives the change.
+   *
+   * @param changeAddress is the change address
+   * @return this transaction for chaining
+   */
   public ZephyrTxWallet setChangeAddress(String changeAddress) {
     this.changeAddress = changeAddress;
     return this;
   }
 
+  /**
+   * Returns the change: what the transaction sends back to the wallet, in atomic units of the
+   * source asset. {@code ZephyrWalletFull} sets it on the transactions that {@code createTxs} and
+   * the sweeps return, and {@code describeTxSet} fills it.
+   *
+   * @return the change, null if not known
+   */
   public BigInteger getChangeAmount() {
     return changeAmount;
   }
 
+  /**
+   * Sets the change.
+   *
+   * @param changeAmount is the change in atomic units
+   * @return this transaction for chaining
+   */
   public ZephyrTxWallet setChangeAmount(BigInteger changeAmount) {
     this.changeAmount = changeAmount;
     return this;
   }
 
+  /**
+   * Returns the number of destinations with an amount of 0 (dummy outputs). Only
+   * {@code describeTxSet} fills it, from an unsigned or multisig transaction set.
+   *
+   * @return the number of dummy outputs, null if not known
+   */
   public Integer getNumDummyOutputs() {
     return numDummyOutputs;
   }
 
+  /**
+   * Sets the number of dummy outputs.
+   *
+   * @param numDummyOutputs is the number of dummy outputs
+   * @return this transaction for chaining
+   */
   public ZephyrTxWallet setNumDummyOutputs(Integer numDummyOutputs) {
     this.numDummyOutputs = numDummyOutputs;
     return this;
   }
 
+  /**
+   * Returns the extra field of the transaction as hex. Only {@code describeTxSet} fills it, from an
+   * unsigned or multisig transaction set.
+   *
+   * @return the extra field as hex, null if not known
+   */
   public String getExtraHex() {
     return extraHex;
   }
 
+  /**
+   * Sets the extra field as hex.
+   *
+   * @param extraHex is the extra field as hex
+   * @return this transaction for chaining
+   */
   public ZephyrTxWallet setExtraHex(String extraHex) {
     this.extraHex = extraHex;
     return this;
@@ -434,6 +663,16 @@ public class ZephyrTxWallet extends ZephyrTx {
     return toString(indent, false);
   }
   
+  /**
+   * Returns a description of this transaction: the fields that are set, one per line, or with
+   * {@code oneLine} a single line of hash, timestamp, confirmed state, outgoing amount and incoming
+   * amount, separated by commas. The single line needs {@link #isConfirmed()} to be set, and the
+   * block of a confirmed transaction.
+   *
+   * @param indent is the indentation in levels of two spaces (ignored for one line)
+   * @param oneLine is true for the single line
+   * @return the description
+   */
   public String toString(int indent, boolean oneLine) {
     StringBuilder sb = new StringBuilder();
     

@@ -20,6 +20,9 @@ public class ZephyrOutputWallet extends ZephyrOutput {
   private Boolean isSpent;
   private Boolean isFrozen;
   
+  /**
+   * Creates an empty wallet output.
+   */
   public ZephyrOutputWallet() {
     super();
   }
@@ -55,35 +58,76 @@ public class ZephyrOutputWallet extends ZephyrOutput {
     return this;
   }
   
+  /**
+   * Sets the wallet transaction this output belongs to.
+   *
+   * @param tx is the transaction
+   * @return this output for chaining
+   */
   @JsonProperty("tx")
   public ZephyrOutputWallet setTx(ZephyrTxWallet tx) {
     super.setTx(tx);
     return this;
   }
   
+  /**
+   * Returns the index of the account that owns the output.
+   *
+   * @return the account index, null if not known
+   */
   public Integer getAccountIndex() {
     return accountIndex;
   }
   
+  /**
+   * Sets the index of the account that owns the output.
+   *
+   * @param accountIndex is the account index
+   * @return this output for chaining
+   */
   public ZephyrOutputWallet setAccountIndex(Integer accountIndex) {
     this.accountIndex = accountIndex;
     return this;
   }
   
+  /**
+   * Returns the index, within the account, of the subaddress that received the output.
+   *
+   * @return the subaddress index, null if not known
+   */
   public Integer getSubaddressIndex() {
     return subaddressIndex;
   }
   
+  /**
+   * Sets the index of the subaddress that received the output.
+   *
+   * @param subaddressIndex is the subaddress index
+   * @return this output for chaining
+   */
   public ZephyrOutputWallet setSubaddressIndex(Integer subaddressIndex) {
     this.subaddressIndex = subaddressIndex;
     return this;
   }
   
+  /**
+   * Returns whether the output has been spent. A view-only wallet does not see its spends and
+   * reports spent outputs as unspent. See the user guide, {@code docs/guide/02-wallets.md}, section
+   * "View-only wallets".
+   *
+   * @return true if spent, null if not known
+   */
   @JsonProperty("isSpent")
   public Boolean isSpent() {
     return isSpent;
   }
   
+  /**
+   * Sets whether the output has been spent.
+   *
+   * @param isSpent is true if spent
+   * @return this output for chaining
+   */
   public ZephyrOutputWallet setIsSpent(Boolean isSpent) {
     this.isSpent = isSpent;
     return this;
@@ -100,6 +144,12 @@ public class ZephyrOutputWallet extends ZephyrOutput {
     return isFrozen;
   }
   
+  /**
+   * Sets whether the output is frozen, see {@link #isFrozen()}.
+   *
+   * @param isFrozen is true if frozen
+   * @return this output for chaining
+   */
   public ZephyrOutputWallet setIsFrozen(Boolean isFrozen) {
     this.isFrozen = isFrozen;
     return this;
@@ -121,6 +171,13 @@ public class ZephyrOutputWallet extends ZephyrOutput {
     return merge((ZephyrOutputWallet) output);
   }
   
+  /**
+   * Merges the information of the given output (the same output, seen another way) into this one,
+   * as {@link ZephyrOutput#merge(ZephyrOutput)} does; spent wins over unspent.
+   *
+   * @param output is the output to merge into this one
+   * @return this output for chaining
+   */
   public ZephyrOutputWallet merge(ZephyrOutputWallet output) {
     if (this == output) return this;
     super.merge(output);

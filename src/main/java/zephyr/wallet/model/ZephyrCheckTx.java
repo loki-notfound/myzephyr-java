@@ -7,8 +7,17 @@ import java.math.BigInteger;
  */
 public class ZephyrCheckTx extends ZephyrCheck {
 
+  /**
+   * Whether the checked transaction is in the pool; see {@link #inTxPool()}.
+   */
   public Boolean inTxPool;
+  /**
+   * The confirmations of the checked transaction; see {@link #getNumConfirmations()}.
+   */
   public Long numConfirmations;
+  /**
+   * The received amount; see {@link #getReceivedAmount()}.
+   */
   public BigInteger receivedAmount;
   
   /**
@@ -16,18 +25,40 @@ public class ZephyrCheckTx extends ZephyrCheck {
    */
   public ZephyrCheckTx() { }
   
+  /**
+   * Returns whether the checked transaction is in the node's pool, as the node reports it.
+   *
+   * @return true if in the pool; null from a {@code checkTxProof} whose signature check failed
+   */
   public Boolean inTxPool() {
     return inTxPool;
   }
   
+  /**
+   * Sets whether the checked transaction is in the pool.
+   *
+   * @param inTxPool is true if in the pool
+   */
   public void setInTxPool(Boolean inTxPool) {
     this.inTxPool = inTxPool;
   }
   
+  /**
+   * Returns the number of confirmations of the checked transaction, as the node reports it; 0 in
+   * the pool.
+   *
+   * @return the number of confirmations; null from a {@code checkTxProof} whose signature check
+   * failed
+   */
   public Long getNumConfirmations() {
     return numConfirmations;
   }
   
+  /**
+   * Sets the number of confirmations.
+   *
+   * @param numConfirmations is the number of confirmations
+   */
   public void setNumConfirmations(Long numConfirmations) {
     this.numConfirmations = numConfirmations;
   }
@@ -48,6 +79,11 @@ public class ZephyrCheckTx extends ZephyrCheck {
     return receivedAmount;
   }
   
+  /**
+   * Sets the received amount.
+   *
+   * @param receivedAmount is the amount in atomic units
+   */
   public void setReceivedAmount(BigInteger receivedAmount) {
     this.receivedAmount = receivedAmount;
   }

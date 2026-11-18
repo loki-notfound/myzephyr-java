@@ -30,50 +30,111 @@ public class ZephyrTxSet {
    */
   public ZephyrTxSet() { }
   
+  /**
+   * Returns the transactions of the set.
+   *
+   * @return the transactions, null if none
+   */
   @JsonManagedReference("tx_set")
   public List<ZephyrTxWallet> getTxs() {
     return txs;
   }
 
+  /**
+   * Sets the transactions of the set.
+   *
+   * @param txs are the transactions
+   * @return this set for chaining
+   */
   @JsonProperty("txs")
   public ZephyrTxSet setTxs(List<ZephyrTxWallet> txs) {
     this.txs = txs;
     return this;
   }
   
+  /**
+   * Sets the transactions of the set, as {@link #setTxs(List)} does.
+   *
+   * @param txs are the transactions
+   * @return this set for chaining
+   */
   @JsonIgnore
   public ZephyrTxSet setTxs(ZephyrTxWallet... txs) {
     this.txs = GenUtils.arrayToList(txs);
     return this;
   }
 
+  /**
+   * Returns the transactions as multisig hex, for the other participants to sign; set when a
+   * multisig wallet builds transactions. Multisig wallets are inherited from monero-java; not
+   * tested against Zephyr.
+   *
+   * @return the multisig hex, null if none
+   */
   public String getMultisigTxHex() {
     return multisigTxHex;
   }
   
+  /**
+   * Sets the multisig hex.
+   *
+   * @param multisigTxHex is the multisig hex
+   * @return this set for chaining
+   */
   public ZephyrTxSet setMultisigTxHex(String multisigTxHex) {
     this.multisigTxHex = multisigTxHex;
     return this;
   }
   
+  /**
+   * Returns the unsigned transactions as hex, set when a view-only wallet builds transactions with
+   * {@code createTxs} or a sweep: a wallet with the spend key signs them ({@code signTxs}).
+   *
+   * @return the unsigned hex, null if none
+   */
   public String getUnsignedTxHex() {
     return unsignedTxHex;
   }
   
+  /**
+   * Sets the unsigned hex.
+   *
+   * @param unsignedTxHex is the unsigned hex
+   * @return this set for chaining
+   */
   public ZephyrTxSet setUnsignedTxHex(String unsignedTxHex) {
     this.unsignedTxHex = unsignedTxHex;
     return this;
   }
   
+  /**
+   * Returns the signed transactions as hex. {@code ZephyrWalletFull} does not fill it in the sets
+   * it returns (read in the core's code); {@code signTxs} returns the signed hex as a string.
+   *
+   * @return the signed hex, null if none
+   */
   public String getSignedTxHex() {
     return signedTxHex;
   }
   
+  /**
+   * Sets the signed hex.
+   *
+   * @param signedTxHex is the signed hex
+   * @return this set for chaining
+   */
   public ZephyrTxSet setSignedTxHex(String signedTxHex) {
     this.signedTxHex = signedTxHex;
     return this;
   }
   
+  /**
+   * Merges the given set into this one: its hex fields must agree with this set's, or the merge
+   * throws, and its transactions join this set, merged with the ones of the same hash.
+   *
+   * @param txSet is the set to merge into this one
+   * @return this set for chaining
+   */
   public ZephyrTxSet merge(ZephyrTxSet txSet) {
     GenUtils.assertNotNull(txSet);
     if (this == txSet) return this;
@@ -99,6 +160,12 @@ public class ZephyrTxSet {
     return toString(0);
   }
   
+  /**
+   * Returns the fields of this set that are set and its transactions, indented.
+   *
+   * @param indent is the indentation in levels of two spaces
+   * @return the description
+   */
   public String toString(int indent) {
     StringBuilder sb = new StringBuilder();
     sb.append(GenUtils.kvLine("Multisig tx hex: ", getMultisigTxHex(), indent));

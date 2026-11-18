@@ -16,6 +16,10 @@ import zephyr.lib.utils.GenUtils;
  */
 public class ZephyrTx {
   
+  /**
+   * The payment ID of sixteen zeros, which stands for no payment ID. {@code ZephyrWalletFull}
+   * reports a transaction with this payment ID as having none ({@link #getPaymentId()} is null).
+   */
   public static final String DEFAULT_PAYMENT_ID = "0000000000000000";
 
   private ZephyrBlock block;
@@ -56,6 +60,9 @@ public class ZephyrTx {
   private String maxUsedBlockHash;
   private List<String> signatures;
   
+  /**
+   * Creates an empty transaction; every field is null.
+   */
   public ZephyrTx() {
     // nothing to build
   }
@@ -110,357 +117,857 @@ public class ZephyrTx {
     if (tx.signatures != null) this.signatures = new ArrayList<String>(tx.signatures);
   }
   
+  /**
+   * Returns a deep copy of this transaction, its inputs and outputs included. The copy does not
+   * reference the block, so its {@link #getHeight()} is null.
+   *
+   * @return the copy
+   */
   public ZephyrTx copy() {
     return new ZephyrTx(this);
   }
   
+  /**
+   * Returns the block that contains this transaction.
+   *
+   * @return the block, null while the transaction is in no block (in the pool, or built and not yet
+   * relayed)
+   */
   @JsonBackReference("block_txs")
   public ZephyrBlock getBlock() {
     return block;
   }
   
+  /**
+   * Sets the block that contains this transaction.
+   *
+   * @param block is the block, null for none
+   * @return this transaction for chaining
+   */
   public ZephyrTx setBlock(ZephyrBlock block) {
     this.block = block;
     return this;
   }
   
+  /**
+   * Returns the height of the block that contains this transaction.
+   *
+   * @return the block height, null while the transaction is in no block: a transaction in the pool,
+   * or one that {@code createTxs} has just built
+   */
   public Long getHeight() {
     return this.getBlock() == null ? null : this.getBlock().getHeight();
   }
   
+  /**
+   * Returns the hash of the transaction, its ID (64 hex characters).
+   *
+   * @return the hash
+   */
   public String getHash() {
     return hash;
   }
   
+  /**
+   * Sets the hash of the transaction.
+   *
+   * @param hash is the hash
+   * @return this transaction for chaining
+   */
   public ZephyrTx setHash(String hash) {
     this.hash = hash;
     return this;
   }
   
+  /**
+   * Returns the version of the transaction format. {@code ZephyrWalletFull} does not fill it on the
+   * transactions of {@code getTxs} and {@code createTxs} (read in the core's code); the transaction
+   * of an output notification to a listener carries it.
+   *
+   * @return the version, null if unknown
+   */
   public Integer getVersion() {
     return version;
   }
   
+  /**
+   * Sets the version of the transaction format.
+   *
+   * @param version is the version
+   * @return this transaction for chaining
+   */
   public ZephyrTx setVersion(Integer version) {
     this.version = version;
     return this;
   }
   
+  /**
+   * Returns whether this is a miner (coinbase) transaction, which creates the block reward.
+   *
+   * @return true for a miner transaction, null if unknown
+   */
   @JsonProperty("isMinerTx")
   public Boolean isMinerTx() {
     return isMinerTx;
   }
   
+  /**
+   * Sets whether this is a miner transaction.
+   *
+   * @param isMinerTx is true for a miner transaction
+   * @return this transaction for chaining
+   */
   public ZephyrTx setIsMinerTx(Boolean isMinerTx) {
     this.isMinerTx = isMinerTx;
     return this;
   }
   
+  /**
+   * Returns the payment ID of the transaction as hex. {@code ZephyrWalletFull} shortens a
+   * 64-character ID whose last 48 characters are zeros to its first 16 characters, and reports the
+   * all-zero ID as null (read in the core's code).
+   *
+   * @return the payment ID, null if the transaction has none
+   */
   public String getPaymentId() {
     return paymentId;
   }
   
+  /**
+   * Sets the payment ID.
+   *
+   * @param paymentId is the payment ID as hex
+   * @return this transaction for chaining
+   */
   public ZephyrTx setPaymentId(String paymentId) {
     this.paymentId = paymentId;
     return this;
   }
   
+  /**
+   * Returns the fee of the transaction in atomic units (10^12 per coin). The fee is paid in the
+   * source asset, the asset the transaction spends, also for a conversion. See the user guide,
+   * {@code docs/guide/07-sending.md}, section "Fees and priorities".
+   *
+   * @return the fee in atomic units of the source asset, null if unknown
+   */
   public BigInteger getFee() {
     return fee;
   }
   
+  /**
+   * Sets the fee.
+   *
+   * @param fee is the fee in atomic units
+   * @return this transaction for chaining
+   */
   public ZephyrTx setFee(BigInteger fee) {
     this.fee = fee;
     return this;
   }
   
+  /**
+   * Returns the ring size: the number of outputs each input is hidden among, its own included.
+   * {@code ZephyrWalletFull} sets the constant 16 (the core's {@code RING_SIZE}) on the
+   * transactions that {@code createTxs} and the sweeps return without reading the built
+   * transaction, leaves it null on the transactions of {@code getTxs}, and {@code describeTxSet}
+   * reports the smallest ring of each transaction (read in the core's code).
+   *
+   * @return the ring size, null if unknown
+   */
   public Integer getRingSize() {
     return ringSize;
   }
   
+  /**
+   * Sets the ring size.
+   *
+   * @param ringSize is the ring size
+   * @return this transaction for chaining
+   */
   public ZephyrTx setRingSize(Integer ringSize) {
     this.ringSize = ringSize;
     return this;
   }
   
+  /**
+   * Returns whether the transaction is meant to be relayed: on a transaction that {@code createTxs}
+   * or a sweep returns, the relay setting of its configuration; true for the transactions of
+   * {@code getTxs}.
+   *
+   * @return whether the transaction is meant to be relayed, null if unknown
+   */
   public Boolean getRelay() {
     return relay;
   }
   
+  /**
+   * Sets whether the transaction is meant to be relayed.
+   *
+   * @param relay is true to relay
+   * @return this transaction for chaining
+   */
   public ZephyrTx setRelay(Boolean relay) {
     this.relay = relay;
     return this;
   }
   
+  /**
+   * Returns whether the transaction has been relayed to the network. A transaction that
+   * {@code createTxs} built without relaying reports false; relaying it later does not update the
+   * returned object, so read it again with {@code getTxs}.
+   *
+   * @return true if relayed, null if unknown
+   */
   @JsonProperty("isRelayed")
   public Boolean isRelayed() {
     return isRelayed;
   }
   
+  /**
+   * Sets whether the transaction has been relayed.
+   *
+   * @param isRelayed is true if relayed
+   * @return this transaction for chaining
+   */
   public ZephyrTx setIsRelayed(Boolean isRelayed) {
     this.isRelayed = isRelayed;
     return this;
   }
   
+  /**
+   * Returns whether the transaction is in a block.
+   *
+   * @return true if in a block, null if unknown
+   */
   @JsonProperty("isConfirmed")
   public Boolean isConfirmed() {
     return isConfirmed;
   }
   
+  /**
+   * Sets whether the transaction is in a block.
+   *
+   * @param isConfirmed is true if in a block
+   * @return this transaction for chaining
+   */
   public ZephyrTx setIsConfirmed(Boolean isConfirmed) {
     this.isConfirmed = isConfirmed;
     return this;
   }
   
+  /**
+   * Returns whether the transaction is in the node's pool: relayed, and not yet in a block.
+   *
+   * @return true if in the pool, null if unknown
+   */
   @JsonProperty("inTxPool")
   public Boolean inTxPool() {
     return inTxPool;
   }
   
+  /**
+   * Sets whether the transaction is in the pool.
+   *
+   * @param inTxPool is true if in the pool
+   * @return this transaction for chaining
+   */
   public ZephyrTx setInTxPool(Boolean inTxPool) {
     this.inTxPool = inTxPool;
     return this;
   }
   
+  /**
+   * Returns the number of confirmations: for a wallet transaction, the wallet's height as of its
+   * last sync minus the height of the transaction's block; 0 in the pool.
+   *
+   * @return the number of confirmations, null if unknown
+   */
   public Long getNumConfirmations() {
     return numConfirmations;
   }
   
+  /**
+   * Sets the number of confirmations.
+   *
+   * @param numConfirmations is the number of confirmations
+   * @return this transaction for chaining
+   */
   public ZephyrTx setNumConfirmations(Long numConfirmations) {
     this.numConfirmations = numConfirmations;
     return this;
   }
   
+  /**
+   * Returns the unlock time the transaction itself carries: 0 when it sets none, as the
+   * transactions this library builds do unless {@code ZephyrTxConfig.setUnlockHeight} is used.
+   * Received funds and change unlock 10 blocks after the block that contains them in any case;
+   * {@code ZephyrTxWallet.isLocked()} tells whether they have. See the user guide,
+   * {@code docs/guide/05-assets-and-balances.md}, section "Locked and unlocked".
+   *
+   * @return the unlock time (a block height), 0 for none, null if unknown
+   */
   public Long getUnlockHeight() {
     return unlockHeight;
   }
   
+  /**
+   * Sets the unlock time the transaction carries.
+   *
+   * @param unlockHeight is the unlock height, 0 for none
+   * @return this transaction for chaining
+   */
   public ZephyrTx setUnlockHeight(Long unlockHeight) {
     this.unlockHeight = unlockHeight;
     return this;
   }
   
+  /**
+   * Returns when the transaction was last relayed, in seconds since the Unix epoch.
+   * {@code ZephyrWalletFull} sets it only on a transaction that {@code createTxs} or a sweep
+   * relayed in the same call (the local time of the call).
+   *
+   * @return the time in seconds, null if unknown
+   */
   public Long getLastRelayedTimestamp() {
     return lastRelayedTimestamp;
   }
   
+  /**
+   * Sets when the transaction was last relayed.
+   *
+   * @param lastRelayedTimestamp is the time in seconds since the Unix epoch
+   * @return this transaction for chaining
+   */
   public ZephyrTx setLastRelayedTimestamp(Long lastRelayedTimestamp) {
     this.lastRelayedTimestamp = lastRelayedTimestamp;
     return this;
   }
   
+  /**
+   * Returns when the node received the transaction into its pool, in seconds since the Unix epoch.
+   * {@code ZephyrWalletFull} does not fill it (null). {@code ZephyrDaemonRpc} fills it from the
+   * node; its transaction calls are inherited from monero-java; not tested against Zephyr.
+   *
+   * @return the time in seconds, null if unknown
+   */
   public Long getReceivedTimestamp() {
     return receivedTimestamp;
   }
   
+  /**
+   * Sets when the node received the transaction.
+   *
+   * @param receivedTimestamp is the time in seconds since the Unix epoch
+   * @return this transaction for chaining
+   */
   public ZephyrTx setReceivedTimestamp(Long receivedTimestamp) {
     this.receivedTimestamp = receivedTimestamp;
     return this;
   }
   
+  /**
+   * Returns whether the node saw another transaction spend the same inputs while this one was in
+   * the pool. {@code ZephyrWalletFull} reports false for transactions in a block and the node's
+   * flag for incoming transactions in the pool.
+   *
+   * @return true if a double spend was seen, null if unknown
+   */
   @JsonProperty("isDoubleSpendSeen")
   public Boolean isDoubleSpendSeen() {
     return isDoubleSpendSeen;
   }
   
+  /**
+   * Sets whether a double spend was seen.
+   *
+   * @param isDoubleSpend is true if a double spend was seen
+   * @return this transaction for chaining
+   */
   public ZephyrTx setIsDoubleSpendSeen(Boolean isDoubleSpend) {
     this.isDoubleSpendSeen = isDoubleSpend;
     return this;
   }
   
+  /**
+   * Returns the secret key of the transaction as hex. {@code ZephyrWalletFull} sets it on the
+   * transactions that {@code createTxs} and the sweeps return; the transactions of {@code getTxs}
+   * do not carry it, {@code getTxKey(hash)} reads it from the wallet. With the key and the hash
+   * anyone can check the transaction against an address, so treat it as a secret and do not log it.
+   *
+   * @return the secret key, null if not known here
+   */
   public String getKey() {
     return key;
   }
   
+  /**
+   * Sets the secret key of the transaction.
+   *
+   * @param key is the secret key as hex
+   * @return this transaction for chaining
+   */
   public ZephyrTx setKey(String key) {
     this.key = key;
     return this;
   }
   
+  /**
+   * Returns the complete transaction, serialized as hex. {@code ZephyrWalletFull} sets it on the
+   * transactions that {@code createTxs} and the sweeps return, and not on those of {@code getTxs}.
+   *
+   * @return the transaction as hex, null if not known here
+   */
   public String getFullHex() {
     return fullHex;
   }
   
+  /**
+   * Sets the complete transaction as hex.
+   *
+   * @param fullHex is the transaction as hex
+   * @return this transaction for chaining
+   */
   public ZephyrTx setFullHex(String fullHex) {
     this.fullHex = fullHex;
     return this;
   }
   
+  /**
+   * Returns the pruned part of the transaction (without its prunable signature data) as hex.
+   * {@code ZephyrWalletFull} does not fill it (null). {@code ZephyrDaemonRpc} fills it from the
+   * node; its transaction calls are inherited from monero-java; not tested against Zephyr.
+   *
+   * @return the pruned transaction as hex, null if not known
+   */
   public String getPrunedHex() {
     return prunedHex;
   }
   
+  /**
+   * Sets the pruned part of the transaction as hex.
+   *
+   * @param prunedHex is the pruned part as hex
+   * @return this transaction for chaining
+   */
   public ZephyrTx setPrunedHex(String prunedHex) {
     this.prunedHex = prunedHex;
     return this;
   }
   
+  /**
+   * Returns the prunable part of the transaction (its signature data) as hex.
+   * {@code ZephyrWalletFull} does not fill it (null). {@code ZephyrDaemonRpc} fills it from the
+   * node; its transaction calls are inherited from monero-java; not tested against Zephyr.
+   *
+   * @return the prunable part as hex, null if not known
+   */
   public String getPrunableHex() {
     return prunableHex;
   }
   
+  /**
+   * Sets the prunable part of the transaction as hex.
+   *
+   * @param prunableHex is the prunable part as hex
+   * @return this transaction for chaining
+   */
   public ZephyrTx setPrunableHex(String prunableHex) {
     this.prunableHex = prunableHex;
     return this;
   }
   
+  /**
+   * Returns the hash of the prunable part of the transaction. {@code ZephyrWalletFull} does not
+   * fill it (null). {@code ZephyrDaemonRpc} fills it from the node; its transaction calls are
+   * inherited from monero-java; not tested against Zephyr.
+   *
+   * @return the hash, null if not known
+   */
   public String getPrunableHash() {
     return prunableHash;
   }
   
+  /**
+   * Sets the hash of the prunable part.
+   *
+   * @param prunableHash is the hash
+   * @return this transaction for chaining
+   */
   public ZephyrTx setPrunableHash(String prunableHash) {
     this.prunableHash = prunableHash;
     return this;
   }
   
+  /**
+   * Returns the size of the transaction in bytes. {@code ZephyrWalletFull} does not fill it (null).
+   * {@code ZephyrDaemonRpc} fills it from the node; its transaction calls are inherited from
+   * monero-java; not tested against Zephyr.
+   *
+   * @return the size in bytes, null if not known
+   */
   public Long getSize() {
     return size;
   }
   
+  /**
+   * Sets the size of the transaction.
+   *
+   * @param size is the size in bytes
+   * @return this transaction for chaining
+   */
   public ZephyrTx setSize(Long size) {
     this.size = size;
     return this;
   }
   
+  /**
+   * Returns the weight of the transaction in bytes, the measure its fee is based on.
+   * {@code ZephyrWalletFull} sets it on the transactions that {@code createTxs} and the sweeps
+   * return.
+   *
+   * @return the weight, null if not known
+   */
   public Long getWeight() {
     return weight;
   }
   
+  /**
+   * Sets the weight of the transaction.
+   *
+   * @param weight is the weight in bytes
+   * @return this transaction for chaining
+   */
   public ZephyrTx setWeight(Long weight) {
     this.weight = weight;
     return this;
   }
   
+  /**
+   * Returns the inputs of the transaction: the outputs it spends. In {@code ZephyrWalletFull} the
+   * inputs of a transaction that {@code createTxs} or a sweep returns carry only their key images,
+   * the transactions of {@code getTxs} carry none, and the transaction of a spent notification to a
+   * listener carries the spent output.
+   *
+   * @return the inputs, null if not known
+   */
   @JsonManagedReference
   public List<ZephyrOutput> getInputs() {
     return inputs;
   }
   
+  /**
+   * Sets the inputs of the transaction.
+   *
+   * @param inputs are the inputs
+   * @return this transaction for chaining
+   */
   public ZephyrTx setInputs(List<ZephyrOutput> inputs) {
     this.inputs = inputs;
     return this;
   }
   
+  /**
+   * Returns the outputs of the transaction. For a wallet transaction these are only the wallet's
+   * own outputs ({@code ZephyrOutputWallet}). {@code ZephyrWalletFull.getTxs} fills them only when
+   * the query asks for them ({@code ZephyrTxQuery.setIncludeOutputs(true)} or an output query),
+   * from the same data as {@code getOutputs()}, so they carry no asset.
+   *
+   * @return the outputs, null if not known
+   */
   @JsonManagedReference
   public List<ZephyrOutput> getOutputs() {
     return outputs;
   }
   
+  /**
+   * Sets the outputs of the transaction.
+   *
+   * @param outputs are the outputs
+   * @return this transaction for chaining
+   */
   public ZephyrTx setOutputs(List<ZephyrOutput> outputs) {
     this.outputs = outputs;
     return this;
   }
   
+  /**
+   * Returns the global indices of the transaction's outputs on the chain. {@code ZephyrWalletFull}
+   * does not fill it (null). {@code ZephyrDaemonRpc} fills it from the node; its transaction calls
+   * are inherited from monero-java; not tested against Zephyr.
+   *
+   * @return the output indices, null if not known
+   */
   public List<Long> getOutputIndices() {
     return outputIndices;
   }
   
+  /**
+   * Sets the global indices of the outputs.
+   *
+   * @param outputIndices are the output indices
+   * @return this transaction for chaining
+   */
   public ZephyrTx setOutputIndices(List<Long> outputIndices) {
     this.outputIndices = outputIndices;
     return this;
   }
   
+  /**
+   * Returns the serialized pending transaction that {@code relayTx} and {@code relayTxs} send.
+   * {@code ZephyrWalletFull} sets it on the transactions that {@code createTxs} and the sweeps
+   * return; the transactions of {@code getTxs} do not carry it. It contains the transaction's
+   * secret key, so treat it as a secret and do not log it.
+   *
+   * @return the metadata, null if not known here
+   */
   public String getMetadata() {
     return metadata;
   }
   
+  /**
+   * Sets the serialized pending transaction.
+   *
+   * @param metadata is the metadata
+   * @return this transaction for chaining
+   */
   public ZephyrTx setMetadata(String metadata) {
     this.metadata = metadata;
     return this;
   }
   
+  /**
+   * Returns the extra field of the transaction as byte values from 0 to 255.
+   * {@code ZephyrWalletFull} does not fill it (null). {@code ZephyrDaemonRpc} fills it from the
+   * node; its transaction calls are inherited from monero-java; not tested against Zephyr.
+   *
+   * @return the extra field, null if not known
+   */
   public int[] getExtra() {
     return extra;
   }
   
+  /**
+   * Sets the extra field of the transaction.
+   *
+   * @param extra is the extra field as byte values
+   * @return this transaction for chaining
+   */
   public ZephyrTx setExtra(int[] extra) {
     this.extra = extra;
     return this;
   }
   
+  /**
+   * Returns the RingCT signature data of the transaction as an untyped structure.
+   * {@code ZephyrWalletFull} does not fill it (null). {@code ZephyrDaemonRpc} fills it from the
+   * node; its transaction calls are inherited from monero-java; not tested against Zephyr.
+   *
+   * @return the signature data, null if not known
+   */
   public Object getRctSignatures() {
     return rctSignatures;
   }
   
+  /**
+   * Sets the RingCT signature data.
+   *
+   * @param rctSignatures is the signature data
+   * @return this transaction for chaining
+   */
   public ZephyrTx setRctSignatures(Object rctSignatures) {
     this.rctSignatures = rctSignatures;
     return this;
   }
   
+  /**
+   * Returns the prunable RingCT signature data of the transaction as an untyped structure.
+   * {@code ZephyrWalletFull} does not fill it (null). {@code ZephyrDaemonRpc} fills it from the
+   * node; its transaction calls are inherited from monero-java; not tested against Zephyr.
+   *
+   * @return the prunable signature data, null if not known
+   */
   public Object getRctSigPrunable() {
     return rctSigPrunable;
   }
   
+  /**
+   * Sets the prunable RingCT signature data.
+   *
+   * @param rctSigPrunable is the prunable signature data
+   * @return this transaction for chaining
+   */
   public ZephyrTx setRctSigPrunable(Object rctSigPrunable) {
     this.rctSigPrunable = rctSigPrunable;
     return this;
   }
   
+  /**
+   * Returns the node's flag that it keeps this pool transaction because it came with a block.
+   * {@code ZephyrWalletFull} does not fill it (null). {@code ZephyrDaemonRpc} fills it from the
+   * node; its transaction calls are inherited from monero-java; not tested against Zephyr.
+   *
+   * @return the flag, null if not known
+   */
   @JsonProperty("isKeptByBlock")
   public Boolean isKeptByBlock() {
     return isKeptByBlock;
   }
   
+  /**
+   * Sets the node's kept-by-block flag.
+   *
+   * @param isKeptByBlock is the flag
+   * @return this transaction for chaining
+   */
   public ZephyrTx setIsKeptByBlock(Boolean isKeptByBlock) {
     this.isKeptByBlock = isKeptByBlock;
     return this;
   }
   
+  /**
+   * Returns whether the transaction failed: an outgoing transaction that the wallet's core records
+   * as failed, which is then not in the pool. {@code ZephyrWalletFull} reports false for incoming
+   * transactions and for transactions in a block.
+   *
+   * @return true if failed, null if unknown
+   */
   @JsonProperty("isFailed")
   public Boolean isFailed() {
     return isFailed;
   }
   
+  /**
+   * Sets whether the transaction failed.
+   *
+   * @param isFailed is true if failed
+   * @return this transaction for chaining
+   */
   public ZephyrTx setIsFailed(Boolean isFailed) {
     this.isFailed = isFailed;
     return this;
   }
   
+  /**
+   * Returns the height of the block in which the node last failed to include this pool transaction.
+   * {@code ZephyrWalletFull} does not fill it (null). {@code ZephyrDaemonRpc} fills it from the
+   * node; its transaction calls are inherited from monero-java; not tested against Zephyr.
+   *
+   * @return the height, null if not known
+   */
   public Long getLastFailedHeight() {
     return lastFailedHeight;
   }
   
+  /**
+   * Sets the height of the last failed inclusion.
+   *
+   * @param lastFailedHeight is the height
+   * @return this transaction for chaining
+   */
   public ZephyrTx setLastFailedHeight(Long lastFailedHeight) {
     this.lastFailedHeight = lastFailedHeight;
     return this;
   }
   
+  /**
+   * Returns the hash of the block in which the node last failed to include this pool transaction.
+   * {@code ZephyrWalletFull} does not fill it (null). {@code ZephyrDaemonRpc} fills it from the
+   * node; its transaction calls are inherited from monero-java; not tested against Zephyr.
+   *
+   * @return the block hash, null if not known
+   */
   public String getLastFailedHash() {
     return lastFailedHash;
   }
   
+  /**
+   * Sets the hash of the block of the last failed inclusion.
+   *
+   * @param lastFailedHash is the block hash
+   * @return this transaction for chaining
+   */
   public ZephyrTx setLastFailedHash(String lastFailedHash) {
     this.lastFailedHash = lastFailedHash;
     return this;
   }
   
+  /**
+   * Returns the height of the highest block that the inputs of this pool transaction refer to.
+   * {@code ZephyrWalletFull} does not fill it (null). {@code ZephyrDaemonRpc} fills it from the
+   * node; its transaction calls are inherited from monero-java; not tested against Zephyr.
+   *
+   * @return the height, null if not known
+   */
   public Long getMaxUsedBlockHeight() {
     return maxUsedBlockHeight;
   }
   
+  /**
+   * Sets the height of the highest block the inputs refer to.
+   *
+   * @param maxUsedBlockHeight is the height
+   * @return this transaction for chaining
+   */
   public ZephyrTx setMaxUsedBlockHeight(Long maxUsedBlockHeight) {
     this.maxUsedBlockHeight = maxUsedBlockHeight;
     return this;
   }
   
+  /**
+   * Returns the hash of the highest block that the inputs of this pool transaction refer to.
+   * {@code ZephyrWalletFull} does not fill it (null). {@code ZephyrDaemonRpc} fills it from the
+   * node; its transaction calls are inherited from monero-java; not tested against Zephyr.
+   *
+   * @return the block hash, null if not known
+   */
   public String getMaxUsedBlockHash() {
     return maxUsedBlockHash;
   }
   
+  /**
+   * Sets the hash of the highest block the inputs refer to.
+   *
+   * @param maxUsedBlockHash is the block hash
+   * @return this transaction for chaining
+   */
   public ZephyrTx setMaxUsedBlockHash(String maxUsedBlockHash) {
     this.maxUsedBlockHash = maxUsedBlockHash;
     return this;
   }
   
+  /**
+   * Returns the signatures of the transaction as the node reports them. {@code ZephyrWalletFull}
+   * does not fill it (null). {@code ZephyrDaemonRpc} fills it from the node; its transaction calls
+   * are inherited from monero-java; not tested against Zephyr.
+   *
+   * @return the signatures, null if not known
+   */
   public List<String> getSignatures() {
     return signatures;
   }
   
+  /**
+   * Sets the signatures of the transaction.
+   *
+   * @param signatures are the signatures
+   * @return this transaction for chaining
+   */
   public ZephyrTx setSignatures(List<String> signatures) {
     this.signatures = signatures;
     return this;
   }
   
+  /**
+   * Merges the information of the given transaction (the same transaction, seen another way) into
+   * this one. Fields this one lacks are taken over; states that only move forward (confirmed,
+   * relayed, failed, double spend seen, the number of confirmations) take the later value; other
+   * fields that both carry must agree, or the merge throws. The given transaction may be modified
+   * or referenced afterwards, so do not reuse it.
+   *
+   * @param tx is the transaction to merge into this one
+   * @return this transaction for chaining
+   */
   public ZephyrTx merge(ZephyrTx tx) {
     if (this == tx) return this;
     
@@ -567,6 +1074,12 @@ public class ZephyrTx {
     return toString(0);
   }
   
+  /**
+   * Returns the fields of this transaction that are set, one per line, indented.
+   *
+   * @param indent is the indentation in levels of two spaces
+   * @return the description
+   */
   public String toString(int indent) {
     StringBuilder sb = new StringBuilder();
     sb.append(GenUtils.getIndent(indent) + "=== TX ===\n");

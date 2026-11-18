@@ -17,10 +17,19 @@ public class ZephyrOutgoingTransfer extends ZephyrTransfer {
   private List<String> addresses;
   private List<ZephyrDestination> destinations;
   
+  /**
+   * Creates an empty outgoing transfer.
+   */
   public ZephyrOutgoingTransfer() {
     // nothing to initialize
   }
   
+  /**
+   * Creates a copy of the given outgoing transfer with copies of its destinations, without its
+   * transaction.
+   *
+   * @param transfer is the transfer to copy
+   */
   public ZephyrOutgoingTransfer(final ZephyrOutgoingTransfer transfer) {
     super(transfer);
     if (transfer.subaddressIndices != null) this.subaddressIndices = new ArrayList<Integer>(transfer.subaddressIndices);
@@ -43,28 +52,72 @@ public class ZephyrOutgoingTransfer extends ZephyrTransfer {
     return false;
   }
   
+  /**
+   * Returns the indices of the subaddresses of the account that the transaction spent from.
+   *
+   * @return the subaddress indices, null if not known: on a transaction that {@code createTxs} or a
+   * sweep returns they are known only when exactly one subaddress index was requested
+   */
   public List<Integer> getSubaddressIndices() {
     return subaddressIndices;
   }
 
+  /**
+   * Sets the indices of the subaddresses spent from.
+   *
+   * @param subaddressIndices are the subaddress indices
+   * @return this transfer for chaining
+   */
   public ZephyrOutgoingTransfer setSubaddressIndices(List<Integer> subaddressIndices) {
     this.subaddressIndices = subaddressIndices;
     return this;
   }
   
+  /**
+   * Returns the addresses of the subaddresses that the transaction spent from, in the order of
+   * {@link #getSubaddressIndices()}.
+   *
+   * @return the addresses, null if not known, as on the transactions that {@code createTxs} and the
+   * sweeps return
+   */
   public List<String> getAddresses() {
     return addresses;
   }
 
+  /**
+   * Sets the addresses of the subaddresses spent from.
+   *
+   * @param addresses are the addresses
+   * @return this transfer for chaining
+   */
   public ZephyrOutgoingTransfer setAddresses(List<String> addresses) {
     this.addresses = addresses;
     return this;
   }
 
+  /**
+   * Returns the recipients of the transfer with their amounts. They are local data of the sending
+   * wallet: a wallet restored from its mnemonic does not have them for earlier sends. For a
+   * conversion the destination's amount changes meaning (see
+   * {@link ZephyrDestination#getAmount()}). On the transactions that {@code createTxs} and
+   * {@code sweepUnlocked} return, a destination's {@link ZephyrDestination#getAssetType()} is not
+   * the asset sent: the core repeats the asset of the configuration's destination, or its default
+   * {@code "ZEPH"} when that has none (read in the core's code). The currency pair of the
+   * configuration is what was sent.
+   *
+   * @return the destinations, null if not known, and on the transactions of a {@code createTxs}
+   * send that the core split into several transactions
+   */
   public List<ZephyrDestination> getDestinations() {
     return destinations;
   }
   
+  /**
+   * Sets the recipients of the transfer.
+   *
+   * @param destinations are the destinations
+   * @return this transfer for chaining
+   */
   public ZephyrOutgoingTransfer setDestinations(List<ZephyrDestination> destinations) {
     this.destinations = destinations;
     return this;

@@ -22,10 +22,18 @@ public class ZephyrOutput {
   private String stealthPublicKey;
   private String assetType;
   
+  /**
+   * Creates an empty output; every field is null.
+   */
   public ZephyrOutput() {
     // nothing to build
   }
   
+  /**
+   * Creates a deep copy of the given output, without its transaction reference.
+   *
+   * @param output is the output to copy
+   */
   public ZephyrOutput(final ZephyrOutput output) {
     if (output.keyImage != null) this.keyImage = output.keyImage.copy();
     this.amount = output.amount;
@@ -35,60 +43,139 @@ public class ZephyrOutput {
     this.assetType = output.assetType;
   }
   
+  /**
+   * Returns a deep copy of this output, without its transaction reference.
+   *
+   * @return the copy
+   */
   public ZephyrOutput copy() {
     return new ZephyrOutput(this);
   }
   
+  /**
+   * Returns the transaction this output belongs to: the transaction that created it, or for an
+   * input the transaction that spends it.
+   *
+   * @return the transaction, null if not set
+   */
   @JsonBackReference
   public ZephyrTx getTx() {
     return tx;
   }
   
+  /**
+   * Sets the transaction this output belongs to.
+   *
+   * @param tx is the transaction
+   * @return this output for chaining
+   */
   public ZephyrOutput setTx(ZephyrTx tx) {
     this.tx = tx;
     return this;
   }
   
+  /**
+   * Returns the key image of the output, which marks the output as spent when a transaction uses
+   * it.
+   *
+   * @return the key image, null when the wallet does not know it, as for the outputs of a view-only
+   * wallet without imported key images
+   */
   public ZephyrKeyImage getKeyImage() {
     return keyImage;
   }
   
+  /**
+   * Sets the key image of the output.
+   *
+   * @param keyImage is the key image
+   * @return this output for chaining
+   */
   public ZephyrOutput setKeyImage(ZephyrKeyImage keyImage) {
     this.keyImage = keyImage;
     return this;
   }
   
+  /**
+   * Returns the amount of the output in atomic units (10^12 per coin) of the output's asset.
+   *
+   * @return the amount, null if not known (the inputs of a transaction that {@code createTxs}
+   * returns carry only their key images)
+   */
   public BigInteger getAmount() {
     return amount;
   }
   
+  /**
+   * Sets the amount of the output.
+   *
+   * @param amount is the amount in atomic units
+   * @return this output for chaining
+   */
   public ZephyrOutput setAmount(BigInteger amount) {
     this.amount = amount;
     return this;
   }
   
+  /**
+   * Returns the global index of the output on the chain as the core reports it.
+   * {@code ZephyrWalletFull} fills it in {@code getOutputs} from the wallet's record of the output.
+   *
+   * @return the index, null if not known
+   */
   public Long getIndex() {
     return index;
   }
   
+  /**
+   * Sets the global index of the output.
+   *
+   * @param index is the index
+   * @return this output for chaining
+   */
   public ZephyrOutput setIndex(Long index) {
     this.index = index;
     return this;
   }
   
+  /**
+   * Returns, for an input, the global indices of the outputs of its ring. {@code ZephyrWalletFull}
+   * does not fill it (null). {@code ZephyrDaemonRpc} fills it from the node; its transaction calls
+   * are inherited from monero-java; not tested against Zephyr.
+   *
+   * @return the ring's output indices, null if not known
+   */
   public List<Long> getRingOutputIndices() {
     return ringOutputIndices;
   }
   
+  /**
+   * Sets the global indices of the ring's outputs.
+   *
+   * @param ringOutputIndices are the indices
+   * @return this output for chaining
+   */
   public ZephyrOutput setRingOutputIndices(List<Long> ringOutputIndices) {
     this.ringOutputIndices = ringOutputIndices;
     return this;
   }
   
+  /**
+   * Returns the one-time public key of the output as hex. {@code ZephyrWalletFull} fills it in
+   * {@code getOutputs}.
+   *
+   * @return the public key, null if not known
+   */
   public String getStealthPublicKey() {
     return stealthPublicKey;
   }
   
+  /**
+   * Sets the one-time public key of the output.
+   *
+   * @param stealthPublicKey is the public key as hex
+   * @return this output for chaining
+   */
   public ZephyrOutput setStealthPublicKey(String stealthPublicKey) {
     this.stealthPublicKey = stealthPublicKey;
     return this;
@@ -123,6 +210,15 @@ public class ZephyrOutput {
     return toString(0);
   }
   
+  /**
+   * Merges the information of the given output (the same output, seen another way) into this one.
+   * If the two belong to different transaction objects, the transactions are merged instead. Fields
+   * this one lacks are taken over; fields both carry must agree, or the merge throws. The given
+   * output may be modified or referenced afterwards, so do not reuse it.
+   *
+   * @param output is the output to merge into this one
+   * @return this output for chaining
+   */
   public ZephyrOutput merge(ZephyrOutput output) {
     GenUtils.assertTrue(output instanceof ZephyrOutput);
     if (this == output) return this;
@@ -142,6 +238,12 @@ public class ZephyrOutput {
     return this;
   }
   
+  /**
+   * Returns the fields of this output that are set, one per line, indented.
+   *
+   * @param indent is the indentation in levels of two spaces
+   * @return the description
+   */
   public String toString(int indent) {
     StringBuilder sb = new StringBuilder();
     if (getKeyImage() != null) {

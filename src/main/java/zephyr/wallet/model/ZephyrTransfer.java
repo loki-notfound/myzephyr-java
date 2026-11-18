@@ -21,10 +21,19 @@ public abstract class ZephyrTransfer {
   private Integer accountIndex;
   private String assetType;
   
+  /**
+   * Creates an empty transfer.
+   */
   public ZephyrTransfer() {
     // nothing to initialize
   }
   
+  /**
+   * Creates a copy of the given transfer's amount, account index and asset, without its
+   * transaction.
+   *
+   * @param transfer is the transfer to copy
+   */
   public ZephyrTransfer(final ZephyrTransfer transfer) {
     this.amount = transfer.amount;
     this.accountIndex = transfer.accountIndex;
@@ -32,39 +41,91 @@ public abstract class ZephyrTransfer {
     validate();
   }
   
+  /**
+   * Returns a copy of this transfer without its transaction reference.
+   *
+   * @return the copy
+   */
   public abstract ZephyrTransfer copy();
   
+  /**
+   * Returns the transaction this transfer belongs to.
+   *
+   * @return the transaction
+   */
   @JsonBackReference
   public ZephyrTxWallet getTx() {
     return tx;
   }
   
+  /**
+   * Sets the transaction this transfer belongs to.
+   *
+   * @param tx is the transaction
+   * @return this transfer for chaining
+   */
   public ZephyrTransfer setTx(ZephyrTxWallet tx) {
     this.tx = tx;
     return this;
   }
   
+  /**
+   * Returns whether this is an outgoing transfer, the opposite of {@link #isIncoming()}.
+   *
+   * @return true for an outgoing transfer
+   */
   @JsonIgnore
   public Boolean isOutgoing() {
     return !isIncoming();
   }
   
+  /**
+   * Returns whether this is an incoming transfer.
+   *
+   * @return true for a {@link ZephyrIncomingTransfer}, false for a {@link ZephyrOutgoingTransfer}
+   */
   @JsonProperty("isIncoming")
   public abstract Boolean isIncoming();
   
+  /**
+   * Returns the amount of the transfer in atomic units (10^12 per coin) of its asset
+   * ({@link #getAssetType()}). For an outgoing transfer it is what the wallet sent, without fee and
+   * change, in the source asset; for a conversion that is the source amount. See the user guide,
+   * {@code docs/guide/05-assets-and-balances.md}, section "Amounts".
+   *
+   * @return the amount, null if not known
+   */
   public BigInteger getAmount() {
     return amount;
   }
   
+  /**
+   * Sets the amount of the transfer.
+   *
+   * @param amount is the amount in atomic units
+   * @return this transfer for chaining
+   */
   public ZephyrTransfer setAmount(BigInteger amount) {
     this.amount = amount;
     return this;
   }
   
+  /**
+   * Returns the index of the account the funds went to (incoming) or came from (outgoing).
+   *
+   * @return the account index, null if not known: the incoming transfer of a conversion that
+   * {@code createTxs} returns has none
+   */
   public Integer getAccountIndex() {
     return accountIndex;
   }
 
+  /**
+   * Sets the index of the account; a negative index throws a {@code ZephyrError}.
+   *
+   * @param accountIndex is the account index
+   * @return this transfer for chaining
+   */
   public ZephyrTransfer setAccountIndex(Integer accountIndex) {
     this.accountIndex = accountIndex;
     validate();
@@ -131,6 +192,12 @@ public abstract class ZephyrTransfer {
     return toString(0);
   }
   
+  /**
+   * Returns the fields of this transfer that are set, one per line, indented.
+   *
+   * @param indent is the indentation in levels of two spaces
+   * @return the description
+   */
   public String toString(int indent) {
     StringBuilder sb = new StringBuilder();
     sb.append(GenUtils.kvLine("Is incoming", this.isIncoming(), indent));

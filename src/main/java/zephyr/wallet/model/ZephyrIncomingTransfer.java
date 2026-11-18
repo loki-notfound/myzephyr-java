@@ -15,10 +15,18 @@ public class ZephyrIncomingTransfer extends ZephyrTransfer {
   private String address;
   private Long numSuggestedConfirmations;
   
+  /**
+   * Creates an empty incoming transfer.
+   */
   public ZephyrIncomingTransfer() {
     // nothing to initialize
   }
   
+  /**
+   * Creates a copy of the given incoming transfer, without its transaction.
+   *
+   * @param transfer is the transfer to copy
+   */
   public ZephyrIncomingTransfer(final ZephyrIncomingTransfer transfer) {
     super(transfer);
     this.subaddressIndex = transfer.subaddressIndex;
@@ -36,19 +44,43 @@ public class ZephyrIncomingTransfer extends ZephyrTransfer {
     return true;
   }
   
+  /**
+   * Returns the index, within the account, of the subaddress that received the funds.
+   *
+   * @return the subaddress index, null if not known: the incoming transfer of a conversion that
+   * {@code createTxs} returns has none
+   */
   public Integer getSubaddressIndex() {
     return subaddressIndex;
   }
   
+  /**
+   * Sets the index of the subaddress that received the funds.
+   *
+   * @param subaddressIndex is the subaddress index
+   * @return this transfer for chaining
+   */
   public ZephyrIncomingTransfer setSubaddressIndex(Integer subaddressIndex) {
     this.subaddressIndex = subaddressIndex;
     return this;
   }
   
+  /**
+   * Returns the address that received the funds: the subaddress at {@link #getAccountIndex()} and
+   * {@link #getSubaddressIndex()}.
+   *
+   * @return the address, null if not known (as for the indices)
+   */
   public String getAddress() {
     return address;
   }
 
+  /**
+   * Sets the address that received the funds.
+   *
+   * @param address is the address
+   * @return this transfer for chaining
+   */
   public ZephyrIncomingTransfer setAddress(String address) {
     this.address = address;
     return this;
@@ -66,6 +98,12 @@ public class ZephyrIncomingTransfer extends ZephyrTransfer {
     return numSuggestedConfirmations;
   }
   
+  /**
+   * Sets the suggested number of confirmations, see {@link #getNumSuggestedConfirmations()}.
+   *
+   * @param numSuggestedConfirmations is the number of confirmations
+   * @return this transfer for chaining
+   */
   public ZephyrIncomingTransfer setNumSuggestedConfirmations(Long numSuggestedConfirmations) {
     this.numSuggestedConfirmations = numSuggestedConfirmations;
     return this;
