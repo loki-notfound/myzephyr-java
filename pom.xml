@@ -225,6 +225,9 @@
 							<!-- the MIT licence, not the plugin's default "All rights reserved" footer;
 							     bin/javadoc-bottom.txt is the source, bin/check_versions.sh checks that they agree -->
 							<bottom>Copyright &#169; the zephyr-java contributors. MIT licence.</bottom>
+							<!-- doclint without the "missing" group, as in bin/javadoc_sorted.sh, which reports
+							     missing comments only for the files of bin/javadoc-complete.txt -->
+							<doclint>all,-missing</doclint>
 						</configuration>
 					</plugin>
 					<plugin>
@@ -340,6 +343,8 @@
 							<!-- the MIT licence, not the plugin's default "All rights reserved" footer;
 							     bin/javadoc-bottom.txt is the source, bin/check_versions.sh checks that they agree -->
 							<bottom>Copyright &#169; the zephyr-java contributors. MIT licence.</bottom>
+							<!-- doclint without the "missing" group, as in bin/javadoc_sorted.sh -->
+							<doclint>all,-missing</doclint>
 						</configuration>
 					</plugin>
 					<plugin>

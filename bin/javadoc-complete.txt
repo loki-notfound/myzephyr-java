@@ -1,0 +1,45 @@
+# The source files whose Javadoc is kept complete, relative to src/main/java, one per line.
+# bin/javadoc_sorted.sh reports a missing comment (doclint group "missing": no comment, no @param or
+# @return, a default constructor) only in these files; the generation itself leaves that group out,
+# so the files inherited unchanged from monero-java (zephyr.daemon.model, the RPC classes and the
+# rest) produce no such warnings. A missing comment in a listed file is reported; add a file once
+# its Javadoc is complete.
+zephyr/common/TaskLooper.java
+zephyr/common/ZephyrConnectionManagerListener.java
+zephyr/common/ZephyrTls.java
+zephyr/common/ZephyrUtils.java
+zephyr/daemon/ZephyrDaemon.java
+zephyr/daemon/model/ZephyrNetworkType.java
+zephyr/daemon/model/ZephyrOutput.java
+zephyr/daemon/model/ZephyrPricingRecord.java
+zephyr/daemon/model/ZephyrTx.java
+zephyr/lib/utils/GenUtils.java
+zephyr/lib/utils/Keccak256.java
+zephyr/wallet/ZephyrWallet.java
+zephyr/wallet/ZephyrWalletDefault.java
+zephyr/wallet/ZephyrWalletFull.java
+zephyr/wallet/model/ZephyrAccount.java
+zephyr/wallet/model/ZephyrAssets.java
+zephyr/wallet/model/ZephyrBalance.java
+zephyr/wallet/model/ZephyrCheck.java
+zephyr/wallet/model/ZephyrCheckTx.java
+zephyr/wallet/model/ZephyrDecodedAddress.java
+zephyr/wallet/model/ZephyrDestination.java
+zephyr/wallet/model/ZephyrIncomingTransfer.java
+zephyr/wallet/model/ZephyrIntegratedAddress.java
+zephyr/wallet/model/ZephyrOutgoingTransfer.java
+zephyr/wallet/model/ZephyrOutputQuery.java
+zephyr/wallet/model/ZephyrOutputWallet.java
+zephyr/wallet/model/ZephyrReserveInfo.java
+zephyr/wallet/model/ZephyrSubaddress.java
+zephyr/wallet/model/ZephyrSyncResult.java
+zephyr/wallet/model/ZephyrTransfer.java
+zephyr/wallet/model/ZephyrTransferQuery.java
+zephyr/wallet/model/ZephyrTxConfig.java
+zephyr/wallet/model/ZephyrTxPriority.java
+zephyr/wallet/model/ZephyrTxQuery.java
+zephyr/wallet/model/ZephyrTxSet.java
+zephyr/wallet/model/ZephyrTxWallet.java
+zephyr/wallet/model/ZephyrWalletConfig.java
+zephyr/wallet/model/ZephyrWalletListener.java
+zephyr/wallet/model/ZephyrWalletListenerI.java

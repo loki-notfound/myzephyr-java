@@ -24,6 +24,13 @@
 # java-api-package-list-1.8, line endings LF). Warnings are allowed; an error stops the script.
 # The classpath is the compile classpath that Maven resolves (maven-dependency-plugin, pinned).
 #
+# Missing comments: the generation runs doclint with every group except "missing"
+# (-Xdoclint:all,-missing; javadoc's default is all), so the files inherited unchanged from
+# monero-java report no "no comment" warnings. A second javadoc run with -Xdoclint:missing over the
+# files of bin/javadoc-complete.txt alone (the other sources on the source path) reports a missing
+# comment in those files; it writes to a scratch directory that is deleted, so target/apidocs is
+# the generation's alone.
+#
 # Environment: JAVA_HOME (optional; else javadoc from PATH)
 # Usage: bin/javadoc_sorted.sh
 
@@ -53,7 +60,19 @@ rm -rf target/apidocs
   -encoding UTF-8 -docencoding UTF-8 -charset UTF-8 -source 8 -notimestamp \
   -windowtitle "$TITLE" -doctitle "$TITLE" -bottom "$(cat bin/javadoc-bottom.txt)" \
   -linkoffline https://docs.oracle.com/javase/8/docs/api bin/javadoc-java8 \
+  -Xdoclint:all,-missing \
   -classpath "$(cat target/javadoc-classpath.txt)" \
   -d target/apidocs @target/javadoc-sources.txt
 [ -f target/apidocs/index.html ] || { echo "javadoc wrote no target/apidocs/index.html" >&2; exit 1; }
 echo "target/apidocs: $(find target/apidocs -type f | wc -l) files from $(wc -l < target/javadoc-sources.txt) sources in sorted order"
+
+# missing comments in the files kept complete (bin/javadoc-complete.txt)
+grep -v '^#' bin/javadoc-complete.txt | grep . | sed 's#^#src/main/java/#' > target/javadoc-complete-sources.txt
+rm -rf target/javadoc-complete-check
+"$JAVADOC" -quiet -protected -encoding UTF-8 -source 8 -Xdoclint:missing -Xmaxwarns 100000 \
+  -sourcepath src/main/java -classpath "$(cat target/javadoc-classpath.txt)" \
+  -d target/javadoc-complete-check @target/javadoc-complete-sources.txt > target/javadoc-complete.log 2>&1 \
+  || { cat target/javadoc-complete.log >&2; exit 1; }
+rm -rf target/javadoc-complete-check
+cat target/javadoc-complete.log >&2
+echo "missing Javadoc in the $(wc -l < target/javadoc-complete-sources.txt) files of bin/javadoc-complete.txt: $(grep -c ': warning:' target/javadoc-complete.log || true) warnings"
