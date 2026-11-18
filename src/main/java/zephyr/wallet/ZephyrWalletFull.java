@@ -688,7 +688,6 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       try {
         setProxyJni(uri);
       } catch (Exception e) {
-        e.printStackTrace();
         throw toZephyrError(e);
       }
     } catch (RuntimeException | AssertionError e) {
@@ -1495,9 +1494,6 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   public List<ZephyrTxWallet> createTxs(ZephyrTxConfig config) {
     beginCall();
     try {
-      LOGGER.fine("java createTxs(request)");
-      LOGGER.fine("Tx config: " + JsonUtils.serialize(config));
-    
       // validate request
       if (config == null) throw new ZephyrError("Tx config cannot be null");
     
@@ -1505,13 +1501,14 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       String txSetJson;
       try {
         txSetJson = createTxsJni(JsonUtils.serialize(config));
-        LOGGER.fine("Received createTxs() response from JNI: " + txSetJson.substring(0, Math.min(5000, txSetJson.length())) + "...");
       } catch (Exception e) {
         throw toZephyrError(e);
       }
     
-      // deserialize and return txs
+      // deserialize and return txs; the log names the hashes only, as the transactions carry their
+      // secret keys and the config the destinations
       ZephyrTxSet txSet = JsonUtils.deserialize(txSetJson, ZephyrTxSet.class);
+      logCreated("createTxs", txSet.getTxs());
       return txSet.getTxs();
     } catch (RuntimeException | AssertionError e) {
       throw toZephyrError(e);
@@ -1550,7 +1547,6 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       String txSetsJson;
       try {
         txSetsJson = sweepUnlockedJni(JsonUtils.serialize(config));
-        LOGGER.fine("Received sweepUnlocked() response from JNI: " + txSetsJson.substring(0, Math.min(5000, txSetsJson.length())) + "...");
       } catch (Exception e) {
         throw toZephyrError(e);
       }
@@ -1561,6 +1557,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       // return txs
       List<ZephyrTxWallet> txs = new ArrayList<ZephyrTxWallet>();
       for (ZephyrTxSet txSet : txSets) txs.addAll(txSet.getTxs());
+      logCreated("sweepUnlocked", txs);
       return txs;
     } catch (RuntimeException | AssertionError e) {
       throw toZephyrError(e);
@@ -2823,6 +2820,17 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     synchronized (jniListener) {
       if (jniListenerHandle == 0) jniListenerHandle = setListenerJni(jniListener);
     }
+  }
+  
+  /**
+   * Logs at FINE how many transactions a call built and their hashes: never the config, the
+   * transactions' JSON or their keys.
+   */
+  private static void logCreated(String call, List<ZephyrTxWallet> txs) {
+    if (!LOGGER.isLoggable(Level.FINE)) return;
+    List<String> hashes = new ArrayList<String>();
+    if (txs != null) for (ZephyrTxWallet tx : txs) hashes.add(tx.getHash());
+    LOGGER.fine(call + " built " + hashes.size() + " transaction(s): " + hashes);
   }
   
   private void assertNotClosed() {

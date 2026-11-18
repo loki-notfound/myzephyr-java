@@ -332,10 +332,10 @@ public class ZephyrRpcConnection {
       synchronized (this) {
 
         // logging
-        if (ZephyrUtils.getLogLevel() >= 2) ZephyrUtils.log(2, "Sending json request with method='" + method + "', body=" + JsonUtils.serialize(body) + ", uri=" + uri);
+        if (ZephyrUtils.getLogLevel() >= 2) ZephyrUtils.log(2, "Sending json request with method='" + method + "', body=" + JsonUtils.serialize(Redaction.redact(body)) + ", uri=" + Redaction.uri(uri));
         if (printStackTrace) {
           try {
-            throw new RuntimeException("Debug stack trace for json request with method '" + method + "' and body " + JsonUtils.serialize(body));
+            throw new RuntimeException("Debug stack trace for json request with method '" + method + "' and body " + JsonUtils.serialize(Redaction.redact(body)));
           } catch (Exception e) {
             e.printStackTrace();
           }
@@ -352,9 +352,9 @@ public class ZephyrRpcConnection {
         respMap = JsonUtils.toMap(MAPPER, EntityUtils.toString(resp.getEntity(), "UTF-8"));
         EntityUtils.consume(resp.getEntity());
         if (ZephyrUtils.getLogLevel() >= 3) {
-          String respStr = JsonUtils.serialize(respMap);
+          String respStr = JsonUtils.serialize(Redaction.redact(respMap));
           respStr = respStr.substring(0, Math.min(10000, respStr.length()));
-          ZephyrUtils.log(3, "Received json response from method='" + method + "', response=" + respStr + ", uri=" + uri + " (" + (System.currentTimeMillis() - startTime) + " ms)");
+          ZephyrUtils.log(3, "Received json response from method='" + method + "', response=" + respStr + ", uri=" + Redaction.uri(uri) + " (" + (System.currentTimeMillis() - startTime) + " ms)");
         }
       }
       
@@ -423,10 +423,10 @@ public class ZephyrRpcConnection {
       synchronized (this) {
 
         // logging
-        if (ZephyrUtils.getLogLevel() >= 2) ZephyrUtils.log(2, "Sending path request with path='" + path + "', params=" + JsonUtils.serialize(params) + ", uri=" + uri);
+        if (ZephyrUtils.getLogLevel() >= 2) ZephyrUtils.log(2, "Sending path request with path='" + path + "', params=" + JsonUtils.serialize(Redaction.redact(params)) + ", uri=" + Redaction.uri(uri));
         if (printStackTrace) {
           try {
-            throw new RuntimeException("Debug stack trace for path request with path '" + path + "' and params " + JsonUtils.serialize(params));
+            throw new RuntimeException("Debug stack trace for path request with path '" + path + "' and params " + JsonUtils.serialize(Redaction.redact(params)));
           } catch (Exception e) {
             e.printStackTrace();
           }
@@ -443,9 +443,9 @@ public class ZephyrRpcConnection {
         respMap = JsonUtils.toMap(MAPPER, EntityUtils.toString(resp.getEntity(), "UTF-8"));
         EntityUtils.consume(resp.getEntity());
         if (ZephyrUtils.getLogLevel() >= 3) {
-          String respStr = JsonUtils.serialize(respMap);
+          String respStr = JsonUtils.serialize(Redaction.redact(respMap));
           respStr = respStr.substring(0, Math.min(10000, respStr.length()));
-          ZephyrUtils.log(3, "Received path response from path='" + path + "', response=" + respStr + ", uri=" + uri + " (" + (System.currentTimeMillis() - startTime) + " ms)");
+          ZephyrUtils.log(3, "Received path response from path='" + path + "', response=" + respStr + ", uri=" + Redaction.uri(uri) + " (" + (System.currentTimeMillis() - startTime) + " ms)");
         }
       }
       
@@ -502,7 +502,7 @@ public class ZephyrRpcConnection {
       synchronized (this) {
 
         // logging
-        if (ZephyrUtils.getLogLevel() >= 2) ZephyrUtils.log(2, "Sending binary request with path='" + path + "', params=" + JsonUtils.serialize(params) + ", uri=" + uri);
+        if (ZephyrUtils.getLogLevel() >= 2) ZephyrUtils.log(2, "Sending binary request with path='" + path + "', params=" + JsonUtils.serialize(Redaction.redact(params)) + ", uri=" + Redaction.uri(uri));
         if (printStackTrace) {
           try {
             throw new RuntimeException("Debug stack trace for binary request with path '" + path);
@@ -545,6 +545,7 @@ public class ZephyrRpcConnection {
   
   @Override
   public String toString() {
+    String uri = Redaction.uri(this.uri); // credentials written into the URI are not printed
     return uri + " (uri=" + uri + ", username=" + username + ", password=" + (password == null ? "null" : "***") + ", priority=" + priority + ", isOnline=" + isOnline + ", isAuthenticated=" + isAuthenticated + ")";
   }
   

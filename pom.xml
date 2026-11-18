@@ -174,6 +174,7 @@
 								<include>test/TestDefaultPort.java</include>
 								<include>test/TestWalletClosing.java</include>
 								<include>test/TestWalletExceptions.java</include>
+								<include>test/TestLibraryLogging.java</include>
 							</includes>
 							<argLine>-Djava.library.path=${native.library.path}</argLine>
 						</configuration>

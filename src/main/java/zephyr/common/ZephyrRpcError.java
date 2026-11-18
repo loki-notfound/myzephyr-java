@@ -1,15 +1,5 @@
 package zephyr.common;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
 import zephyr.lib.utils.JsonUtils;
 
 /**
@@ -19,15 +9,8 @@ public class ZephyrRpcError extends ZephyrError {
 
   private static final long serialVersionUID = -6282368684634114151L;
 
-  /**
-   * Request parameters whose values {@link #toString()} replaces with {@link #REDACTED}: passwords,
-   * the seed and its offset, and private keys. Keys match case-insensitively, at any depth.
-   */
-  private static final Set<String> SECRET_PARAMS = Collections.unmodifiableSet(new HashSet<String>(Arrays.asList(
-      "password", "old_password", "new_password", "seed", "seed_offset", "spendkey", "viewkey", "tx_key")));
-
   /** The text {@link #toString()} prints instead of a secret parameter's value. */
-  public static final String REDACTED = "<redacted>";
+  public static final String REDACTED = Redaction.REDACTED;
   
   private String rpcMethod;
   private Object rpcParams;
@@ -53,32 +36,15 @@ public class ZephyrRpcError extends ZephyrError {
   
   /**
    * The code and the message, then the RPC method and the request's parameters as JSON. The values
-   * of password, old_password, new_password, seed, seed_offset, spendkey, viewkey and tx_key are
-   * printed as {@value #REDACTED}, in nested maps and lists as well; {@link #getRpcParams()} keeps
-   * them.
+   * of password, old_password, new_password, seed, seed_offset, spendkey, viewkey, tx_key, key,
+   * tx_key_list, tx_metadata, tx_metadata_list, signed_txset, multisig_txset, multisig_info and info
+   * are printed as {@value #REDACTED}, in nested maps and lists as well (names matched without
+   * regard to case; the same list as the request and response logging of
+   * {@link ZephyrRpcConnection}); {@link #getRpcParams()} keeps them.
    */
   public String toString() {
     String str = super.toString();
-    if (rpcMethod != null || rpcParams != null) str += "\nRPC request: '" + rpcMethod + "' with params: " + JsonUtils.serialize(redact(rpcParams));
+    if (rpcMethod != null || rpcParams != null) str += "\nRPC request: '" + rpcMethod + "' with params: " + JsonUtils.serialize(Redaction.redact(rpcParams));
     return str;
-  }
-
-  /** A copy of the value with the values of secret keys replaced, in the same order. */
-  private static Object redact(Object value) {
-    if (value instanceof Map) {
-      Map<Object, Object> copy = new LinkedHashMap<Object, Object>();
-      for (Map.Entry<?, ?> entry : ((Map<?, ?>) value).entrySet()) {
-        Object key = entry.getKey();
-        boolean secret = key instanceof String && SECRET_PARAMS.contains(((String) key).toLowerCase(Locale.ROOT));
-        copy.put(key, secret ? REDACTED : redact(entry.getValue()));
-      }
-      return copy;
-    }
-    if (value instanceof Collection || value instanceof Object[]) {
-      List<Object> copy = new ArrayList<Object>();
-      for (Object element : value instanceof Object[] ? Arrays.asList((Object[]) value) : (Collection<?>) value) copy.add(redact(element));
-      return copy;
-    }
-    return value;
   }
 }
