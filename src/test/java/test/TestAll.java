@@ -13,8 +13,6 @@ import org.junit.runner.RunWith;
   TestSerialization.class,
   TestZephyrUtils.class,
   TestZephyrDaemonRpc.class,
-  TestZephyrWalletFull.class,
-  TestZephyrWalletRpc.class,
-  TestZephyrConnectionManager.class
+  TestZephyrWalletFull.class
 })
 public class TestAll {}

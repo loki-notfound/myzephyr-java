@@ -16,7 +16,6 @@ public class Scratchpad {
     
     // initialize daemon, wallet, and direct rpc interface
 //    ZephyrDaemon daemon = TestUtils.getDaemonRpc();
-//    ZephyrWalletRpc walletRpc = TestUtils.getWalletRpc();
 //    ZephyrWalletFull walletFull = TestUtils.getWalletFull();
     
     // -------------------------------- SCRATCHPAD ----------------------------

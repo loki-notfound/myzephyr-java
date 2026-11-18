@@ -21,7 +21,6 @@ import zephyr.common.ZephyrUtils;
 import zephyr.daemon.ZephyrDaemonRpc;
 import zephyr.daemon.model.ZephyrNetworkType;
 import zephyr.wallet.ZephyrWalletFull;
-import zephyr.wallet.ZephyrWalletRpc;
 import zephyr.wallet.model.ZephyrTxWallet;
 import zephyr.wallet.model.ZephyrWalletConfig;
 
@@ -43,7 +42,7 @@ public class TestUtils {
     }
   }
   
-  // directory with zephyr binaries to test (zephyrd and zephyr-wallet-rpc)
+  // directory with zephyr binaries to test (zephyrd)
   public static final String ZEPHYR_BINS_DIR = "";
   
   // zephyr daemon rpc endpoint configuration (change per your configuration)
@@ -51,21 +50,6 @@ public class TestUtils {
   public static final String DAEMON_RPC_USERNAME = "";
   public static final String DAEMON_RPC_PASSWORD = "";
   public static final String DAEMON_LOCAL_PATH = ZEPHYR_BINS_DIR + "/zephyrd";
-  
-  // zephyr wallet rpc configuration (change per your configuration)
-  public static final int WALLET_RPC_PORT_START = 28084; // test wallet executables will bind to consecutive ports after these
-  public static final boolean WALLET_RPC_ZMQ_ENABLED = false;
-  public static final int WALLET_RPC_ZMQ_PORT_START = 58083;
-  public static final int WALLET_RPC_ZMQ_BIND_PORT_START = 48083;  // TODO: zmq bind port necessary?
-  public static final String WALLET_RPC_USERNAME = "rpc_user";
-  public static final String WALLET_RPC_PASSWORD = "abc123";
-  public static final String WALLET_RPC_ZMQ_DOMAIN = "127.0.0.1";
-  public static final String WALLET_RPC_DOMAIN = "localhost";
-  public static final String WALLET_RPC_URI = WALLET_RPC_DOMAIN + ":" + WALLET_RPC_PORT_START;
-  public static final String WALLET_RPC_ZMQ_URI = "tcp://" + WALLET_RPC_ZMQ_DOMAIN + ":" + WALLET_RPC_ZMQ_PORT_START;
-  public static final String WALLET_RPC_LOCAL_PATH = ZEPHYR_BINS_DIR + "/zephyr-wallet-rpc";
-  public static final String WALLET_RPC_LOCAL_WALLET_DIR = ZEPHYR_BINS_DIR;
-  public static final String WALLET_RPC_ACCESS_CONTROL_ORIGINS = "http://localhost:8080"; // cors access from web browser
   
   // test wallet config
   public static final String WALLET_NAME = "test_wallet_1";
@@ -107,99 +91,6 @@ public class TestUtils {
       daemonRpc = new ZephyrDaemonRpc(rpc);
     }
     return daemonRpc;
-  }
-  
-  /**
-   * Get a singleton instance of a zephyr-wallet-rpc client.
-   */
-  private static ZephyrWalletRpc walletRpc;
-  public static ZephyrWalletRpc getWalletRpc() {
-    if (walletRpc == null) {
-      
-      // construct wallet rpc instance with daemon connection
-      ZephyrRpcConnection rpc = new ZephyrRpcConnection(WALLET_RPC_URI, WALLET_RPC_USERNAME, WALLET_RPC_PASSWORD, WALLET_RPC_ZMQ_ENABLED ? WALLET_RPC_ZMQ_URI : null);
-      walletRpc = new ZephyrWalletRpc(rpc);
-    }
-    
-    // attempt to open test wallet
-    try {
-      walletRpc.openWallet(WALLET_NAME, WALLET_PASSWORD);
-    } catch (ZephyrRpcError e) {
-      
-      // -1 returned when wallet does not exist or fails to open e.g. it's already open by another application
-      if (e.getCode() == -1) {
-        
-        // create wallet
-        walletRpc.createWallet(new ZephyrWalletConfig().setPath(WALLET_NAME).setPassword(WALLET_PASSWORD).setMnemonic(MNEMONIC).setRestoreHeight(FIRST_RECEIVE_HEIGHT));
-      } else {
-        throw e;
-      }
-    }
-    
-    // ensure we're testing the right wallet
-    assertEquals(TestUtils.MNEMONIC, walletRpc.getMnemonic());
-    assertEquals(TestUtils.ADDRESS, walletRpc.getPrimaryAddress());
-    
-    // sync and save the wallet
-    walletRpc.sync();
-    walletRpc.save();
-    
-    // start background synchronizing with sync rate
-    walletRpc.startSyncing(TestUtils.SYNC_PERIOD_IN_MS);
-    
-    // return cached wallet rpc
-    return walletRpc;
-  }
-  
-  /**
-   * Start a zephyr-wallet-rpc process bound to the next available port.
-   */
-  public static Map<ZephyrWalletRpc, Integer> WALLET_PORT_OFFSETS = new HashMap<ZephyrWalletRpc, Integer>();
-  public static ZephyrWalletRpc startWalletRpcProcess() { return TestUtils.startWalletRpcProcess(false); }
-  public static ZephyrWalletRpc startWalletRpcProcess(boolean offline) {
-    
-    // get next available offset of ports to bind to
-    int portOffset = 1;
-    while (WALLET_PORT_OFFSETS.values().contains(portOffset)) portOffset++;
-    
-    // create command to start client with internal zephyr-wallet-rpc process
-    List<String> cmd = new ArrayList<String>(Arrays.asList(
-        TestUtils.WALLET_RPC_LOCAL_PATH,
-        "--" + TestUtils.NETWORK_TYPE.toString().toLowerCase(),
-        "--rpc-bind-port", "" + (TestUtils.WALLET_RPC_PORT_START + portOffset),
-        "--rpc-login", TestUtils.WALLET_RPC_USERNAME + ":" + TestUtils.WALLET_RPC_PASSWORD,
-        "--wallet-dir", TestUtils.WALLET_RPC_LOCAL_WALLET_DIR,
-        "--rpc-access-control-origins", TestUtils.WALLET_RPC_ACCESS_CONTROL_ORIGINS));
-    if (offline) cmd.add("--offline");
-    else cmd.addAll(Arrays.asList("--daemon-address", TestUtils.DAEMON_RPC_URI));
-    if (TestUtils.DAEMON_RPC_USERNAME != null && !TestUtils.DAEMON_RPC_USERNAME.equals("")) cmd.addAll(Arrays.asList("--daemon-login", TestUtils.DAEMON_RPC_USERNAME + ":" + TestUtils.DAEMON_RPC_PASSWORD));
-    
-    // start with zmq if enabled
-    if (WALLET_RPC_ZMQ_ENABLED) {
-      cmd.addAll(Arrays.asList("--zmq-rpc-bind-port", "" + (TestUtils.WALLET_RPC_ZMQ_BIND_PORT_START + portOffset)));
-      cmd.addAll(Arrays.asList("--zmq-pub", "tcp://" + WALLET_RPC_ZMQ_DOMAIN + ":" + (TestUtils.WALLET_RPC_ZMQ_PORT_START + portOffset)));
-    } else {
-      //cmd.add("--no-zmq"); // TODO: enable this when zmq supported in zephyr-wallet-rpc
-    }
-    
-    // register wallet with port offset
-    try {
-      ZephyrWalletRpc wallet = new ZephyrWalletRpc(cmd);
-      WALLET_PORT_OFFSETS.put(wallet, portOffset);
-      return wallet;
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
-  
-  /**
-   * Stop a zephyr-wallet-rpc process and release its associated port.
-   * 
-   * @param walletRpc - wallet created with internal zephyr-wallet-rpc process
-   */
-  public static void stopWalletRpcProcess(ZephyrWalletRpc walletRpc) throws InterruptedException {
-    WALLET_PORT_OFFSETS.remove(walletRpc);
-    walletRpc.stopProcess();
   }
   
   /**

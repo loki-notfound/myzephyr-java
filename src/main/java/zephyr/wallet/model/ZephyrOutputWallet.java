@@ -211,9 +211,8 @@ public class ZephyrOutputWallet extends ZephyrOutput {
    * Returns the asset of this output.
    * 
    * <p>Zephyr: {@code null} for the outputs that {@code getOutputs()} returns in the full wallet
-   * ({@code ZephyrWalletFull}): the core keeps an output's asset but does not serialize it. Through
-   * {@code ZephyrWalletRpc} it is {@code null} as well for now (the RPC client does not read the
-   * asset yet). The wallet's {@code getOutputAssetType(output)} takes the asset from the output's
+   * ({@code ZephyrWalletFull}): the core keeps an output's asset but does not serialize it. The
+   * wallet's {@code getOutputAssetType(output)} takes the asset from the output's
    * transaction. The outputs of the listener callbacks carry the asset, except for an output seen in
    * the pool ({@code ""}). See the user guide, {@code docs/guide/06-history.md}, section "getOutputs() reports no asset".</p>
    * 

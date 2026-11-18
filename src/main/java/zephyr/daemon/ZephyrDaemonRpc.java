@@ -195,16 +195,16 @@ public class ZephyrDaemonRpc extends ZephyrDaemonDefault {
   }
   
   /**
-   * Get the internal process running zephyr-wallet-rpc.
+   * Get the internal process running zephyrd.
    * 
-   * @return the process running zephyr-wallet-rpc, null if not created from new process
+   * @return the process running zephyrd, null if not created from new process
    */
   public Process getProcess() {
     return process;
   }
   
   /**
-   * Stop the internal process running zephyr-wallet-rpc, if applicable.
+   * Stop the internal process running zephyrd, if applicable.
    * 
    * @return the error code from stopping the process
    */

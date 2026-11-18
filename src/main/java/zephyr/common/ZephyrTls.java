@@ -31,8 +31,7 @@ import javax.net.ssl.X509TrustManager;
  *
  * <p>This class decides which root certificates {@link zephyr.wallet.ZephyrWalletFull} trusts when
  * its daemon URI is {@code https://}. The Java RPC classes ({@code ZephyrDaemonRpc},
- * {@code ZephyrWalletRpc}, {@code ZephyrRpcConnection}) are not affected: they use the trust store
- * of the Java runtime.</p>
+ * {@code ZephyrRpcConnection}) are not affected: they use the trust store of the Java runtime.</p>
  *
  * <p><b>The default</b> is the root certificates shipped in this library and nothing else: Mozilla's
  * list of root certificates as curl publishes it ({@link #getShippedCertificatesDate()}), the same

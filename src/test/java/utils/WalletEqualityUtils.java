@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -14,7 +15,6 @@ import java.util.Map;
 import zephyr.daemon.model.ZephyrOutput;
 import zephyr.daemon.model.ZephyrTx;
 import zephyr.wallet.ZephyrWallet;
-import zephyr.wallet.ZephyrWalletRpc.IncomingTransferComparator;
 import zephyr.wallet.model.ZephyrAccount;
 import zephyr.wallet.model.ZephyrAssets; // base coin ZPH only
 import zephyr.wallet.model.ZephyrIncomingTransfer;
@@ -352,6 +352,34 @@ public class WalletEqualityUtils {
         assertEquals(output1.getTx().getHash(), output2.getTx().getHash());
         assertEquals(output1, output2);
       }
+    }
+  }
+  
+  /**
+   * Compares two incoming transfers by the height of their transactions (unconfirmed last), then by
+   * ascending account and subaddress indices (until java.4 a nested class of the wallet RPC client).
+   */
+  private static class IncomingTransferComparator implements Comparator<ZephyrIncomingTransfer> {
+    @Override
+    public int compare(ZephyrIncomingTransfer t1, ZephyrIncomingTransfer t2) {
+      
+      // compare by height
+      int heightComparison = compareByHeight(t1.getTx(), t2.getTx());
+      if (heightComparison != 0) return heightComparison;
+      
+      // compare by account and subaddress index
+      if (t1.getAccountIndex() < t2.getAccountIndex()) return -1;
+      else if (t1.getAccountIndex() == t2.getAccountIndex()) return t1.getSubaddressIndex().compareTo(t2.getSubaddressIndex());
+      return 1;
+    }
+    
+    private static int compareByHeight(ZephyrTx tx1, ZephyrTx tx2) {
+      if (tx1.getHeight() == null && tx2.getHeight() == null) return 0; // both unconfirmed
+      else if (tx1.getHeight() == null) return 1;   // tx1 is unconfirmed
+      else if (tx2.getHeight() == null) return -1;  // tx2 is unconfirmed
+      int diff = tx1.getHeight().compareTo(tx2.getHeight());
+      if (diff != 0) return diff;
+      return tx1.getBlock().getTxs().indexOf(tx1) - tx2.getBlock().getTxs().indexOf(tx2); // txs are in the same block so retain their original order
     }
   }
 }

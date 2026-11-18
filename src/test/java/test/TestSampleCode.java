@@ -15,7 +15,6 @@ import zephyr.daemon.ZephyrDaemonRpc;
 import zephyr.daemon.model.ZephyrNetworkType;
 import zephyr.daemon.model.ZephyrTx;
 import zephyr.wallet.ZephyrWalletFull;
-import zephyr.wallet.ZephyrWalletRpc;
 import zephyr.wallet.model.ZephyrAssets;
 import zephyr.wallet.model.ZephyrOutputWallet;
 import zephyr.wallet.model.ZephyrTxConfig;
@@ -41,10 +40,6 @@ public class TestSampleCode {
     // all wallets need to wait for txs to confirm to reliably sync
     TestUtils.WALLET_TX_TRACKER.reset();
     
-    // pre-create test wallet
-    ZephyrWalletRpc wallet = TestUtils.getWalletRpc();
-    wallet.close();
-
     // create directory for test wallets if it doesn't exist
     File testWalletsDir = new File(TestUtils.TEST_WALLETS_DIR);
     if (!testWalletsDir.exists()) testWalletsDir.mkdirs();
@@ -60,12 +55,11 @@ public class TestSampleCode {
     long height = daemon.getHeight();                       // 1523651
     List<ZephyrTx> txsInPool = daemon.getTxPool();          // get transactions in the pool
     
-    // open wallet on zephyr-wallet-rpc
-    ZephyrWalletRpc walletRpc = new ZephyrWalletRpc(TestUtils.WALLET_RPC_URI, TestUtils.WALLET_RPC_USERNAME, TestUtils.WALLET_RPC_PASSWORD); // *** REPLACE WITH CONSTANTS IN README ***
-    walletRpc.openWallet("test_wallet_1", "supersecretpassword123");  // *** CHANGE README TO "sample_wallet_rpc" ***
-    String primaryAddress = walletRpc.getPrimaryAddress();  // 555zgduFhmKd2o8rPUz...
-    BigInteger balance = walletRpc.getBalance().get(ZephyrAssets.ZPH);            // 533648366742
-    List<ZephyrTxWallet> txs = walletRpc.getTxs();          // get transactions containing transfers to/from the wallet
+    // open the funded test wallet
+    ZephyrWalletFull walletSender = TestUtils.getWalletFull();
+    String primaryAddress = walletSender.getPrimaryAddress();  // 555zgduFhmKd2o8rPUz...
+    BigInteger balance = walletSender.getBalance().get(ZephyrAssets.ZPH);            // 533648366742
+    List<ZephyrTxWallet> txs = walletSender.getTxs();          // get transactions containing transfers to/from the wallet
     
     // create wallet from mnemonic phrase using JNI bindings to zephyr
     ZephyrWalletFull walletFull = ZephyrWalletFull.createWallet(new ZephyrWalletConfig()
@@ -101,16 +95,16 @@ public class TestSampleCode {
       }
     });
     
-    // send funds from RPC wallet to full wallet
-    TestUtils.WALLET_TX_TRACKER.waitForWalletTxsToClearPool(walletRpc);                                     // *** REMOVE FROM README SAMPLE ***
-    TestUtils.WALLET_TX_TRACKER.waitForUnlockedBalance(walletRpc, 0, null, new BigInteger("250000000000")); // *** REMOVE FROM README SAMPLE ***
-    ZephyrTxWallet createdTx = walletRpc.createTx(new ZephyrTxConfig()
+    // send funds from the test wallet to the new full wallet
+    TestUtils.WALLET_TX_TRACKER.waitForWalletTxsToClearPool(walletSender);                                     // *** REMOVE FROM README SAMPLE ***
+    TestUtils.WALLET_TX_TRACKER.waitForUnlockedBalance(walletSender, 0, null, new BigInteger("250000000000")); // *** REMOVE FROM README SAMPLE ***
+    ZephyrTxWallet createdTx = walletSender.createTx(new ZephyrTxConfig()
             .setAccountIndex(0)
             .setAddress(walletFull.getAddress(1, 0))
             .setAmount("250000000000") // send 0.25 coins (denominated in atomic units)
             .setRelay(false)); // create transaction and relay to the network if true
     BigInteger fee = createdTx.getFee(); // "Are you sure you want to send... ?"
-    walletRpc.relayTx(createdTx); // relay the transaction
+    walletSender.relayTx(createdTx); // relay the transaction
     
     // recipient receives unconfirmed funds within 5 seconds
     TimeUnit.SECONDS.sleep(5);

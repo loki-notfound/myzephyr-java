@@ -58,14 +58,6 @@
 			<version>1.7.25</version>
 			<scope>test</scope>
 		</dependency>
-		<dependency>
-			<!-- optional: only ZephyrWalletRpc's ZMQ listener uses it; an application that uses that
-			     listener adds jeromq itself (the AAR declares it compileOnly) -->
-			<groupId>org.zeromq</groupId>
-			<artifactId>jeromq</artifactId>
-			<version>0.5.2</version>
-			<optional>true</optional>
-		</dependency>
 	</dependencies>
 
 	<scm>

@@ -20,10 +20,6 @@
 -keep class zephyr.daemon.model.** { *; }
 -keep class zephyr.common.** { *; }
 
-# jeromq is compile-only in the AAR: ZephyrWalletRpc's ZMQ listener needs it, and an app that uses
-# that listener adds jeromq itself; without this an app's R8 reports the absent classes as errors.
--dontwarn org.zeromq.**
-
 # Jackson reads its annotations (@JsonProperty, @JsonIgnore, ...) and the generic signatures of
 # fields and methods (List<ZephyrOutput>, Map<String, BigInteger>) at run time.
 -keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod

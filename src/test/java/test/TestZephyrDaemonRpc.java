@@ -96,7 +96,7 @@ public class TestZephyrDaemonRpc {
   @BeforeAll
   public static void beforeAll() throws Exception {
     daemon = TestUtils.getDaemonRpc();
-    wallet = TestUtils.getWalletRpc();
+    wallet = TestUtils.getWalletFull();
     TestUtils.WALLET_TX_TRACKER.reset(); // all wallets need to wait for txs to confirm to reliably sync
   }
   

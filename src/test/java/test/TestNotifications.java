@@ -11,7 +11,6 @@ import org.junit.runner.RunWith;
 @RunWith(JUnitPlatform.class)
 @IncludeTags("NotificationTest")
 @SelectClasses({
-  TestZephyrWalletFull.class,
-  TestZephyrWalletRpc.class
+  TestZephyrWalletFull.class
 })
 public class TestNotifications {}

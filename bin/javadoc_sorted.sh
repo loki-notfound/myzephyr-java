@@ -4,9 +4,11 @@
 # the Javadoc jar (maven-jar-plugin's javadoc-jar execution in pom.xml packages target/apidocs)
 # and the site's javadoc/ (bin/make_site.sh copies it) are this one generation.
 #
-# Why a sorted list: JDK 17's javadoc lists a member that two classes inherit from a common base
-# (close(), createAccount(), ... of ZephyrWalletDefault, inherited by ZephyrWalletFull and
-# ZephyrWalletRpc) under the first class it meets in index-all.html and member-search-index.js.
+# Why a sorted list: JDK 17's javadoc lists a member that two classes inherit from a package-private
+# base under the first class it meets in index-all.html and member-search-index.js (up to java.4:
+# close(), createAccount(), ... of ZephyrWalletDefault, inherited by ZephyrWalletFull and the wallet
+# RPC client that java.5 removed; the sorted order stays, so that such a case cannot make the jar
+# depend on the directory order again).
 # maven-javadoc-plugin passes package names, and javadoc then meets the files of a package in the
 # file system's directory order, which differs between machines (ext4 seeds its directory hash per
 # file system), so a CI build and a local build of the same commit gave different Javadoc jars.

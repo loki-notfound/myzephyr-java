@@ -30,8 +30,7 @@ public class PrintBalances {
     
     // collect info about subaddresses
     List<Pair<String, List<Object>>> pairs = new ArrayList<Pair<String, List<Object>>>();
-    if (wallet == null) wallet = TestUtils.getWalletRpc();
-    //if (wallet == null) wallet = TestUtils.getWalletFull();
+    if (wallet == null) wallet = TestUtils.getWalletFull();
     BigInteger balance = wallet.getBalance().get(ZephyrAssets.ZPH);
     BigInteger unlockedBalance = wallet.getUnlockedBalance().get(ZephyrAssets.ZPH);
     List<ZephyrAccount> accounts = wallet.getAccounts(true);

@@ -14,7 +14,6 @@ import java.io.File;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -43,7 +42,6 @@ import zephyr.daemon.model.ZephyrNetworkType;
 import zephyr.daemon.model.ZephyrPricingRecord;
 import zephyr.wallet.ZephyrWallet;
 import zephyr.wallet.ZephyrWalletFull;
-import zephyr.wallet.ZephyrWalletRpc;
 import zephyr.wallet.model.ZephyrAccount;
 import zephyr.wallet.model.ZephyrAddressType;
 import zephyr.wallet.model.ZephyrAssets;
@@ -64,8 +62,7 @@ import zephyr.wallet.model.ZephyrWalletListener;
  * <p>Configured by system properties only; nothing is hardcoded:</p>
  * <ul>
  *   <li>{@code zephyr.daemon.uri}: the node's RPC uri, required by every test (all skip without it);</li>
- *   <li>{@code zephyr.test.password}: the password of the persistent test wallet (tests 4 to 9, 11 and 12);</li>
- *   <li>{@code zephyr.wallet.rpc.bin}: a zephyr-wallet-rpc binary (test 11);</li>
+ *   <li>{@code zephyr.test.password}: the password of the persistent test wallet (tests 4 to 9 and 12);</li>
  *   <li>{@code zephyr.view.address}, {@code zephyr.view.key}, {@code zephyr.view.height}: a view-only
  *       wallet with history (test 10);</li>
  *   <li>{@code zephyr.daemon.uri.tls}: the node's {@code https://} uri, for the TLS tests 13 to 15,
@@ -85,14 +82,12 @@ public class TestZephyrIntegration {
 
   private static final String DAEMON_URI = System.getProperty("zephyr.daemon.uri");
   private static final String TEST_PASSWORD = System.getProperty("zephyr.test.password");
-  private static final String WALLET_RPC_BIN = System.getProperty("zephyr.wallet.rpc.bin");
   private static final String VIEW_ADDRESS = System.getProperty("zephyr.view.address");
   private static final String VIEW_KEY = System.getProperty("zephyr.view.key");
   private static final String VIEW_HEIGHT = System.getProperty("zephyr.view.height");
   private static final String TLS_URI = System.getProperty("zephyr.daemon.uri.tls");
 
   private static final String WALLET_PATH = "test_wallets/zephyr-java-r8";  // gitignored
-  private static final String WALLET_RPC_DIR = System.getProperty("user.home") + "/tmp/zephyr-java-r8/wallets";
   private static final Duration SYNC_TIMEOUT = Duration.ofMinutes(20);
   private static final long NEW_BLOCK_WAIT_MS = 420000;
 
@@ -101,7 +96,6 @@ public class TestZephyrIntegration {
   private static ZephyrWalletFull wallet;        // the persistent test wallet (test 4)
   private static ZephyrWalletFull dataWallet;    // the in-memory copy (test 9)
   private static ZephyrWalletFull viewWallet;    // the view-only wallet (test 10)
-  private static ZephyrWalletRpc walletRpc;      // the zephyr-wallet-rpc client (test 11)
   private static long startDaemonHeight = -1;
   private static int walletsOpen = 0;
   private static int maxWalletsOpen = 0;
@@ -512,44 +506,6 @@ public class TestZephyrIntegration {
     });
   }
 
-  @Test
-  @Order(11)
-  public void testWalletRpc() throws Exception {
-    assumeDaemon();
-    Assumptions.assumeTrue(WALLET_RPC_BIN != null && !WALLET_RPC_BIN.isEmpty(), "zephyr.wallet.rpc.bin not set");
-    Assumptions.assumeTrue(TEST_PASSWORD != null && !TEST_PASSWORD.isEmpty(), "zephyr.test.password not set");
-    URI uri = new URI(DAEMON_URI);
-    new File(WALLET_RPC_DIR).mkdirs();
-    List<String> cmd = Arrays.asList(WALLET_RPC_BIN,
-        "--daemon-address", uri.getHost() + ":" + uri.getPort(),
-        "--rpc-bind-port", "28084",
-        "--rpc-login", "rpc_user:abc123",
-        "--wallet-dir", WALLET_RPC_DIR,
-        "--log-level", "0",
-        "--trusted-daemon");
-    walletRpc = new ZephyrWalletRpc(cmd);
-    String name = "r8-" + System.currentTimeMillis();
-    walletRpc.createWallet(new ZephyrWalletConfig().setPath(name).setPassword(TEST_PASSWORD));
-    walletOpened();
-    try {
-      String address = walletRpc.getPrimaryAddress();
-      ZephyrDecodedAddress decoded = ZephyrUtils.decodeAddress(address);
-      assertEquals(ZephyrNetworkType.MAINNET, decoded.getNetworkType());
-      log("wallet-rpc wallet " + name + ": " + address);
-      ZephyrBalance balance = walletRpc.getBalance();
-      assertNotNull(balance);
-      assertEquals(BigInteger.ZERO, balance.get(ZephyrAssets.ZPH));
-      log("wallet-rpc balance " + balance.toMap());
-      ZephyrError e1 = assertThrows(ZephyrError.class, () -> walletRpc.getBalance(ZephyrAssets.ZSD, 0));
-      log("getBalance(ZSD, 0): " + e1.getMessage());
-      ZephyrError e2 = assertThrows(ZephyrError.class, () -> walletRpc.getReserveInfo());
-      log("getReserveInfo(): " + e2.getMessage());
-    } finally {
-      walletRpc.close();
-      walletClosed();
-    }
-  }
-
   /**
    * getOutputs() reports no asset (the core does not serialize it); getOutputAssetType takes it from
    * the output's transaction. Every output of the funded test wallet must resolve to ZPH or ZRS, and
@@ -790,10 +746,6 @@ public class TestZephyrIntegration {
     }
     if (wallet != null && !wallet.isClosed()) {
       try { wallet.close(true); walletClosed(); } catch (Throwable t) { errors.add(t); }
-    }
-    if (walletRpc != null) {
-      try { if (!walletRpc.isClosed()) walletRpc.close(); } catch (Throwable t) { errors.add(t); }
-      try { log("wallet-rpc process stopped: exit " + walletRpc.stopProcess()); } catch (Throwable t) { errors.add(t); }
     }
     if (DAEMON_URI != null && !DAEMON_URI.isEmpty()) {
       try { log("daemon height at start " + startDaemonHeight + ", at end " + getDaemon().getHeight()); } catch (Throwable t) { errors.add(t); }

@@ -8,7 +8,7 @@ import zephyr.wallet.ZephyrWallet;
 public class PrintHeight {
 
   public static void main(String[] args) {
-    ZephyrWallet wallet = TestUtils.getWalletRpc();
+    ZephyrWallet wallet = TestUtils.getWalletFull();
     System.out.println("Height: " + wallet.getHeight());
   }
 }

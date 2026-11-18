@@ -23,7 +23,6 @@ import zephyr.daemon.model.ZephyrKeyImage;
 import zephyr.daemon.model.ZephyrNetworkType;
 import zephyr.wallet.ZephyrWallet;
 import zephyr.wallet.ZephyrWalletFull;
-import zephyr.wallet.ZephyrWalletRpc;
 import zephyr.wallet.model.ZephyrAssets;
 import zephyr.wallet.model.ZephyrMultisigInfo;
 import zephyr.wallet.model.ZephyrMultisigInitResult;
@@ -380,103 +379,6 @@ public class TestZephyrWalletFull extends TestZephyrWalletCommon {
       walletKeys.close();
     }
   }
-  
-  // Is compatible with zephyr-wallet-rpc wallet files
-  @Test
-  public void testWalletFileCompatibility() {
-    assumeTrue(TEST_NON_RELAYS);
-    
-    // create wallet using zephyr-wallet-rpc
-    String walletName = GenUtils.getUUID();
-    ZephyrWalletRpc walletRpc = TestUtils.getWalletRpc();
-    walletRpc.createWallet(new ZephyrWalletConfig().setPath(walletName).setPassword(TestUtils.WALLET_PASSWORD).setMnemonic(TestUtils.MNEMONIC).setRestoreHeight(TestUtils.FIRST_RECEIVE_HEIGHT));
-    walletRpc.sync();
-    BigInteger balance = walletRpc.getBalance().get(ZephyrAssets.ZPH);
-    String outputsHex = walletRpc.exportOutputs();
-    walletRpc.close(true);
-    
-    // open as full wallet
-    ZephyrWalletFull walletFull = ZephyrWalletFull.openWallet(new ZephyrWalletConfig().setPath(TestUtils.WALLET_RPC_LOCAL_WALLET_DIR + "/" + walletName).setPassword(TestUtils.WALLET_PASSWORD).setNetworkType(TestUtils.NETWORK_TYPE).setServerUri(TestUtils.DAEMON_RPC_URI).setServerUsername(TestUtils.DAEMON_RPC_USERNAME).setServerPassword(TestUtils.DAEMON_RPC_PASSWORD));
-    walletFull.sync();
-    assertEquals(TestUtils.MNEMONIC, walletFull.getMnemonic());
-    assertEquals(TestUtils.ADDRESS, walletFull.getPrimaryAddress());
-    assertEquals(balance, walletFull.getBalance().get(ZephyrAssets.ZPH));
-    assertEquals(outputsHex.length(), walletFull.exportOutputs().length());
-    walletFull.close(true);
-    
-    // create full wallet
-    walletName = GenUtils.getUUID();
-    String path = TestUtils.WALLET_RPC_LOCAL_WALLET_DIR + "/" + walletName;
-    walletFull = ZephyrWalletFull.createWallet(new ZephyrWalletConfig().setPath(path).setPassword(TestUtils.WALLET_PASSWORD).setNetworkType(TestUtils.NETWORK_TYPE).setMnemonic(TestUtils.MNEMONIC).setRestoreHeight(TestUtils.FIRST_RECEIVE_HEIGHT).setServerUri(TestUtils.DAEMON_RPC_URI).setServerUsername(TestUtils.DAEMON_RPC_USERNAME).setServerPassword(TestUtils.DAEMON_RPC_PASSWORD));
-    walletFull.sync();
-    balance = walletFull.getBalance().get(ZephyrAssets.ZPH);
-    outputsHex = walletFull.exportOutputs();
-    walletFull.close(true);
-    
-    // rebuild wallet cache using full wallet
-    new File(path).delete();
-    walletFull = ZephyrWalletFull.openWallet(new ZephyrWalletConfig().setPath(path).setPassword(TestUtils.WALLET_PASSWORD).setNetworkType(TestUtils.NETWORK_TYPE).setServerUri(TestUtils.DAEMON_RPC_URI).setServerUsername(TestUtils.DAEMON_RPC_USERNAME).setServerPassword(TestUtils.DAEMON_RPC_PASSWORD));
-    walletFull.close(true);
-    
-    // open wallet using zephyr-wallet-rpc
-    walletRpc.openWallet(new ZephyrWalletConfig().setPath(walletName).setPassword(TestUtils.WALLET_PASSWORD));
-    walletRpc.sync();
-    assertEquals(TestUtils.MNEMONIC, walletRpc.getMnemonic());
-    assertEquals(TestUtils.ADDRESS, walletRpc.getPrimaryAddress());
-    assertEquals(balance, walletRpc.getBalance().get(ZephyrAssets.ZPH));
-    assertEquals(outputsHex.length(), walletRpc.exportOutputs().length());
-    walletRpc.close(true);
-  }
-  
-  // Is compatible with zephyr-wallet-rpc outputs and offline transaction signing
-  @SuppressWarnings("unused")
-  @Test
-  public void testViewOnlyAndOfflineWalletCompatibility() throws InterruptedException, IOException {
-    assumeTrue(!LITE_MODE && (TEST_NON_RELAYS || TEST_RELAYS));
-    
-    // create view-only wallet in wallet rpc process
-    ZephyrWalletRpc viewOnlyWallet = TestUtils.startWalletRpcProcess();
-    viewOnlyWallet.createWallet(new ZephyrWalletConfig().setPath(GenUtils.getUUID()).setPassword(TestUtils.WALLET_PASSWORD).setPrimaryAddress(wallet.getPrimaryAddress()).setPrivateViewKey(wallet.getPrivateViewKey()).setRestoreHeight(TestUtils.FIRST_RECEIVE_HEIGHT));
-    viewOnlyWallet.sync();
-    
-    // create offline full wallet
-    ZephyrWalletFull offlineWallet = createWallet(new ZephyrWalletConfig().setPrimaryAddress(wallet.getPrimaryAddress()).setPrivateViewKey(wallet.getPrivateViewKey()).setPrivateSpendKey(wallet.getPrivateSpendKey()).setServerUri(TestUtils.OFFLINE_SERVER_URI).setRestoreHeight(0l));
-    
-    // test tx signing with wallets
-    try {
-      testViewOnlyAndOfflineWallets(viewOnlyWallet, offlineWallet);
-    } finally {
-      TestUtils.stopWalletRpcProcess(viewOnlyWallet);
-      closeWallet(offlineWallet);
-    }
-  };
-  
-  // Is compatible with zephyr-wallet-rpc multisig wallets
-  @Test
-  public void testMultisigCompatibility() throws InterruptedException, IOException {
-    assumeTrue(!LITE_MODE);
-    
-    // create participants with full wallet and zephyr-wallet-rpc
-    List<ZephyrWallet> participants = new ArrayList<ZephyrWallet>();
-    participants.add(TestUtils.startWalletRpcProcess().createWallet(new ZephyrWalletConfig().setPath(GenUtils.getUUID()).setPassword(TestUtils.WALLET_PASSWORD)));
-    participants.add(TestUtils.startWalletRpcProcess().createWallet(new ZephyrWalletConfig().setPath(GenUtils.getUUID()).setPassword(TestUtils.WALLET_PASSWORD)));
-    participants.add(createWallet(new ZephyrWalletConfig()));
-    
-    // test multisig
-    try {
-      testMultisigParticipants(participants, 3, 3, true);
-    } finally {
-      
-      // stop mining at end of test
-      try { daemon.stopMining(); }
-      catch (ZephyrError e) { }
-      
-      // save and close participants
-      TestUtils.stopWalletRpcProcess((ZephyrWalletRpc) participants.get(0));
-      TestUtils.stopWalletRpcProcess((ZephyrWalletRpc) participants.get(1));
-      closeWallet(participants.get(2), true);
-    }
-  };
   
   // Can re-sync an existing wallet from scratch
   @Test
@@ -858,41 +760,6 @@ public class TestZephyrWalletFull extends TestZephyrWalletCommon {
     wallet2.sync();
     assertTrue(tester2.isNotified());
     assertFalse(tester3.isNotified());
-  }
-  
-  // Is equal to the RPC wallet.
-  @Test
-  public void testWalletEqualityRpc() {
-    WalletEqualityUtils.testWalletEqualityOnChain(TestUtils.getWalletRpc(), wallet);
-  }
-  
-  // Is equal to the RPC wallet with a seed offset
-  @Test
-  public void testWalletEqualityRpcWithOffset() {
-    
-    // use common offset to compare wallet implementations
-    String seedOffset = "my super secret offset!";
-    
-    // create rpc wallet with offset
-    ZephyrWalletRpc walletRpc = TestUtils.getWalletRpc();
-    walletRpc.createWallet(new ZephyrWalletConfig().setPath(UUID.randomUUID().toString()).setPassword(TestUtils.WALLET_PASSWORD).setMnemonic(walletRpc.getMnemonic()).setRestoreHeight(TestUtils.FIRST_RECEIVE_HEIGHT).setSeedOffset(seedOffset));
-    
-    // create full wallet with offset
-    ZephyrWalletFull walletFull = createWallet(new ZephyrWalletConfig()
-            .setPath(getRandomWalletPath())
-            .setPassword(TestUtils.WALLET_PASSWORD)
-            .setNetworkType(TestUtils.NETWORK_TYPE)
-            .setMnemonic(TestUtils.MNEMONIC)
-            .setServer(TestUtils.getDaemonRpc().getRpcConnection())
-            .setRestoreHeight(TestUtils.FIRST_RECEIVE_HEIGHT)
-            .setSeedOffset(seedOffset));
-    
-    // deep compare
-    try {
-      WalletEqualityUtils.testWalletEqualityOnChain(walletRpc, walletFull);
-    } finally {
-      walletFull.close();
-    }
   }
   
   // Can be saved

@@ -38,7 +38,6 @@ import zephyr.daemon.model.ZephyrSubmitTxResult;
 import zephyr.daemon.model.ZephyrTx;
 import zephyr.daemon.model.ZephyrVersion;
 import zephyr.wallet.ZephyrWallet;
-import zephyr.wallet.ZephyrWalletRpc;
 import zephyr.wallet.model.ZephyrAccount;
 import zephyr.wallet.model.ZephyrAddressBookEntry;
 import zephyr.wallet.model.ZephyrAssets; // base coin ZPH only
@@ -213,7 +212,7 @@ public abstract class TestZephyrWalletCommon {
         ZephyrUtils.validatePrivateViewKey(wallet.getPrivateViewKey());
         ZephyrUtils.validatePrivateSpendKey(wallet.getPrivateSpendKey());
         ZephyrUtils.validateMnemonic(wallet.getMnemonic());
-        if (!(wallet instanceof ZephyrWalletRpc)) assertEquals(ZephyrWallet.DEFAULT_LANGUAGE, wallet.getMnemonicLanguage());  // TODO zephyr-wallet-rpc: get mnemonic language
+        assertEquals(ZephyrWallet.DEFAULT_LANGUAGE, wallet.getMnemonicLanguage());
       } catch (Exception e) {
         e2 = e;
       }
@@ -263,7 +262,7 @@ public abstract class TestZephyrWalletCommon {
         assertEquals(privateViewKey, wallet.getPrivateViewKey());
         assertEquals(privateSpendKey, wallet.getPrivateSpendKey());
         assertEquals(TestUtils.MNEMONIC, wallet.getMnemonic());
-        if (!(wallet instanceof ZephyrWalletRpc)) assertEquals(ZephyrWallet.DEFAULT_LANGUAGE, wallet.getMnemonicLanguage());
+        assertEquals(ZephyrWallet.DEFAULT_LANGUAGE, wallet.getMnemonicLanguage());
       } catch (Exception e) {
         e2 = e;
       }
@@ -307,7 +306,7 @@ public abstract class TestZephyrWalletCommon {
         assertNotEquals(TestUtils.MNEMONIC, wallet.getMnemonic());
         ZephyrUtils.validateAddress(wallet.getPrimaryAddress(), TestUtils.NETWORK_TYPE);
         assertNotEquals(TestUtils.ADDRESS, wallet.getPrimaryAddress());
-        if (!(wallet instanceof ZephyrWalletRpc)) assertEquals(ZephyrWallet.DEFAULT_LANGUAGE, wallet.getMnemonicLanguage());  // TODO zephyr-wallet-rpc: support
+        assertEquals(ZephyrWallet.DEFAULT_LANGUAGE, wallet.getMnemonicLanguage());
       } catch (Exception e) {
         e2 = e;
       }
@@ -342,10 +341,8 @@ public abstract class TestZephyrWalletCommon {
         assertEquals(privateSpendKey, wallet.getPrivateSpendKey());
         if (!wallet.isConnectedToDaemon()) System.out.println("WARNING: wallet created from keys is not connected to authenticated daemon"); // TODO zephyr: keys wallets not connected
         assertTrue(wallet.isConnectedToDaemon(), "Wallet created from keys is not connected to authenticated daemon");
-        if (!(wallet instanceof ZephyrWalletRpc)) {
-          ZephyrUtils.validateMnemonic(wallet.getMnemonic()); // TODO zephyr-wallet-rpc: cannot get mnemonic from wallet created from keys?
-          assertEquals(ZephyrWallet.DEFAULT_LANGUAGE, wallet.getMnemonicLanguage());
-        }
+        ZephyrUtils.validateMnemonic(wallet.getMnemonic());
+        assertEquals(ZephyrWallet.DEFAULT_LANGUAGE, wallet.getMnemonicLanguage());
       } catch (Exception e) {
         e2 = e;
       }
@@ -353,7 +350,7 @@ public abstract class TestZephyrWalletCommon {
       if (e2 != null) throw e2;
       
       // recreate test wallet from spend key
-      if (!(wallet instanceof ZephyrWalletRpc)) { // TODO zephyr-wallet-rpc: cannot create wallet from spend key?
+      {
         wallet = createWallet(new ZephyrWalletConfig().setPrivateSpendKey(privateSpendKey).setRestoreHeight(daemon.getHeight()));
         e2 = null;
         try {
@@ -362,10 +359,8 @@ public abstract class TestZephyrWalletCommon {
           assertEquals(privateSpendKey, wallet.getPrivateSpendKey());
           if (!wallet.isConnectedToDaemon()) System.out.println("WARNING: wallet created from keys is not connected to authenticated daemon"); // TODO zephyr: keys wallets not connected
           assertTrue(wallet.isConnectedToDaemon(), "Wallet created from keys is not connected to authenticated daemon");
-          if (!(wallet instanceof ZephyrWalletRpc)) {
-            ZephyrUtils.validateMnemonic(wallet.getMnemonic()); // TODO zephyr-wallet-rpc: cannot get mnemonic from wallet created from keys?
-            assertEquals(ZephyrWallet.DEFAULT_LANGUAGE, wallet.getMnemonicLanguage());
-          }
+          ZephyrUtils.validateMnemonic(wallet.getMnemonic());
+          assertEquals(ZephyrWallet.DEFAULT_LANGUAGE, wallet.getMnemonicLanguage());
         } catch (Exception e) {
           e2 = e;
         }
@@ -456,13 +451,8 @@ public abstract class TestZephyrWalletCommon {
     
     // create random wallet with default daemon connection
     ZephyrWallet wallet = createWallet(new ZephyrWalletConfig().setServerUri(""));
-    if (wallet instanceof ZephyrWalletRpc) {
-      assertEquals(new ZephyrRpcConnection(TestUtils.DAEMON_RPC_URI, TestUtils.DAEMON_RPC_USERNAME, TestUtils.DAEMON_RPC_PASSWORD), wallet.getDaemonConnection());
-      assertTrue(wallet.isConnectedToDaemon()); // uses default localhost connection
-    } else {
-      assertEquals(null, wallet.getDaemonConnection());
-      assertFalse(wallet.isConnectedToDaemon());
-    }
+    assertEquals(null, wallet.getDaemonConnection());
+    assertFalse(wallet.isConnectedToDaemon());
     
     // set empty server uri
     wallet.setDaemonConnection("");
@@ -2498,7 +2488,7 @@ public abstract class TestZephyrWalletCommon {
     // test offline wallet
     assertFalse(offlineWallet.isConnectedToDaemon());
     assertFalse(offlineWallet.isViewOnly());
-    if (!(offlineWallet instanceof ZephyrWalletRpc)) assertEquals(TestUtils.MNEMONIC, offlineWallet.getMnemonic()); // TODO zephyr: cannot get mnemonic from offline wallet rpc
+    assertEquals(TestUtils.MNEMONIC, offlineWallet.getMnemonic());
     assertEquals(0, offlineWallet.getTxs(new ZephyrTxQuery().setInTxPool(false)).size());
     
     // import outputs to offline wallet
@@ -4786,7 +4776,6 @@ public abstract class TestZephyrWalletCommon {
                 for (ZephyrOutputWallet outputReceived : senderNotificationCollector.getOutputsReceived(confirmedQuery)) netAmount = netAmount.subtract(outputReceived.getAmount());
                 if (tx.getFee().compareTo(netAmount) != 0) {
                   if (sameAccount) issues.add("WARNING: net output amount != tx fee when funds sent to same account: " + netAmount + " vs " + tx.getFee());
-                  else if (sender instanceof ZephyrWalletRpc) issues.add("WARNING: net output amount != tx fee when funds sent to same wallet because zephyr-wallet-rpc does not provide tx inputs: " + netAmount + " vs " + tx.getFee()); // TODO (zephyr): open issue to provide tx inputs
                   else issues.add("ERROR: net output amount must equal tx fee when funds sent to same wallet: " + netAmount + " vs " + tx.getFee());
                 }
               }

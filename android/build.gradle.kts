@@ -77,8 +77,6 @@ dependencies {
     api("com.fasterxml.jackson.core:jackson-core:2.13.5")
     api("com.fasterxml.jackson.core:jackson-databind:2.13.5")
     api("org.apache.httpcomponents.client5:httpclient5:5.2.1")
-    // ZephyrWalletRpc's ZMQ listener needs jeromq; an app that uses that listener adds jeromq itself
-    compileOnly("org.zeromq:jeromq:0.5.2")
 }
 
 publishing {
