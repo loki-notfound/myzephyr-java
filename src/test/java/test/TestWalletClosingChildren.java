@@ -29,7 +29,9 @@ import org.junit.jupiter.api.Test;
  * runner's JVM could not report.
  *
  * <p>A child passes when it prints "RESULT ok" and its JVM ends by itself with status 0, leaves no
- * {@code hs_err} file and prints no "Wallet is closed" on stderr. Every child has a time limit
+ * {@code hs_err} file and prints no "Wallet is closed" on stderr. The core's threads are attached
+ * as daemon threads, so a JVM that exits no longer shows that every callback thread was detached;
+ * the background scenarios check the callback threads themselves ({@link ClosingChild}). Every child has a time limit
  * ({@value #CHILD_LIMIT_S} s, and {@value #EXIT_LIMIT_S} s from the moment its main returns); one
  * that passes it gets a thread dump (SIGQUIT, where {@code kill} exists), is destroyed and fails.</p>
  *
@@ -241,6 +243,19 @@ public class TestWalletClosingChildren {
   public void closeFromACallbackOfBackgroundSync() throws Exception {
     assumeNodeAndWallet();
     run("fromcallback", true, "fromcallback").check();
+  }
+
+  /**
+   * T4: main returns while background syncing runs and the wallet is still open: exit status 0, no
+   * crash report. Twenty runs. Known to fail: while the core's sync thread is inside a refresh, the
+   * JVM does not finish exiting (it exits once that thread waits between two syncs), so the test
+   * runs only with {@code -Dzephyr.test.exitopen=true}. Close the wallet before the JVM exits.
+   */
+  @RepeatedTest(20)
+  public void exitWithTheWalletOpenAndSyncing(RepetitionInfo repetition) throws Exception {
+    assumeNodeAndWallet();
+    Assumptions.assumeTrue(Boolean.getBoolean("zephyr.test.exitopen"), "known to fail; run with -Dzephyr.test.exitopen=true");
+    run("exitopen-" + repetition.getCurrentRepetition(), true, "exitopen").check();
   }
 
   /**

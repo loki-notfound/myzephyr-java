@@ -1,13 +1,21 @@
 package test;
 
+import java.io.File;
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadMXBean;
 import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import zephyr.common.ZephyrError;
@@ -15,14 +23,18 @@ import zephyr.daemon.model.ZephyrNetworkType;
 import zephyr.wallet.ZephyrWalletFull;
 import zephyr.wallet.model.ZephyrOutputWallet;
 import zephyr.wallet.model.ZephyrSyncResult;
+import zephyr.wallet.model.ZephyrTxConfig;
 import zephyr.wallet.model.ZephyrWalletConfig;
 import zephyr.wallet.model.ZephyrWalletListener;
 
 /**
  * The program {@link TestWalletClosingChildren} runs in a JVM of its own, one scenario per run.
- * Success is the JVM ending by itself after main returns, which is what the parent checks: a
- * native thread left attached would keep it alive. A scenario that sees something wrong prints a
- * line starting with "FAIL" and exits with status 2.
+ * Success is the JVM ending by itself after main returns, which is what the parent checks. The
+ * core's own threads are attached to the JVM as daemon threads for each callback, so a thread left
+ * attached would no longer keep the JVM alive: the background scenarios check the callback
+ * threads themselves instead (each callback's {@code java.lang.Thread} must have ended once
+ * {@code close()} has returned, which it does only when the bridge detached it). A scenario that
+ * sees something wrong prints a line starting with "FAIL" and exits with status 2.
  *
  * <p>Arguments: the scenario, then the wallet path (the keys file of a wallet without a cache,
  * so it scans from its restore height), except for "silent". The node's uri comes from the system
@@ -53,6 +65,7 @@ public class ClosingChild {
       case "stopclose": stopClose(args[1]); break;
       case "fromcallback": fromCallback(args[1]); break;
       case "silent": silent(); break;
+      case "exitopen": exitOpen(args[1]); break;
       default: fail("unknown scenario " + args[0]);
     }
     log("RESULT ok");
@@ -75,6 +88,7 @@ public class ClosingChild {
     final CountDownLatch firstProgress = new CountDownLatch(1);
     volatile boolean thrown;
     volatile String threadName;
+    final Set<Thread> threads = ConcurrentHashMap.newKeySet(); // every thread that delivered a callback
     Counting(String throwFrom) { this.throwFrom = throwFrom; }
     private void maybeThrow(String kind) {
       if (kind.equals(throwFrom) && !thrown) {
@@ -84,14 +98,15 @@ public class ClosingChild {
       }
     }
     @Override public void onSyncProgress(long height, long startHeight, long endHeight, double percentDone, String message) {
+      threads.add(Thread.currentThread());
       if (progress.incrementAndGet() == 1) { threadName = Thread.currentThread().getName(); log("first onSyncProgress: height " + height + " on thread '" + threadName + "' daemon=" + Thread.currentThread().isDaemon()); }
       firstProgress.countDown();
       maybeThrow("progress");
     }
-    @Override public void onNewBlock(long height) { blocks.incrementAndGet(); maybeThrow("block"); }
-    @Override public void onBalancesChanged(BigInteger newBalance, BigInteger newUnlockedBalance, String assetType) { balances.incrementAndGet(); maybeThrow("balances"); }
-    @Override public void onOutputReceived(ZephyrOutputWallet output) { received.incrementAndGet(); }
-    @Override public void onOutputSpent(ZephyrOutputWallet output) { spent.incrementAndGet(); }
+    @Override public void onNewBlock(long height) { threads.add(Thread.currentThread()); blocks.incrementAndGet(); maybeThrow("block"); }
+    @Override public void onBalancesChanged(BigInteger newBalance, BigInteger newUnlockedBalance, String assetType) { threads.add(Thread.currentThread()); balances.incrementAndGet(); maybeThrow("balances"); }
+    @Override public void onOutputReceived(ZephyrOutputWallet output) { threads.add(Thread.currentThread()); received.incrementAndGet(); }
+    @Override public void onOutputSpent(ZephyrOutputWallet output) { threads.add(Thread.currentThread()); spent.incrementAndGet(); }
     String counts() {
       return "onSyncProgress=" + progress + " onNewBlock=" + blocks + " onBalancesChanged=" + balances + " onOutputReceived=" + received + " onOutputSpent=" + spent + " thrown=" + thrown;
     }
@@ -101,7 +116,7 @@ public class ClosingChild {
     if (!listener.firstProgress.await(WAIT_MS, TimeUnit.MILLISECONDS)) fail("no onSyncProgress within " + WAIT_MS + " ms");
   }
 
-  private static void timedClose(ZephyrWalletFull wallet) {
+  private static long timedClose(ZephyrWalletFull wallet) {
     long start = System.nanoTime();
     wallet.close();
     long ms = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
@@ -113,6 +128,25 @@ public class ClosingChild {
     } catch (ZephyrError e) {
       log("getHeight() after close() threw ZephyrError: " + e.getMessage());
     }
+    return ms;
+  }
+
+  /**
+   * The background scenarios, after close() returned: every thread that delivered a callback of
+   * the core's sync thread must have ended. The bridge attaches that native thread for each
+   * callback and detaches it at the callback's end, which ends the callback's java.lang.Thread; a
+   * thread left attached stays alive (as a daemon thread it no longer keeps the JVM from exiting,
+   * so the JVM's exit does not show it).
+   */
+  private static void assertCallbackThreadsEnded(Set<Thread> threads) {
+    List<String> alive = new ArrayList<String>();
+    for (Thread thread : threads) {
+      if (thread == Thread.currentThread()) fail("a background callback ran on the main thread");
+      if (thread.isAlive()) alive.add(thread.getName() + (thread.isDaemon() ? "(d)" : "") + " " + thread.getState());
+    }
+    if (threads.isEmpty()) fail("no callback thread was recorded");
+    if (!alive.isEmpty()) fail(alive.size() + " of " + threads.size() + " callback thread(s) still alive after close(): " + alive);
+    log("all " + threads.size() + " callback thread(s) ended");
   }
 
   private static void threads(String when) {
@@ -142,6 +176,7 @@ public class ClosingChild {
     timedClose(wallet);
     log("after close: " + listener.counts());
     threads("after close");
+    assertCallbackThreadsEnded(listener.threads);
   }
 
   /** N4a: close() from main while another thread is inside a foreground sync(). */
@@ -191,6 +226,7 @@ public class ClosingChild {
     if (after != before) fail((after - before) + " callbacks after close() returned");
     log("after close: " + listener.counts());
     threads("end");
+    assertCallbackThreadsEnded(listener.threads);
   }
 
   /** stopSyncing() directly followed by close(), during a busy background scan. */
@@ -205,6 +241,7 @@ public class ClosingChild {
     timedClose(wallet);
     log("after close: " + listener.counts());
     threads("end");
+    assertCallbackThreadsEnded(listener.threads);
   }
 
   /**
@@ -216,8 +253,10 @@ public class ClosingChild {
     AtomicReference<Throwable> fromClose = new AtomicReference<Throwable>();
     AtomicReference<String> fromHeight = new AtomicReference<String>();
     CountDownLatch tried = new CountDownLatch(1);
+    Set<Thread> callbackThreads = ConcurrentHashMap.newKeySet();
     wallet.addListener(new ZephyrWalletListener() {
       @Override public void onSyncProgress(long height, long startHeight, long endHeight, double percentDone, String message) {
+        callbackThreads.add(Thread.currentThread());
         if (tried.getCount() == 0) return;
         try {
           fromHeight.set("height " + wallet.getHeight());
@@ -242,6 +281,7 @@ public class ClosingChild {
     log("main: wallet still open, height " + wallet.getHeight());
     timedClose(wallet);
     threads("end");
+    assertCallbackThreadsEnded(callbackThreads);
   }
 
   /**
@@ -291,5 +331,18 @@ public class ClosingChild {
     server.close();
     synchronized (held) { for (Socket socket : held) socket.close(); }
     threads("end");
+  }
+
+  /**
+   * T4: main returns while background syncing runs and the wallet is still open; the JVM must exit
+   * with status 0 and leave no crash report, wherever the core's thread is at that moment.
+   */
+  private static void exitOpen(String path) throws Exception {
+    ZephyrWalletFull wallet = open(path);
+    Counting listener = new Counting("none");
+    wallet.addListener(listener);
+    wallet.startSyncing(1000L);
+    awaitFirstProgress(listener);
+    log("main returns with the wallet open and syncing: " + listener.counts());
   }
 }

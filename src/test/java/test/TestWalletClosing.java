@@ -2,6 +2,7 @@ package test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -12,12 +13,18 @@ import java.lang.reflect.Method;
 import java.math.BigInteger;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
@@ -30,6 +37,7 @@ import zephyr.common.ZephyrError;
 import zephyr.daemon.model.ZephyrNetworkType;
 import zephyr.wallet.ZephyrWalletFull;
 import zephyr.wallet.model.ZephyrOutputWallet;
+import zephyr.wallet.model.ZephyrTxConfig;
 import zephyr.wallet.model.ZephyrWalletConfig;
 import zephyr.wallet.model.ZephyrWalletListener;
 
@@ -78,6 +86,17 @@ public class TestWalletClosing {
   }
 
   // -------------------------- callbacks by reflection -------------------------
+
+  private static Object field(ZephyrWalletFull wallet, String name) throws Exception {
+    Field field = ZephyrWalletFull.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field.get(wallet);
+  }
+
+  /** The call lock: a thread that holds its read side is inside one of the wallet's calls. */
+  private static ReentrantReadWriteLock callLock(ZephyrWalletFull wallet) throws Exception {
+    return (ReentrantReadWriteLock) field(wallet, "callLock");
+  }
 
   private static Object callbackReceiver(ZephyrWalletFull wallet) throws Exception {
     Field field = ZephyrWalletFull.class.getDeclaredField("jniListener");
@@ -348,5 +367,100 @@ public class TestWalletClosing {
     assertThrows(ZephyrError.class, () -> wallet.getReserveProofWallet("message"));
     assertThrows(ZephyrError.class, wallet::getData);
     assertThrows(ZephyrError.class, () -> wallet.changePassword("closing-test", "new"));
+  }
+
+  /**
+   * close() from a thread that is inside one of the wallet's own calls (it holds the call lock's
+   * read side, as a listener of a foreground sync does) is refused, and the wallet stays open; a
+   * nested call on that thread enters the call lock again.
+   */
+  @Test
+  public void closeFromInsideACallIsRefused() throws Exception {
+    ZephyrWalletFull wallet = inMemoryWallet();
+    ReentrantReadWriteLock lock = callLock(wallet);
+    lock.readLock().lock();
+    try {
+      ZephyrError e = assertThrows(ZephyrError.class, wallet::close);
+      assertEquals("Cannot close the wallet from inside one of its own calls or listener callbacks", e.getMessage());
+      assertFalse(wallet.isClosed(), "the wallet was closed from inside its own call");
+      assertTrue(wallet.getHeight() >= 0, "a nested call");
+    } finally {
+      lock.readLock().unlock();
+    }
+    wallet.close();
+    assertTrue(wallet.isClosed());
+  }
+
+  /**
+   * A callback delivered on a thread that is inside a call (the way a foreground sync delivers
+   * them): the listener's reads enter the call lock again, and close() from there is refused.
+   */
+  @Test
+  public void callbackOnAThreadInsideACall() throws Exception {
+    ZephyrWalletFull wallet = inMemoryWallet();
+    List<Long> heights = new CopyOnWriteArrayList<Long>();
+    AtomicReference<Throwable> fromClose = new AtomicReference<Throwable>();
+    wallet.addListener(new ZephyrWalletListener() {
+      @Override public void onNewBlock(long height) {
+        heights.add(wallet.getHeight());
+        try {
+          wallet.close();
+        } catch (Throwable t) {
+          fromClose.set(t);
+        }
+      }
+    });
+    ReentrantReadWriteLock lock = callLock(wallet);
+    lock.readLock().lock();
+    try {
+      assertEquals(null, deliverNewBlock(wallet), "the callback threw");
+    } finally {
+      lock.readLock().unlock();
+    }
+    assertEquals(1, heights.size(), "reads from the callback");
+    assertTrue(fromClose.get() instanceof ZephyrError, "close() from the callback: " + fromClose.get());
+    assertFalse(wallet.isClosed());
+  }
+
+  /**
+   * close() racing calls that run on another thread, 100 rounds on in-memory wallets: no crash,
+   * the other thread ends with ZephyrError("Wallet is closed") and nothing else, and close()
+   * returns. A native call outside the call lock would be freed under the running call here.
+   */
+  @Test
+  public void closeRacesRunningCalls() throws Exception {
+    Random random = new Random(25);
+    for (int round = 0; round < 100; round++) {
+      ZephyrWalletFull wallet = inMemoryWallet();
+      AtomicReference<Throwable> ended = new AtomicReference<Throwable>();
+      AtomicInteger loops = new AtomicInteger();
+      CountDownLatch running = new CountDownLatch(1);
+      Thread caller = new Thread(() -> {
+        try {
+          while (true) {
+            wallet.getData();
+            wallet.getAccounts(true);
+            wallet.createSubaddress(0);
+            wallet.getBalance();
+            loops.incrementAndGet();
+            running.countDown();
+          }
+        } catch (Throwable t) {
+          ended.set(t);
+          running.countDown();
+        }
+      }, "caller-" + round);
+      caller.start();
+      assertTrue(running.await(60, TimeUnit.SECONDS), "round " + round + ": the caller did not start");
+      Thread.sleep(random.nextInt(5));
+      long start = System.nanoTime();
+      wallet.close();
+      long ms = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+      caller.join(TimeUnit.SECONDS.toMillis(30));
+      assertFalse(caller.isAlive(), "round " + round + ": the caller still runs 30 s after close()");
+      Throwable t = ended.get();
+      assertTrue(t instanceof ZephyrError && "Wallet is closed".equals(t.getMessage()), "round " + round + ": the caller ended with " + t);
+      assertTrue(ms < TimeUnit.SECONDS.toMillis(30), "round " + round + ": close() took " + ms + " ms");
+    }
   }
 }
