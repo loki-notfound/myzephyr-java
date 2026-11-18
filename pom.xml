@@ -173,6 +173,7 @@
 								<include>test/TestZephyrTls.java</include>
 								<include>test/TestDefaultPort.java</include>
 								<include>test/TestWalletClosing.java</include>
+								<include>test/TestWalletExceptions.java</include>
 							</includes>
 							<argLine>-Djava.library.path=${native.library.path}</argLine>
 						</configuration>

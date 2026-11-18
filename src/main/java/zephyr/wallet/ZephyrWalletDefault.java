@@ -22,7 +22,6 @@
 
 package zephyr.wallet;
 
-import zephyr.lib.utils.GenUtils;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -178,7 +177,7 @@ abstract class ZephyrWalletDefault implements ZephyrWallet {
   public ZephyrSubaddress getSubaddress(int accountIdx, int subaddressIdx) {
     List<ZephyrSubaddress> subaddresses = getSubaddresses(accountIdx, Arrays.asList(subaddressIdx));
     if (subaddresses.isEmpty()) throw new ZephyrError("Subaddress at index " + subaddressIdx + " is not initialized");
-    GenUtils.assertEquals("Only 1 subaddress should be returned", 1, subaddresses.size());
+    if (subaddresses.size() != 1) throw new ZephyrError("Only 1 subaddress should be returned");
     return subaddresses.get(0);
   }
   
@@ -199,6 +198,7 @@ abstract class ZephyrWalletDefault implements ZephyrWallet {
   
   @Override
   public List<ZephyrTxWallet> getTxs(String... txHashes) {
+    if (txHashes == null) throw new ZephyrError("Must provide tx hashes");
     return getTxs(new ZephyrTxQuery().setHashes(txHashes));
   }
   
@@ -308,11 +308,13 @@ abstract class ZephyrWalletDefault implements ZephyrWallet {
   
   @Override
   public String relayTx(ZephyrTxWallet tx) {
+    if (tx == null) throw new ZephyrError("Must provide a transaction to relay");
     return relayTx(tx.getMetadata());
   }
   
   @Override
   public List<String> relayTxs(List<ZephyrTxWallet> txs) {
+    if (txs == null) throw new ZephyrError("Must provide transactions to relay");
     List<String> txHexes = new ArrayList<String>();
     for (ZephyrTxWallet tx : txs) txHexes.add(tx.getMetadata());
     return relayTxs(txHexes);
@@ -365,12 +367,31 @@ abstract class ZephyrWalletDefault implements ZephyrWallet {
   
   @Override
   public int importMultisigHex(String... multisigHexes) {
+    if (multisigHexes == null) throw new ZephyrError("Must provide multisig hexes");
     return importMultisigHex(Arrays.asList(multisigHexes));
   }
   
   @Override
   public void close() {
     close(false); // close without saving
+  }
+  
+  /**
+   * The exception a public call of ZephyrWalletFull throws for a failure inside it: a ZephyrError as
+   * it is; anything
+   * else (an internal check, data from the core that does not parse, a null where a value is
+   * needed) as a ZephyrError with the same message, without the cause, whose message can carry the
+   * data that failed to parse.
+   */
+  static ZephyrError toZephyrError(Throwable e) {
+    if (e instanceof ZephyrError) return (ZephyrError) e;
+    return new ZephyrError(messageOf(e));
+  }
+  
+  /** The message of an exception, or its class name when it has none (a ZephyrError needs one). */
+  static String messageOf(Throwable e) {
+    String message = e.getMessage();
+    return message != null ? message : e.getClass().getName();
   }
   
   /**
@@ -388,7 +409,7 @@ abstract class ZephyrWalletDefault implements ZephyrWallet {
         ZephyrTxQuery txQuery = query.getTxQuery().copy();
         if (query.getTxQuery().getTransferQuery() == query) query = txQuery.getTransferQuery();
         else {
-          GenUtils.assertNull("Transfer query's tx query must be circular reference or null", query.getTxQuery().getTransferQuery());
+          if (query.getTxQuery().getTransferQuery() != null) throw new ZephyrError("Transfer query's tx query must be circular reference or null");
           query = query.copy();
           query.setTxQuery(txQuery);
         }

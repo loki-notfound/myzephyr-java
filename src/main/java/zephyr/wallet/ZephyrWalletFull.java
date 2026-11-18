@@ -126,7 +126,11 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
    * @return true if a wallet exists at the given path, false otherwise
    */
   public static boolean walletExists(String path) {
-    return walletExistsJni(path);
+    try {
+      return walletExistsJni(path);
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
+    }
   }
   
   /**
@@ -139,13 +143,17 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
    * @return the opened wallet
    */
   public static ZephyrWalletFull openWallet(String path, String password, ZephyrNetworkType networkType, ZephyrRpcConnection daemonConnection) {
-    if (!walletExistsJni(path)) throw new ZephyrError("Wallet does not exist at path: " + path);
-    if (networkType == null) throw new ZephyrError("Must provide a network type");
-    if (daemonConnection != null) beforeDaemonUri(daemonConnection.getUri()); // before the wallet exists: a failure leaves nothing open
-    long jniWalletHandle = openWalletJni(path, password, networkType.ordinal());
-    ZephyrWalletFull wallet = new ZephyrWalletFull(jniWalletHandle, password);
-    if (daemonConnection != null) connectOrClose(wallet, daemonConnection);
-    return wallet;
+    try {
+      if (!walletExistsJni(path)) throw new ZephyrError("Wallet does not exist at path: " + path);
+      if (networkType == null) throw new ZephyrError("Must provide a network type");
+      if (daemonConnection != null) beforeDaemonUri(daemonConnection.getUri()); // before the wallet exists: a failure leaves nothing open
+      long jniWalletHandle = openWalletJni(path, password, networkType.ordinal());
+      ZephyrWalletFull wallet = new ZephyrWalletFull(jniWalletHandle, password);
+      if (daemonConnection != null) connectOrClose(wallet, daemonConnection);
+      return wallet;
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
+    }
   }
   /**
    * Open an existing wallet from its files, without a daemon connection.
@@ -166,7 +174,15 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
    * @param daemonUri is the daemon's URI (null for an unconnected wallet)
    * @return the opened wallet
    */
-  public static ZephyrWalletFull openWallet(String path, String password, ZephyrNetworkType networkType, String daemonUri) { return openWallet(path, password, networkType, daemonUri == null ? null : new ZephyrRpcConnection(daemonUri)); }
+  public static ZephyrWalletFull openWallet(String path, String password, ZephyrNetworkType networkType, String daemonUri) {
+    ZephyrRpcConnection daemonConnection;
+    try {
+      daemonConnection = daemonUri == null ? null : new ZephyrRpcConnection(daemonUri);
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
+    }
+    return openWallet(path, password, networkType, daemonConnection);
+  }
 
   /**
    * Open an existing wallet from byte[] data using JNI bindings to wallet2.h
@@ -179,12 +195,16 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
    * @return the opened wallet
    */
   public static ZephyrWalletFull openWalletData(String password, ZephyrNetworkType networkType, byte[] keysData, byte[] cacheData, ZephyrRpcConnection daemonConnection) {
-    if (networkType == null) throw new ZephyrError("Must provide a network type");
-    if (daemonConnection != null) beforeDaemonUri(daemonConnection.getUri()); // before the wallet exists: a failure leaves nothing open
-    long jniWalletHandle = openWalletDataJni(password, networkType.ordinal(), keysData, cacheData);
-    ZephyrWalletFull wallet = new ZephyrWalletFull(jniWalletHandle, password);
-    if (daemonConnection != null) connectOrClose(wallet, daemonConnection);
-    return wallet;
+    try {
+      if (networkType == null) throw new ZephyrError("Must provide a network type");
+      if (daemonConnection != null) beforeDaemonUri(daemonConnection.getUri()); // before the wallet exists: a failure leaves nothing open
+      long jniWalletHandle = openWalletDataJni(password, networkType.ordinal(), keysData, cacheData);
+      ZephyrWalletFull wallet = new ZephyrWalletFull(jniWalletHandle, password);
+      if (daemonConnection != null) connectOrClose(wallet, daemonConnection);
+      return wallet;
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
+    }
   }
   
   /**
@@ -215,25 +235,29 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
    * @return the wallet instance
    */
   public static ZephyrWalletFull openWallet(ZephyrWalletConfig config) {
+    try {
     
-    // validate config
-    if (config == null) throw new ZephyrError("Must specify config to open wallet");
-    if (config.getPassword() == null) throw new ZephyrError("Must specify password to decrypt wallet");
-    if (config.getNetworkType() == null) throw new ZephyrError("Must specify a network type: 'mainnet', 'testnet' or 'stagenet'");
-    if (config.getMnemonic() != null) throw new ZephyrError("Cannot specify mnemonic when opening wallet");
-    if (config.getSeedOffset() != null) throw new ZephyrError("Cannot specify seed offset when opening wallet");
-    if (config.getPrimaryAddress() != null) throw new ZephyrError("Cannot specify primary address when opening wallet");
-    if (config.getPrivateViewKey() != null) throw new ZephyrError("Cannot specify private view key when opening wallet");
-    if (config.getPrivateSpendKey() != null) throw new ZephyrError("Cannot specify private spend key when opening wallet");
-    if (config.getRestoreHeight() != null) throw new ZephyrError("Cannot specify restore height when opening wallet");
-    if (config.getLanguage() != null) throw new ZephyrError("Cannot specify language when opening wallet");
-    if (Boolean.TRUE.equals(config.getSaveCurrent())) throw new ZephyrError("Cannot save current wallet when opening full wallet");
+      // validate config
+      if (config == null) throw new ZephyrError("Must specify config to open wallet");
+      if (config.getPassword() == null) throw new ZephyrError("Must specify password to decrypt wallet");
+      if (config.getNetworkType() == null) throw new ZephyrError("Must specify a network type: 'mainnet', 'testnet' or 'stagenet'");
+      if (config.getMnemonic() != null) throw new ZephyrError("Cannot specify mnemonic when opening wallet");
+      if (config.getSeedOffset() != null) throw new ZephyrError("Cannot specify seed offset when opening wallet");
+      if (config.getPrimaryAddress() != null) throw new ZephyrError("Cannot specify primary address when opening wallet");
+      if (config.getPrivateViewKey() != null) throw new ZephyrError("Cannot specify private view key when opening wallet");
+      if (config.getPrivateSpendKey() != null) throw new ZephyrError("Cannot specify private spend key when opening wallet");
+      if (config.getRestoreHeight() != null) throw new ZephyrError("Cannot specify restore height when opening wallet");
+      if (config.getLanguage() != null) throw new ZephyrError("Cannot specify language when opening wallet");
+      if (Boolean.TRUE.equals(config.getSaveCurrent())) throw new ZephyrError("Cannot save current wallet when opening full wallet");
 
-    // read wallet data from disk if not provided
-    if (config.getKeysData() == null) {
-      return openWallet(config.getPath(), config.getPassword(), config.getNetworkType(), config.getServer());
-    } else {
-      return openWalletData(config.getPassword(), config.getNetworkType(), config.getKeysData(), config.getCacheData(), config.getServer());
+      // read wallet data from disk if not provided
+      if (config.getKeysData() == null) {
+        return openWallet(config.getPath(), config.getPassword(), config.getNetworkType(), config.getServer());
+      } else {
+        return openWalletData(config.getPassword(), config.getNetworkType(), config.getKeysData(), config.getCacheData(), config.getServer());
+      }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     }
   }
   
@@ -288,30 +312,34 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
    * @return the wallet instance
    */
   public static ZephyrWalletFull createWallet(ZephyrWalletConfig config) {
+    try {
     
-    // validate config
-    if (config == null) throw new ZephyrError("Must specify config to open wallet");
-    if (config.getNetworkType() == null) throw new ZephyrError("Must specify a network type: 'mainnet', 'testnet' or 'stagenet'");
-    if (config.getPath() != null && !config.getPath().isEmpty() && ZephyrWalletFull.walletExists(config.getPath())) throw new ZephyrError("Wallet already exists: " + config.getPath());
-    if (config.getMnemonic() != null && (config.getPrimaryAddress() != null || config.getPrivateViewKey() != null || config.getPrivateSpendKey() != null)) {
-      throw new ZephyrError("Wallet may be initialized with a mnemonic or keys but not both");
-    }
-    if (Boolean.TRUE.equals(config.getSaveCurrent() != null)) throw new ZephyrError("Cannot save current wallet when creating full wallet");
+      // validate config
+      if (config == null) throw new ZephyrError("Must specify config to open wallet");
+      if (config.getNetworkType() == null) throw new ZephyrError("Must specify a network type: 'mainnet', 'testnet' or 'stagenet'");
+      if (config.getPath() != null && !config.getPath().isEmpty() && ZephyrWalletFull.walletExists(config.getPath())) throw new ZephyrError("Wallet already exists: " + config.getPath());
+      if (config.getMnemonic() != null && (config.getPrimaryAddress() != null || config.getPrivateViewKey() != null || config.getPrivateSpendKey() != null)) {
+        throw new ZephyrError("Wallet may be initialized with a mnemonic or keys but not both");
+      }
+      if (Boolean.TRUE.equals(config.getSaveCurrent() != null)) throw new ZephyrError("Cannot save current wallet when creating full wallet");
     
-    // the native side receives the server URI with the config (createWalletJni)
-    beforeDaemonUri(daemonUriForCore(config.getServerUri()));
+      // the native side receives the server URI with the config (createWalletJni)
+      beforeDaemonUri(daemonUriForCore(config.getServerUri()));
     
-    // create wallet
-    if (config.getMnemonic() != null) {
-      if (config.getLanguage() != null) throw new ZephyrError("Cannot specify language when creating wallet from mnemonic");
-      return createWalletFromMnemonic(config);
-    } else if (config.getPrimaryAddress() != null || config.getPrivateSpendKey() != null) {
-      if (config.getSeedOffset() != null) throw new ZephyrError("Cannot specify seed offset when creating wallet from keys");
-      return createWalletFromKeys(config);
-    } else {
-      if (config.getSeedOffset() != null) throw new ZephyrError("Cannot specify seed offset when creating random wallet");
-      if (config.getRestoreHeight() != null) throw new ZephyrError("Cannot specify restore height when creating random wallet");
-      return createWalletRandom(config);
+      // create wallet
+      if (config.getMnemonic() != null) {
+        if (config.getLanguage() != null) throw new ZephyrError("Cannot specify language when creating wallet from mnemonic");
+        return createWalletFromMnemonic(config);
+      } else if (config.getPrimaryAddress() != null || config.getPrivateSpendKey() != null) {
+        if (config.getSeedOffset() != null) throw new ZephyrError("Cannot specify seed offset when creating wallet from keys");
+        return createWalletFromKeys(config);
+      } else {
+        if (config.getSeedOffset() != null) throw new ZephyrError("Cannot specify seed offset when creating random wallet");
+        if (config.getRestoreHeight() != null) throw new ZephyrError("Cannot specify restore height when creating random wallet");
+        return createWalletRandom(config);
+      }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     }
   }
   
@@ -332,7 +360,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       connectOrClose(wallet, config.getServer());
       return wallet;
     } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      throw toZephyrError(e);
     }
   }
   
@@ -424,7 +452,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
    * a hint at TLS when the wallet's daemon URI is https.
    */
   private ZephyrError daemonError(Exception e) {
-    String message = e.getMessage();
+    String message = messageOf(e);
     if (NOT_CONNECTED.equals(message)) {
       try {
         String[] connection = getDaemonConnectionJni();
@@ -449,7 +477,11 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
    * @return the available languages for the wallet's mnemonic phrase
    */
   public static List<String> getMnemonicLanguages() {
-    return Arrays.asList(getMnemonicLanguagesJni());
+    try {
+      return Arrays.asList(getMnemonicLanguagesJni());
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
+    }
   }
   
   // ------------ WALLET METHODS SPECIFIC TO JNI IMPLEMENTATION ---------------
@@ -467,6 +499,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       } catch (Exception e) {
         throw daemonError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -485,6 +519,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       } catch (Exception e) {
         throw daemonError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -501,8 +537,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       try {
         return isSyncedJni();
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -517,6 +555,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     beginCall();
     try {
       return ZephyrNetworkType.values()[getNetworkTypeJni()];
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -531,6 +571,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     beginCall();
     try {
       return getRestoreHeightJni();
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -545,6 +587,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     beginCall();
     try {
       setRestoreHeightJni(syncHeight);
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -559,6 +603,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     beginCall();
     try {
       moveToJni(path, password);
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -572,6 +618,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     try {
       super.addListener(listener);
       initListening();
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -594,6 +642,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     beginCall();
     try {
       return isViewOnlyJni();
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -620,9 +670,11 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
         try {
           setDaemonConnectionJni(uri, daemonConnection.getUsername(), daemonConnection.getPassword());
         } catch (Exception e) {
-          throw new ZephyrError(e.getMessage());
+          throw toZephyrError(e);
         }
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -637,8 +689,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
         setProxyJni(uri);
       } catch (Exception e) {
         e.printStackTrace();
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -652,8 +706,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
         String[] vals = getDaemonConnectionJni();
         return vals == null ? null : new ZephyrRpcConnection(vals[0], vals[1], vals[2]);
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -666,8 +722,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       try {
         return isConnectedToDaemonJni();
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -681,8 +739,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
         String versionJson = getVersionJni();
         return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, versionJson, ZephyrVersion.class);
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -694,6 +754,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     try {
       String path = getPathJni();
       return path.isEmpty() ? null : path;
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -706,6 +768,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       String mnemonic = getMnemonicJni();
       if ("".equals(mnemonic)) return null;
       return mnemonic;
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -718,6 +782,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       String mnemonicLanguage = getMnemonicLanguageJni();
       if ("".equals(mnemonicLanguage)) return null;
       return mnemonicLanguage;
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -728,6 +794,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     beginCall();
     try {
       return getPrivateViewKeyJni();
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -740,6 +808,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       String privateSpendKey = getPrivateSpendKeyJni();
       if ("".equals(privateSpendKey)) return null;
       return privateSpendKey;
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -750,6 +820,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     beginCall();
     try {
       return getPublicViewKeyJni();
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -760,6 +832,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     beginCall();
     try {
       return getPublicSpendKeyJni();
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -773,8 +847,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
         String integratedAddressJson = getIntegratedAddressJni(standardAddress, paymentId);
         return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, integratedAddressJson, ZephyrIntegratedAddress.class);
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -788,8 +864,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
         String integratedAddressJson = decodeIntegratedAddressJni(integratedAddress);
         return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, integratedAddressJson, ZephyrIntegratedAddress.class);
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -800,6 +878,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     beginCall();
     try {
       return getHeightJni();
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -814,6 +894,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       } catch (Exception e) {
         throw daemonError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -826,8 +908,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       try {
         return getHeightByDateJni(year, month ,day);
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -853,6 +937,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       } finally {
         if (listener != null) listeners.remove(listener); // unregister listener; throws nothing, also when closed meanwhile or removed by itself
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -867,6 +953,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       } catch (Exception e) {
         throw daemonError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -879,8 +967,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       try {
         stopSyncingJni();
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -896,6 +986,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       } catch (Exception e) {
         throw daemonError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -910,6 +1002,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       } catch (Exception e) {
         throw daemonError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -924,6 +1018,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       } catch (Exception e) {
         throw daemonError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -937,6 +1033,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       List<ZephyrAccount> accounts = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, accountsJson, AccountsContainer.class).accounts;
       for (ZephyrAccount account : accounts) sanitizeAccount(account);
       return accounts;
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -950,6 +1048,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       ZephyrAccount account = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, accountJson, ZephyrAccount.class);
       sanitizeAccount(account);
       return account;
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -963,6 +1063,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       ZephyrAccount account = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, accountJson, ZephyrAccount.class);
       sanitizeAccount(account);
       return account;
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -976,6 +1078,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       List<ZephyrSubaddress> subaddresses = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, subaddresses_json, SubaddressesContainer.class).subaddresses;
       for (ZephyrSubaddress subaddress : subaddresses) sanitizeSubaddress(subaddress);
       return subaddresses;
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -989,6 +1093,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       ZephyrSubaddress subaddress = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, subaddressJson, ZephyrSubaddress.class);
       sanitizeSubaddress(subaddress);
       return subaddress;
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1000,6 +1106,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     try {
       if (label == null) label = "";
       setSubaddressLabelJni(accountIdx, subaddressIdx, label);
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1010,6 +1118,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     beginCall();
     try {
       return getAddressJni(accountIdx, subaddressIdx);
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1024,8 +1134,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
         ZephyrSubaddress subaddress = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, subaddressJson, ZephyrSubaddress.class);
         return sanitizeSubaddress(subaddress);
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1040,6 +1152,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       } catch (ZephyrError e) {
         throw new ZephyrError(e.getMessage());
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1055,6 +1169,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       } catch (ZephyrError e) {
         throw new ZephyrError(e.getMessage());
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1072,6 +1188,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       } catch (ZephyrError e) {
         throw new ZephyrError(e.getMessage());
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1086,6 +1204,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       } catch (ZephyrError e) {
         throw new ZephyrError(e.getMessage());
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1101,6 +1221,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       } catch (ZephyrError e) {
         throw new ZephyrError(e.getMessage());
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1118,6 +1240,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       } catch (ZephyrError e) {
         throw new ZephyrError(e.getMessage());
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1132,6 +1256,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       } catch (ZephyrError e) {
         throw new ZephyrError(e.getMessage());
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1146,6 +1272,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       } catch (ZephyrError e) {
         throw new ZephyrError(e.getMessage());
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1165,11 +1293,13 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       try {
         blocksJson = getTxsJni(JsonUtils.serialize(query.getBlock()));
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
     
       // deserialize and return txs
       return deserializeTxs(query, blocksJson, missingTxHashes);
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1188,11 +1318,13 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       try {
         blocksJson = getTransfersJni(JsonUtils.serialize(query.getTxQuery().getBlock()));
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
     
       // deserialize and return transfers
       return deserializeTransfers(query, blocksJson);
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1211,7 +1343,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
           ZephyrTxQuery txQuery = query.getTxQuery().copy();
           if (query.getTxQuery().getOutputQuery() == query) query = txQuery.getOutputQuery();
           else {
-            GenUtils.assertNull("Output query's tx query must be circular reference or null", query.getTxQuery().getOutputQuery());
+            if (query.getTxQuery().getOutputQuery() != null) throw new ZephyrError("Output query's tx query must be circular reference or null");
             query = query.copy();
             query.setTxQuery(txQuery);
           }
@@ -1226,8 +1358,25 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     
       // deserialize and return outputs
       return deserializeOutputs(query, blocksJson);
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
+    }
+  }
+  
+  /**
+   * {@inheritDoc}
+   *
+   * <p>In this wallet every failure is a ZephyrError, as for its other calls.</p>
+   */
+  @Override
+  public String getOutputAssetType(ZephyrOutputWallet output) {
+    assertNotClosed();
+    try {
+      return super.getOutputAssetType(output);
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     }
   }
   
@@ -1237,6 +1386,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     try {
       String outputsHex = exportOutputsJni(all);
       return outputsHex.isEmpty() ? null : outputsHex;
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1247,6 +1398,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     beginCall();
     try {
       return importOutputsJni(outputsHex);
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1259,6 +1412,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       String keyImagesJson = exportKeyImagesJni(all);
       List<ZephyrKeyImage> keyImages = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, keyImagesJson, KeyImagesContainer.class).keyImages;
       return keyImages;
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1275,6 +1430,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     
       // deserialize response
       return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, importResultJson, ZephyrKeyImageImportResult.class);
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1283,7 +1440,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   @Override
   public List<ZephyrKeyImage> getNewKeyImagesFromLastImport() {
     assertNotClosed();
-    throw new RuntimeException("ZephyrWalletFull.getNewKeyImagesFromLastImport() not implemented");
+    throw new ZephyrError("ZephyrWalletFull.getNewKeyImagesFromLastImport() not implemented");
   }
   
   @Override
@@ -1293,8 +1450,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       try {
         freezeOutputJni(keyImage);
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1307,8 +1466,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       try {
         thawOutputJni(keyImage);
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1321,8 +1482,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       try {
         return isOutputFrozenJni(keyImage);
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1344,12 +1507,14 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
         txSetJson = createTxsJni(JsonUtils.serialize(config));
         LOGGER.fine("Received createTxs() response from JNI: " + txSetJson.substring(0, Math.min(5000, txSetJson.length())) + "...");
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
     
       // deserialize and return txs
       ZephyrTxSet txSet = JsonUtils.deserialize(txSetJson, ZephyrTxSet.class);
       return txSet.getTxs();
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1364,8 +1529,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
         ZephyrTxSet txSet = JsonUtils.deserialize(txSetJson, ZephyrTxSet.class);
         return txSet.getTxs().get(0);
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1385,7 +1552,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
         txSetsJson = sweepUnlockedJni(JsonUtils.serialize(config));
         LOGGER.fine("Received sweepUnlocked() response from JNI: " + txSetsJson.substring(0, Math.min(5000, txSetsJson.length())) + "...");
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
     
       // deserialize tx sets
@@ -1395,6 +1562,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       List<ZephyrTxWallet> txs = new ArrayList<ZephyrTxWallet>();
       for (ZephyrTxSet txSet : txSets) txs.addAll(txSet.getTxs());
       return txs;
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1410,8 +1579,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
         if (txSet.getTxs() == null) txSet.setTxs(new ArrayList<ZephyrTxWallet>());
         return txSet.getTxs();
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1425,8 +1596,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       try {
         return Arrays.asList(relayTxsJni(txMetadatasArr));
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1444,9 +1617,11 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       try {
         describedTxSetJson = describeTxSetJni(JsonUtils.serialize(txSet));
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
       return JsonUtils.deserialize(describedTxSetJson, ZephyrTxSet.class);
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1459,8 +1634,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       try {
         return signTxsJni(unsignedTxHex);
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1473,8 +1650,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       try {
         return Arrays.asList(submitTxsJni(signedTxHex));
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1488,8 +1667,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
         String checkStr = checkTxKeyJni(txHash, txKey, address);
         return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, checkStr, ZephyrCheckTx.class);
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1502,8 +1683,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       try {
         return getTxProofJni(txHash, address, message);
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1517,8 +1700,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
         String checkStr = checkTxProofJni(txHash, address, message, signature);
         return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, checkStr, ZephyrCheckTx.class);
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1531,8 +1716,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       try {
         return getSpendProofJni(txHash, message);
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1545,8 +1732,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       try {
         return checkSpendProofJni(txHash, message, signature);
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1559,8 +1748,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       try {
         return getReserveProofWalletJni(message);
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1573,8 +1764,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       try {
         return getReserveProofAccountJni(accountIdx, amount.toString(), message);
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage(), -1);
+        throw new ZephyrError(messageOf(e), -1);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1588,8 +1781,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
         String checkStr = checkReserveProofJni(address, message, signature);
         return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, checkStr, ZephyrCheckReserve.class);
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage(), -1);
+        throw new ZephyrError(messageOf(e), -1);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1600,6 +1795,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     beginCall();
     try {
       return signMessageJni(msg, signatureType.ordinal(), accountIdx, subaddressIdx);
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1621,6 +1818,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       } catch (Exception e) {
         return new ZephyrMessageSignatureResult(false, null, null, null); // jni can differentiate incorrect from invalid address, but rpc returns -2 for both, so returning bad result for consistency
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1633,8 +1832,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       try {
         return getTxKeyJni(txHash);
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1645,6 +1846,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     beginCall();
     try {
       return Arrays.asList(getTxNotesJni(txHashes.toArray(new String[txHashes.size()])));  // convert to array for jni
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1655,6 +1858,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     beginCall();
     try {
       setTxNotesJni(txHashes.toArray(new String[txHashes.size()]), notes.toArray(new String[notes.size()]));
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1669,6 +1874,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       List<ZephyrAddressBookEntry> entries = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, entriesJson, AddressBookEntriesContainer.class).entries;
       if (entries == null) entries = new ArrayList<ZephyrAddressBookEntry>();
       return entries;
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1679,6 +1886,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     beginCall();
     try {
       return addAddressBookEntryJni(address, description);
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1689,6 +1898,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     beginCall();
     try {
       editAddressBookEntryJni(index, setAddress, address, setDescription, description);
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1699,6 +1910,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     beginCall();
     try {
       deleteAddressBookEntryJni(entryIdx);
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1707,25 +1920,25 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   @Override
   public void tagAccounts(String tag, Collection<Integer> accountIndices) {
     assertNotClosed();
-    throw new RuntimeException("ZephyrWalletFull.tagAccounts() not implemented");
+    throw new ZephyrError("ZephyrWalletFull.tagAccounts() not implemented");
   }
 
   @Override
   public void untagAccounts(Collection<Integer> accountIndices) {
     assertNotClosed();
-    throw new RuntimeException("ZephyrWalletFull.untagAccounts() not implemented");
+    throw new ZephyrError("ZephyrWalletFull.untagAccounts() not implemented");
   }
 
   @Override
   public List<ZephyrAccountTag> getAccountTags() {
     assertNotClosed();
-    throw new RuntimeException("ZephyrWalletFull.getAccountTags() not implemented");
+    throw new ZephyrError("ZephyrWalletFull.getAccountTags() not implemented");
   }
 
   @Override
   public void setAccountTagLabel(String tag, String label) {
     assertNotClosed();
-    throw new RuntimeException("ZephyrWalletFull.setAccountTagLabel() not implemented");
+    throw new ZephyrError("ZephyrWalletFull.setAccountTagLabel() not implemented");
   }
 
   @Override
@@ -1735,8 +1948,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       try {
         return getPaymentUriJni(JsonUtils.serialize(request));
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1750,8 +1965,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
         String sendRequestJson = parsePaymentUriJni(uri);
         return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, sendRequestJson, ZephyrTxConfig.class);
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1761,7 +1978,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   public String getAttribute(String key) {
     beginCall();
     try {
+      if (key == null) throw new ZephyrError("Must provide attribute key"); // the native side cannot take null
       return getAttributeJni(key);
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1771,7 +1991,11 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   public void setAttribute(String key, String val) {
     beginCall();
     try {
+      if (key == null) throw new ZephyrError("Must provide attribute key"); // the native side cannot take null
+      if (val == null) throw new ZephyrError("Must provide attribute value");
       setAttributeJni(key, val);
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1784,8 +2008,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       try {
         startMiningJni(numThreads == null ? 0l : (long) numThreads, Boolean.TRUE.equals(backgroundMining), Boolean.TRUE.equals(ignoreBattery));
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1798,8 +2024,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       try {
         stopMiningJni();
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1811,6 +2039,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     beginCall();
     try {
       return isMultisigImportNeededJni();
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1824,8 +2054,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
         String multisigInfoJson = getMultisigInfoJni();
         return JsonUtils.deserialize(multisigInfoJson, ZephyrMultisigInfo.class);
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1836,6 +2068,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     beginCall();
     try {
       return prepareMultisigJni();
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1848,8 +2082,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       try {
         return makeMultisigJni(multisigHexes.toArray(new String[multisigHexes.size()]), threshold, password);
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1863,8 +2099,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
         String initMultisigResultJson = exchangeMultisigKeysJni(multisigHexes.toArray(new String[multisigHexes.size()]), password);
         return JsonUtils.deserialize(initMultisigResultJson, ZephyrMultisigInitResult.class);
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1877,8 +2115,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       try {
         return exportMultisigHexJni();
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1891,8 +2131,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       try {
         return importMultisigHexJni(multisigHexes.toArray(new String[multisigHexes.size()]));
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1906,8 +2148,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
         String signMultisigResultJson = signMultisigTxHexJni(multisigTxHex);
         return JsonUtils.deserialize(signMultisigResultJson, ZephyrMultisigSignResult.class);
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1920,8 +2164,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       try {
         return Arrays.asList(submitMultisigTxHexJni(signedMultisigTxHex));
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1936,6 +2182,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     beginCall();
     try {
       return new byte[][] { getKeysFileBufferJni(password, isViewOnly()), getCacheFileBufferJni() };
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1946,12 +2194,14 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     beginCall();
     try {
       try {
-        if (!password.equals(oldPassword)) throw new RuntimeException("Invalid original password.");
+        if (!password.equals(oldPassword)) throw new ZephyrError("Invalid original password.");
         changePasswordJni(oldPassword, newPassword);
         password = newPassword;
       } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+        throw toZephyrError(e);
       }
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -1962,6 +2212,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     beginCall();
     try {
       saveJni();
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     } finally {
       endCall();
     }
@@ -2004,7 +2256,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
         try {
           closeJni(save);
         } catch (Exception e) {
-          throw new ZephyrError(e.getMessage());
+          throw toZephyrError(e);
         } finally {
           callLock.writeLock().unlock();
         }
@@ -2519,7 +2771,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     
     // deserialize blocks
     DeserializedBlocksContainer deserializedBlocks = deserializeBlocks(blocksJson);
-    if (!deserializedBlocks.missingTxHashes.isEmpty()) throw new RuntimeException("Wallet missing requested tx hashes: " + deserializedBlocks.missingTxHashes);
+    if (!deserializedBlocks.missingTxHashes.isEmpty()) throw new ZephyrError("Wallet missing requested tx hashes: " + deserializedBlocks.missingTxHashes);
     List<ZephyrBlock> blocks = deserializedBlocks.blocks;
     
     // collect transfers
@@ -2542,7 +2794,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     
     // deserialize blocks
     DeserializedBlocksContainer deserializedBlocks = deserializeBlocks(blocksJson);
-    if (!deserializedBlocks.missingTxHashes.isEmpty()) throw new RuntimeException("Wallet missing requested tx hashes: " + deserializedBlocks.missingTxHashes);
+    if (!deserializedBlocks.missingTxHashes.isEmpty()) throw new ZephyrError("Wallet missing requested tx hashes: " + deserializedBlocks.missingTxHashes);
     List<ZephyrBlock> blocks = deserializedBlocks.blocks;
     
     // collect outputs

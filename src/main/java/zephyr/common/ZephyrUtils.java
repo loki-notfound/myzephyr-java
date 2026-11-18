@@ -183,9 +183,13 @@ public class ZephyrUtils {
    * @return true if a wallet keys file exists at the given path, false otherwise
    */
   public static boolean walletExists(String path) {
-    String basePath = path.lastIndexOf('.') > path.lastIndexOf(File.separatorChar) ? path.substring(0, path.lastIndexOf('.')) : path;
-    File keysFile = new File(basePath + ".keys");
-    return keysFile.exists() && keysFile.isFile();
+    try {
+      String basePath = path.lastIndexOf('.') > path.lastIndexOf(File.separatorChar) ? path.substring(0, path.lastIndexOf('.')) : path;
+      File keysFile = new File(basePath + ".keys");
+      return keysFile.exists() && keysFile.isFile();
+    } catch (RuntimeException e) {
+      throw toZephyrError(e);
+    }
   }
   
   /**
@@ -195,10 +199,10 @@ public class ZephyrUtils {
    * @throws ZephyrError if the given mnemonic is invalid
    */
   public static void validateMnemonic(String mnemonic) {
-    GenUtils.assertNotNull("Mnemonic phrase is not initialized", mnemonic);
-    GenUtils.assertFalse("Mnemonic phrase is empty", mnemonic.isEmpty());
+    if (mnemonic == null) throw new ZephyrError("Mnemonic phrase is not initialized");
+    if (mnemonic.isEmpty()) throw new ZephyrError("Mnemonic phrase is empty");
     String[] words = mnemonic.split(" ");
-    if (words.length != ZephyrUtils.NUM_MNEMONIC_WORDS) throw new Error("Mnemonic phrase is " + words.length + " words but must be " + ZephyrUtils.NUM_MNEMONIC_WORDS);
+    if (words.length != ZephyrUtils.NUM_MNEMONIC_WORDS) throw new ZephyrError("Mnemonic phrase is " + words.length + " words but must be " + ZephyrUtils.NUM_MNEMONIC_WORDS);
   }
   
   /**
@@ -313,7 +317,7 @@ public class ZephyrUtils {
     try {
       return JsonUtils.deserialize(getIntegratedAddressJni(networkType.ordinal(), standardAddress, paymentId == null ? "" : paymentId), ZephyrIntegratedAddress.class);
     } catch (Exception err) {
-      throw new ZephyrError(err.getMessage());
+      throw toZephyrError(err);
     }
   }
   
@@ -324,7 +328,7 @@ public class ZephyrUtils {
    * @return the decoded address and network types
    */
   public static ZephyrDecodedAddress decodeAddress(String address) {
-    GenUtils.assertNotNull("Address is null", address);
+    if (address == null) throw new ZephyrError("Address is null");
     
     // address must consist of base58 characters
     if (!BASE58_PATTERN.matcher(address).matches()) throw new ZephyrError("Address has invalid characters");
@@ -333,7 +337,7 @@ public class ZephyrUtils {
     String addressHex;
     try {
       addressHex = decodeAddressToHex(address);
-    } catch (IllegalArgumentException e) {
+    } catch (RuntimeException e) {
       throw new ZephyrError("Address has invalid encoding");
     }
     
@@ -341,7 +345,7 @@ public class ZephyrUtils {
     if (addressHex.length() < 2 * MIN_DECODED_LENGTH) throw new ZephyrError("Address has invalid length");
     
     // validate address hash
-    GenUtils.assertTrue("Address has invalid hash", isValidAddressHash(addressHex));
+    if (!isValidAddressHash(addressHex)) throw new ZephyrError("Address has invalid hash");
     
     // read the varint tag (little-endian base-128)
     byte[] addressBytes = hexToBin(addressHex);
@@ -433,7 +437,7 @@ public class ZephyrUtils {
     try {
       validateAddressJni(address, networkType.ordinal());
     } catch (Exception err) {
-      throw new ZephyrError(err.getMessage());
+      throw toZephyrError(err);
     }
   }
 
@@ -444,7 +448,11 @@ public class ZephyrUtils {
    */
   // TODO: improve validation
   public static void validatePaymentId(String paymentId) {
-    GenUtils.assertTrue(paymentId.length() == 16 || paymentId.length() == 64);
+    try {
+      if (paymentId.length() != 16 && paymentId.length() != 64) throw new ZephyrError("value asserted as true but was false"); // GenUtils.assertTrue's text, kept
+    } catch (RuntimeException e) {
+      throw toZephyrError(e);
+    }
   }
   
   /**
@@ -480,7 +488,11 @@ public class ZephyrUtils {
    * @throws ZephyrError if the string is not hex
    */
   public static void validateHex(String str) {
-    if (!str.matches("^([0-9A-Fa-f]{2})+$")) throw new ZephyrError("Invalid hex: " + str);
+    try {
+      if (!str.matches("^([0-9A-Fa-f]{2})+$")) throw new ZephyrError("Invalid hex: " + str);
+    } catch (RuntimeException e) {
+      throw toZephyrError(e);
+    }
   }
 
   /**
@@ -490,8 +502,12 @@ public class ZephyrUtils {
    * @throws ZephyrError if a character is not in the base58 alphabet
    */
   public static void validateBase58(String standardAddress) {
-    for (char c : standardAddress.toCharArray()) {
-      if (!CHARS.contains(c)) throw new ZephyrError("Invalid Base58 " + standardAddress);
+    try {
+      for (char c : standardAddress.toCharArray()) {
+        if (!CHARS.contains(c)) throw new ZephyrError("Invalid Base58 " + standardAddress);
+      }
+    } catch (RuntimeException e) {
+      throw toZephyrError(e);
     }
   }
   
@@ -505,13 +521,17 @@ public class ZephyrUtils {
    * @return true if the payment ids are equal, false otherwise
    */
   public static boolean paymentIdsEqual(String paymentId1, String paymentId2) {
-    int maxLength = Math.max(paymentId1.length(), paymentId2.length());
-    for (int i = 0; i < maxLength; i++) {
-      if (i < paymentId1.length() && i < paymentId2.length() && paymentId1.charAt(i) != paymentId2.charAt(i)) return false;
-      if (i >= paymentId1.length() && paymentId2.charAt(i) != '0') return false;
-      if (i >= paymentId2.length() && paymentId1.charAt(i) != '0') return false;
+    try {
+      int maxLength = Math.max(paymentId1.length(), paymentId2.length());
+      for (int i = 0; i < maxLength; i++) {
+        if (i < paymentId1.length() && i < paymentId2.length() && paymentId1.charAt(i) != paymentId2.charAt(i)) return false;
+        if (i >= paymentId1.length() && paymentId2.charAt(i) != '0') return false;
+        if (i >= paymentId2.length() && paymentId1.charAt(i) != '0') return false;
+      }
+      return true;
+    } catch (RuntimeException e) {
+      throw toZephyrError(e);
     }
-    return true;
   }
   
   /**
@@ -522,13 +542,17 @@ public class ZephyrUtils {
    * @param tx is the transaction to merge into the list
    */
   public static <T extends ZephyrTx> void mergeTx(List<T> txs, T tx) {
-    for (ZephyrTx aTx : txs) {
-      if (aTx.getHash().equals(tx.getHash())) {
-        aTx.merge(tx);
-        return;
+    try {
+      for (ZephyrTx aTx : txs) {
+        if (aTx.getHash().equals(tx.getHash())) {
+          aTx.merge(tx);
+          return;
+        }
       }
+      txs.add(tx);
+    } catch (RuntimeException | AssertionError e) {
+      throw toZephyrError(e);
     }
-    txs.add(tx);
   }
   
   /**
@@ -538,7 +562,11 @@ public class ZephyrUtils {
    * @return the binary form
    */
   public static byte[] mapToBinary(Map<String, Object> map) {
-    return jsonToBinaryJni(JsonUtils.serialize(map));
+    try {
+      return jsonToBinaryJni(JsonUtils.serialize(map));
+    } catch (RuntimeException e) {
+      throw toZephyrError(e);
+    }
   }
   
   /**
@@ -548,7 +576,11 @@ public class ZephyrUtils {
    * @return the map
    */
   public static Map<String, Object> binaryToMap(byte[] bin) {
-    return JsonUtils.deserialize(binaryToJsonJni(bin), new TypeReference<Map<String, Object>>(){});
+    try {
+      return JsonUtils.deserialize(binaryToJsonJni(bin), new TypeReference<Map<String, Object>>(){});
+    } catch (RuntimeException e) {
+      throw toZephyrError(e);
+    }
   }
   
   /**
@@ -560,35 +592,39 @@ public class ZephyrUtils {
    */
   @SuppressWarnings("unchecked")
   public static Map<String, Object> binaryBlocksToMap(byte[] binBlocks) {
+    try {
     
-    // convert binary blocks to json then to map
-    Map<String, Object> map = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, binaryBlocksToJsonJni(binBlocks), new TypeReference<Map<String, Object>>(){});
+      // convert binary blocks to json then to map
+      Map<String, Object> map = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, binaryBlocksToJsonJni(binBlocks), new TypeReference<Map<String, Object>>(){});
     
-    // parse blocks to maps
-    List<Map<String, Object>> blockMaps = new ArrayList<Map<String, Object>>();
-    for (String blockStr : (List<String>) map.get("blocks")) {
-      blockMaps.add(JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, blockStr, new TypeReference<Map<String, Object>>(){}));
-    }
-    map.put("blocks", blockMaps); // overwrite block strings
+      // parse blocks to maps
+      List<Map<String, Object>> blockMaps = new ArrayList<Map<String, Object>>();
+      for (String blockStr : (List<String>) map.get("blocks")) {
+        blockMaps.add(JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, blockStr, new TypeReference<Map<String, Object>>(){}));
+      }
+      map.put("blocks", blockMaps); // overwrite block strings
     
-    // parse txs to maps, one array of txs per block
-    List<List<Map<String, Object>>> allTxs = new ArrayList<List<Map<String, Object>>>();
-    List<Object> rpcAllTxs = (List<Object>) map.get("txs");
-    for (Object rpcTxs : rpcAllTxs) {
-      if ("".equals(rpcTxs)) {
-        allTxs.add(new ArrayList<Map<String, Object>>());
-      } else {
-        List<Map<String, Object>> txs = new ArrayList<Map<String, Object>>();
-        allTxs.add(txs);
-        for (String rpcTx : (List<String>) rpcTxs) {
-          txs.add(JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, rpcTx.replaceFirst(",", "{") + "}", new TypeReference<Map<String, Object>>(){})); // modify tx string to proper json and parse // TODO: more efficient way than this json manipulation?
+      // parse txs to maps, one array of txs per block
+      List<List<Map<String, Object>>> allTxs = new ArrayList<List<Map<String, Object>>>();
+      List<Object> rpcAllTxs = (List<Object>) map.get("txs");
+      for (Object rpcTxs : rpcAllTxs) {
+        if ("".equals(rpcTxs)) {
+          allTxs.add(new ArrayList<Map<String, Object>>());
+        } else {
+          List<Map<String, Object>> txs = new ArrayList<Map<String, Object>>();
+          allTxs.add(txs);
+          for (String rpcTx : (List<String>) rpcTxs) {
+            txs.add(JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, rpcTx.replaceFirst(",", "{") + "}", new TypeReference<Map<String, Object>>(){})); // modify tx string to proper json and parse // TODO: more efficient way than this json manipulation?
+          }
         }
       }
-    }
-    map.put("txs", allTxs); // overwrite tx strings
+      map.put("txs", allTxs); // overwrite tx strings
 
-    // return map containing blocks and txs as maps
-    return map;
+      // return map containing blocks and txs as maps
+      return map;
+    } catch (RuntimeException e) {
+      throw toZephyrError(e);
+    }
   }
   
   /**
@@ -598,7 +634,7 @@ public class ZephyrUtils {
    * @param msg message to log
    */
   public static void log(int level, String msg) {
-    GenUtils.assertTrue("Log level must be an integer >= 0", level >= 0);
+    if (level < 0) throw new ZephyrError("Log level must be an integer >= 0");
     if (ZephyrUtils.LOG_LEVEL >= level) System.out.println(msg);
   }
   
@@ -608,7 +644,7 @@ public class ZephyrUtils {
    * @param level - the library's log level
    */
   public static void setLogLevel(int level) {
-    GenUtils.assertTrue("Log level must be an integer >= 0", level >= 0);
+    if (level < 0) throw new ZephyrError("Log level must be an integer >= 0");
     ZephyrUtils.LOG_LEVEL = level;
     if (isNativeLibraryLoaded()) setLogLevelJni(level);
   }
@@ -656,8 +692,12 @@ public class ZephyrUtils {
    * @return amount in coins
    */
   public static double fromAtomicUnits(BigInteger amountAtomicUnits) {
-    BigInteger[] quotientAndRemainder = amountAtomicUnits.divideAndRemainder(BigInteger.valueOf(AU_PER_COIN));
-    return quotientAndRemainder[0].doubleValue() + quotientAndRemainder[1].doubleValue() / ZephyrUtils.AU_PER_COIN;
+    try {
+      BigInteger[] quotientAndRemainder = amountAtomicUnits.divideAndRemainder(BigInteger.valueOf(AU_PER_COIN));
+      return quotientAndRemainder[0].doubleValue() + quotientAndRemainder[1].doubleValue() / ZephyrUtils.AU_PER_COIN;
+    } catch (RuntimeException e) {
+      throw toZephyrError(e);
+    }
   }
   
   // ---------------------------- NATIVE BINDINGS -----------------------------
@@ -671,6 +711,18 @@ public class ZephyrUtils {
   private native static void setLogLevelJni(int level);
   
   // ---------------------------- PRIVATE HELPERS -----------------------------
+  
+  /**
+   * The exception a public method throws for a failure inside it: a ZephyrError as it is; anything
+   * else (an internal check, data that does not parse) as a ZephyrError with the same message, or
+   * the exception's class name when it has none, without the cause, whose message can carry the
+   * data that failed to parse.
+   */
+  private static ZephyrError toZephyrError(Throwable e) {
+    if (e instanceof ZephyrError) return (ZephyrError) e;
+    String message = e.getMessage();
+    return new ZephyrError(message != null ? message : e.getClass().getName());
+  }
   
   private static boolean isHex64(String str) {
     return str != null && str.length() == 64 && GenUtils.isHex(str);
