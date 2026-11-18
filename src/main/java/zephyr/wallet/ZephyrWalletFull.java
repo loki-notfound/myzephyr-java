@@ -36,6 +36,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import zephyr.common.ZephyrError;
 import zephyr.common.ZephyrRpcConnection;
@@ -95,7 +97,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   private long jniListenerHandle;               // memory address of the wallet listener in c++; this variable is read directly by name in c++
   private WalletJniListener jniListener;        // receives notifications from jni c++
   private String password;
-  private boolean isClosed;                     // whether or not wallet is closed
+  private volatile boolean isClosed;            // whether or not wallet is closed; read by the callbacks on the core's threads
   
   /**
    * Private constructor with a handle to the memory address of the wallet in c++.
@@ -1778,85 +1780,136 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   // -------------------------------- LISTENER --------------------------------
   
   /**
-   * Receives notifications directly from jni c++.
+   * Receives notifications directly from jni c++, on the thread that runs the core's sync: the
+   * caller's thread for {@code sync()}, the core's own thread for {@code startSyncing()}.
+   *
+   * <p>Nothing escapes to the native caller: a listener's Throwable is caught and logged at
+   * WARNING (with the listener's class and the callback's name, not the callback's data), and the
+   * other listeners are still called; callback data that cannot be read is logged and dropped the
+   * same way. Once the wallet is closed (or closing), every callback returns at once.</p>
    */
   @SuppressWarnings("unused") // called directly from jni c++
   private class WalletJniListener {
     
+    /** Set while this thread delivers a callback of this wallet: close() from there is refused. */
+    private final ThreadLocal<Boolean> inCallback = new ThreadLocal<Boolean>();
+    
+    boolean inCallback() {
+      return Boolean.TRUE.equals(inCallback.get());
+    }
+    
+    /** Runs one notification: reads its data and announces it; nothing escapes. */
+    private void deliver(String callback, Runnable notification) {
+      if (isClosed) return; // during or after close(): the notification is dropped
+      boolean outermost = !inCallback();
+      inCallback.set(Boolean.TRUE);
+      try {
+        notification.run();
+      } catch (Throwable t) {
+        // building the callback's objects failed (data from the core that does not parse); the
+        // exception's message would carry that data, so only its class is logged
+        LOGGER.log(Level.WARNING, "Could not read the data of " + callback + " (" + t.getClass().getName() + "); the notification is dropped");
+      } finally {
+        if (outermost) inCallback.remove();
+      }
+    }
+    
+    /** Calls every listener registered now, each in its own protection. */
+    private void announce(String callback, Consumer<ZephyrWalletListenerI> call) {
+      for (ZephyrWalletListenerI listener : listeners) { // a snapshot of the copy-on-write set
+        if (isClosed) return;
+        try {
+          call.accept(listener);
+        } catch (Throwable t) {
+          LOGGER.log(Level.WARNING, "Wallet listener " + listener.getClass().getName() + " threw from " + callback + "; ignored", t);
+        }
+      }
+    }
+    
     public void onSyncProgress(long height, long startHeight, long endHeight, double percentDone, String message) {
-      for (ZephyrWalletListenerI listener : getListeners()) listener.onSyncProgress(height, startHeight, endHeight, percentDone, message);
+      deliver("onSyncProgress", () -> announce("onSyncProgress", listener -> listener.onSyncProgress(height, startHeight, endHeight, percentDone, message)));
     }
     
     public void onNewBlock(long height) {
-      for (ZephyrWalletListenerI listener : getListeners()) listener.onNewBlock(height);
+      deliver("onNewBlock", () -> announce("onNewBlock", listener -> listener.onNewBlock(height)));
     }
     
     public void onBalancesChanged(String newBalanceStr, String newUnlockedBalanceStr, String assetType) {
-      for (ZephyrWalletListenerI listener : getListeners()) listener.onBalancesChanged(new BigInteger(newBalanceStr), new BigInteger(newUnlockedBalanceStr), assetType);
+      deliver("onBalancesChanged", () -> {
+        BigInteger newBalance = new BigInteger(newBalanceStr);
+        BigInteger newUnlockedBalance = new BigInteger(newUnlockedBalanceStr);
+        announce("onBalancesChanged", listener -> listener.onBalancesChanged(newBalance, newUnlockedBalance, assetType));
+      });
     }
     
     public void onOutputReceived(long height, String txHash, String amountStr, String assetType, int accountIdx, int subaddressIdx, int version, long unlockHeight, boolean isLocked) {
-      
-      // build output to announce
-      ZephyrOutputWallet output = new ZephyrOutputWallet();
-      output.setAmount(new BigInteger(amountStr));
-      output.setAssetType(assetType);
-      output.setAccountIndex(accountIdx);
-      output.setSubaddressIndex(subaddressIdx);
-      ZephyrTxWallet tx = new ZephyrTxWallet();
-      tx.setHash(txHash);
-      tx.setVersion(version);
-      tx.setUnlockHeight(unlockHeight);
-      output.setTx(tx);
-      tx.setOutputs(Arrays.asList(output));
-      tx.setIsIncoming(true);
-      tx.setIsLocked(isLocked);
-      if (height > 0) {
-        ZephyrBlock block = new ZephyrBlock().setHeight(height);
-        block.setTxs(Arrays.asList(tx));
-        tx.setBlock(block);
-        tx.setIsConfirmed(true);
-        tx.setInTxPool(false);
-        tx.setIsFailed(false);
-      } else {
-        tx.setIsConfirmed(false);
-        tx.setInTxPool(true);
-      }
-      
-      // announce output
-      for (ZephyrWalletListenerI listener : getListeners()) listener.onOutputReceived((ZephyrOutputWallet) tx.getOutputs().get(0));
+      deliver("onOutputReceived", () -> {
+        
+        // build output to announce
+        ZephyrOutputWallet output = new ZephyrOutputWallet();
+        output.setAmount(new BigInteger(amountStr));
+        output.setAssetType(assetType);
+        output.setAccountIndex(accountIdx);
+        output.setSubaddressIndex(subaddressIdx);
+        ZephyrTxWallet tx = new ZephyrTxWallet();
+        tx.setHash(txHash);
+        tx.setVersion(version);
+        tx.setUnlockHeight(unlockHeight);
+        output.setTx(tx);
+        tx.setOutputs(Arrays.asList(output));
+        tx.setIsIncoming(true);
+        tx.setIsLocked(isLocked);
+        if (height > 0) {
+          ZephyrBlock block = new ZephyrBlock().setHeight(height);
+          block.setTxs(Arrays.asList(tx));
+          tx.setBlock(block);
+          tx.setIsConfirmed(true);
+          tx.setInTxPool(false);
+          tx.setIsFailed(false);
+        } else {
+          tx.setIsConfirmed(false);
+          tx.setInTxPool(true);
+        }
+        
+        // announce output
+        ZephyrOutputWallet announced = (ZephyrOutputWallet) tx.getOutputs().get(0);
+        announce("onOutputReceived", listener -> listener.onOutputReceived(announced));
+      });
     }
     
     public void onOutputSpent(long height, String txHash, String amountStr, String assetType, String accountIdxStr, String subaddressIdxStr, int version, long unlockHeight, boolean isLocked) {
-      
-      // build spent output
-      ZephyrOutputWallet output = new ZephyrOutputWallet();
-      output.setAmount(new BigInteger(amountStr));
-      output.setAssetType(assetType);
-      if (accountIdxStr.length() > 0) output.setAccountIndex(Integer.parseInt(accountIdxStr));
-      if (subaddressIdxStr.length() > 0) output.setSubaddressIndex(Integer.parseInt(subaddressIdxStr));
-      ZephyrTxWallet tx = new ZephyrTxWallet();
-      tx.setHash(txHash);
-      tx.setVersion(version);
-      tx.setUnlockHeight(unlockHeight);
-      tx.setIsLocked(isLocked);
-      output.setTx(tx);
-      tx.setInputs(Arrays.asList(output));
-      tx.setIsIncoming(false);
-      if (height > 0) {
-        ZephyrBlock block = new ZephyrBlock().setHeight(height);
-        block.setTxs(Arrays.asList(tx));
-        tx.setBlock(block);
-        tx.setIsConfirmed(true);
-        tx.setInTxPool(false);
-        tx.setIsFailed(false);
-      } else {
-        tx.setIsConfirmed(false);
-        tx.setInTxPool(true);
-      }
-      
-      // announce output
-      for (ZephyrWalletListenerI listener : getListeners()) listener.onOutputSpent((ZephyrOutputWallet) tx.getInputs().get(0));
+      deliver("onOutputSpent", () -> {
+        
+        // build spent output
+        ZephyrOutputWallet output = new ZephyrOutputWallet();
+        output.setAmount(new BigInteger(amountStr));
+        output.setAssetType(assetType);
+        if (accountIdxStr.length() > 0) output.setAccountIndex(Integer.parseInt(accountIdxStr));
+        if (subaddressIdxStr.length() > 0) output.setSubaddressIndex(Integer.parseInt(subaddressIdxStr));
+        ZephyrTxWallet tx = new ZephyrTxWallet();
+        tx.setHash(txHash);
+        tx.setVersion(version);
+        tx.setUnlockHeight(unlockHeight);
+        tx.setIsLocked(isLocked);
+        output.setTx(tx);
+        tx.setInputs(Arrays.asList(output));
+        tx.setIsIncoming(false);
+        if (height > 0) {
+          ZephyrBlock block = new ZephyrBlock().setHeight(height);
+          block.setTxs(Arrays.asList(tx));
+          tx.setBlock(block);
+          tx.setIsConfirmed(true);
+          tx.setInTxPool(false);
+          tx.setIsFailed(false);
+        } else {
+          tx.setIsConfirmed(false);
+          tx.setInTxPool(true);
+        }
+        
+        // announce output
+        ZephyrOutputWallet announced = (ZephyrOutputWallet) tx.getInputs().get(0);
+        announce("onOutputSpent", listener -> listener.onOutputSpent(announced));
+      });
     }
   }
   

@@ -28,9 +28,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArraySet;
 import zephyr.common.ZephyrError;
 import zephyr.common.ZephyrRpcConnection;
 import zephyr.daemon.model.ZephyrBlock;
@@ -57,11 +57,14 @@ import zephyr.wallet.model.ZephyrWalletListenerI;
  */
 abstract class ZephyrWalletDefault implements ZephyrWallet {
   
-  /** The registered listeners, in the order they were added. */
+  /**
+   * The registered listeners, in the order they were added. A copy-on-write set: a thread that
+   * delivers a notification iterates a snapshot while another thread adds or removes listeners.
+   */
   protected Set<ZephyrWalletListenerI> listeners;
   
   public ZephyrWalletDefault() {
-    this.listeners = new LinkedHashSet<ZephyrWalletListenerI>();
+    this.listeners = new CopyOnWriteArraySet<ZephyrWalletListenerI>();
   }
   
   @Override
