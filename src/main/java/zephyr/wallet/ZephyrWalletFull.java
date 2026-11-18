@@ -36,6 +36,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -98,6 +100,9 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   private WalletJniListener jniListener;        // receives notifications from jni c++
   private String password;
   private volatile boolean isClosed;            // whether or not wallet is closed; read by the callbacks on the core's threads
+  private boolean isFreed;                      // whether the native wallet is freed; guarded by closeLock
+  private final ReentrantReadWriteLock callLock = new ReentrantReadWriteLock(); // native calls hold the read side, close() the write side
+  private final Object closeLock = new Object(); // one close() at a time
   
   /**
    * Private constructor with a handle to the memory address of the wallet in c++.
@@ -139,7 +144,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     if (daemonConnection != null) beforeDaemonUri(daemonConnection.getUri()); // before the wallet exists: a failure leaves nothing open
     long jniWalletHandle = openWalletJni(path, password, networkType.ordinal());
     ZephyrWalletFull wallet = new ZephyrWalletFull(jniWalletHandle, password);
-    if (daemonConnection != null) wallet.setDaemonConnection(daemonConnection);
+    if (daemonConnection != null) connectOrClose(wallet, daemonConnection);
     return wallet;
   }
   /**
@@ -178,7 +183,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     if (daemonConnection != null) beforeDaemonUri(daemonConnection.getUri()); // before the wallet exists: a failure leaves nothing open
     long jniWalletHandle = openWalletDataJni(password, networkType.ordinal(), keysData, cacheData);
     ZephyrWalletFull wallet = new ZephyrWalletFull(jniWalletHandle, password);
-    if (daemonConnection != null) wallet.setDaemonConnection(daemonConnection);
+    if (daemonConnection != null) connectOrClose(wallet, daemonConnection);
     return wallet;
   }
   
@@ -314,7 +319,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     if (config.getRestoreHeight() == null) config.setRestoreHeight(0l);
     long jniWalletHandle = createWalletJni(serializeWalletConfig(config));
     ZephyrWalletFull wallet = new ZephyrWalletFull(jniWalletHandle, config.getPassword());
-    wallet.setDaemonConnection(config.getServer());
+    connectOrClose(wallet, config.getServer());
     return wallet;
   }
   
@@ -324,7 +329,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     try {
       long jniWalletHandle = createWalletJni(serializeWalletConfig(config));
       ZephyrWalletFull wallet = new ZephyrWalletFull(jniWalletHandle, config.getPassword());
-      wallet.setDaemonConnection(config.getServer());
+      connectOrClose(wallet, config.getServer());
       return wallet;
     } catch (Exception e) {
       throw new ZephyrError(e.getMessage());
@@ -335,6 +340,23 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     if (config.getLanguage() == null) config.setLanguage(DEFAULT_LANGUAGE);
     long jniWalletHandle = createWalletJni(serializeWalletConfig(config));
     return new ZephyrWalletFull(jniWalletHandle, config.getPassword());
+  }
+  
+  /**
+   * Sets the daemon connection of a wallet that was just opened or created, and closes the wallet
+   * again when that fails: the caller never receives it, so nothing else would free it.
+   */
+  private static void connectOrClose(ZephyrWalletFull wallet, ZephyrRpcConnection daemonConnection) {
+    try {
+      wallet.setDaemonConnection(daemonConnection);
+    } catch (RuntimeException e) {
+      try {
+        wallet.close();
+      } catch (RuntimeException closeFailure) {
+        e.addSuppressed(closeFailure);
+      }
+      throw e;
+    }
   }
   
   /**
@@ -438,11 +460,15 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
    * @return the maximum height of the peers the wallet's daemon is connected to
    */
   public long getDaemonMaxPeerHeight() {
-    assertNotClosed();
+    beginCall();
     try {
-      return getDaemonMaxPeerHeightJni();
-    } catch (Exception e) {
-      throw daemonError(e);
+      try {
+        return getDaemonMaxPeerHeightJni();
+      } catch (Exception e) {
+        throw daemonError(e);
+      }
+    } finally {
+      endCall();
     }
   }
   
@@ -452,11 +478,15 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
    * @return true if the daemon is synced with the network, false otherwise
    */
   public boolean isDaemonSynced() {
-    assertNotClosed();
+    beginCall();
     try {
-      return isDaemonSyncedJni();
-    } catch (Exception e) {
-      throw daemonError(e);
+      try {
+        return isDaemonSyncedJni();
+      } catch (Exception e) {
+        throw daemonError(e);
+      }
+    } finally {
+      endCall();
     }
   }
   
@@ -466,11 +496,15 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
    * @return true if the wallet is synced with the daemon, false otherwise
    */
   public boolean isSynced() {
-    assertNotClosed();
+    beginCall();
     try {
-      return isSyncedJni();
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        return isSyncedJni();
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
   
@@ -480,8 +514,12 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
    * @return the wallet's network type
    */
   public ZephyrNetworkType getNetworkType() {
-    assertNotClosed();
-    return ZephyrNetworkType.values()[getNetworkTypeJni()];
+    beginCall();
+    try {
+      return ZephyrNetworkType.values()[getNetworkTypeJni()];
+    } finally {
+      endCall();
+    }
   }
   
   /**
@@ -490,8 +528,12 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
    * @return the height of the first block that the wallet scans
    */
   public long getRestoreHeight() {
-    assertNotClosed();
-    return getRestoreHeightJni();
+    beginCall();
+    try {
+      return getRestoreHeightJni();
+    } finally {
+      endCall();
+    }
   }
   
   /**
@@ -500,8 +542,12 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
    * @param syncHeight is the height of the first block that the wallet scans
    */
   public void setRestoreHeight(long syncHeight) {
-    assertNotClosed();
-    setRestoreHeightJni(syncHeight);
+    beginCall();
+    try {
+      setRestoreHeightJni(syncHeight);
+    } finally {
+      endCall();
+    }
   }
 
   /**
@@ -510,24 +556,31 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
    * @param path is the new wallet's path
    */
   public void moveTo(String path) {
-    assertNotClosed();
-    moveToJni(path, password);
+    beginCall();
+    try {
+      moveToJni(path, password);
+    } finally {
+      endCall();
+    }
   }
   
   // -------------------------- COMMON WALLET METHODS -------------------------
   
   @Override
   public void addListener(ZephyrWalletListenerI listener) {
-    assertNotClosed();
-    super.addListener(listener);
-    refreshListening();
+    beginCall();
+    try {
+      super.addListener(listener);
+      initListening();
+    } finally {
+      endCall();
+    }
   }
   
   @Override
   public void removeListener(ZephyrWalletListenerI listener) {
     assertNotClosed();
-    super.removeListener(listener);
-    refreshListening();
+    super.removeListener(listener); // the native listener stays until close()
   }
   
   @Override
@@ -538,8 +591,12 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   
   @Override
   public boolean isViewOnly() {
-    assertNotClosed();
-    return isViewOnlyJni();
+    beginCall();
+    try {
+      return isViewOnlyJni();
+    } finally {
+      endCall();
+    }
   }
   
   /**
@@ -554,487 +611,673 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
    */
   @Override
   public void setDaemonConnection(ZephyrRpcConnection daemonConnection) {
-    assertNotClosed();
-    if (daemonConnection == null) setDaemonConnectionJni("", "", "");
-    else {
-      String uri = daemonUriForCore(daemonConnection.getUri() == null ? "" : daemonConnection.getUri());
-      beforeDaemonUri(uri);
-      try {
-        setDaemonConnectionJni(uri, daemonConnection.getUsername(), daemonConnection.getPassword());
-      } catch (Exception e) {
-        throw new ZephyrError(e.getMessage());
+    beginCall();
+    try {
+      if (daemonConnection == null) setDaemonConnectionJni("", "", "");
+      else {
+        String uri = daemonUriForCore(daemonConnection.getUri() == null ? "" : daemonConnection.getUri());
+        beforeDaemonUri(uri);
+        try {
+          setDaemonConnectionJni(uri, daemonConnection.getUsername(), daemonConnection.getPassword());
+        } catch (Exception e) {
+          throw new ZephyrError(e.getMessage());
+        }
       }
+    } finally {
+      endCall();
     }
   }
   
   @Override
   public void setProxyUri(String uri) {
-    assertNotClosed();
-    if (uri == null) uri = "";
+    beginCall();
     try {
-      setProxyJni(uri);
-    } catch (Exception e) {
-      e.printStackTrace();
-      throw new ZephyrError(e.getMessage());
+      if (uri == null) uri = "";
+      try {
+        setProxyJni(uri);
+      } catch (Exception e) {
+        e.printStackTrace();
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
   
   @Override
   public ZephyrRpcConnection getDaemonConnection() {
-    assertNotClosed();
+    beginCall();
     try {
-      String[] vals = getDaemonConnectionJni();
-      return vals == null ? null : new ZephyrRpcConnection(vals[0], vals[1], vals[2]);
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        String[] vals = getDaemonConnectionJni();
+        return vals == null ? null : new ZephyrRpcConnection(vals[0], vals[1], vals[2]);
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
   
   @Override
   public boolean isConnectedToDaemon() {
-    assertNotClosed();
+    beginCall();
     try {
-      return isConnectedToDaemonJni();
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        return isConnectedToDaemonJni();
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
   
   @Override
   public ZephyrVersion getVersion() {
-    assertNotClosed();
+    beginCall();
     try {
-      String versionJson = getVersionJni();
-      return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, versionJson, ZephyrVersion.class);
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        String versionJson = getVersionJni();
+        return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, versionJson, ZephyrVersion.class);
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
   
   @Override
   public String getPath() {
-    assertNotClosed();
-    String path = getPathJni();
-    return path.isEmpty() ? null : path;
+    beginCall();
+    try {
+      String path = getPathJni();
+      return path.isEmpty() ? null : path;
+    } finally {
+      endCall();
+    }
   }
 
   @Override
   public String getMnemonic() {
-    assertNotClosed();
-    String mnemonic = getMnemonicJni();
-    if ("".equals(mnemonic)) return null;
-    return mnemonic;
+    beginCall();
+    try {
+      String mnemonic = getMnemonicJni();
+      if ("".equals(mnemonic)) return null;
+      return mnemonic;
+    } finally {
+      endCall();
+    }
   }
   
   @Override
   public String getMnemonicLanguage() {
-    assertNotClosed();
-    String mnemonicLanguage = getMnemonicLanguageJni();
-    if ("".equals(mnemonicLanguage)) return null;
-    return mnemonicLanguage;
+    beginCall();
+    try {
+      String mnemonicLanguage = getMnemonicLanguageJni();
+      if ("".equals(mnemonicLanguage)) return null;
+      return mnemonicLanguage;
+    } finally {
+      endCall();
+    }
   }
 
   @Override
   public String getPrivateViewKey() {
-    assertNotClosed();
-    return getPrivateViewKeyJni();
+    beginCall();
+    try {
+      return getPrivateViewKeyJni();
+    } finally {
+      endCall();
+    }
   }
   
   @Override
   public String getPrivateSpendKey() {
-    assertNotClosed();
-    String privateSpendKey = getPrivateSpendKeyJni();
-    if ("".equals(privateSpendKey)) return null;
-    return privateSpendKey;
+    beginCall();
+    try {
+      String privateSpendKey = getPrivateSpendKeyJni();
+      if ("".equals(privateSpendKey)) return null;
+      return privateSpendKey;
+    } finally {
+      endCall();
+    }
   }
   
   @Override
   public String getPublicViewKey() {
-    assertNotClosed();
-    return getPublicViewKeyJni();
+    beginCall();
+    try {
+      return getPublicViewKeyJni();
+    } finally {
+      endCall();
+    }
   }
   
   @Override
   public String getPublicSpendKey() {
-    assertNotClosed();
-    return getPublicSpendKeyJni();
+    beginCall();
+    try {
+      return getPublicSpendKeyJni();
+    } finally {
+      endCall();
+    }
   }
 
   @Override
   public ZephyrIntegratedAddress getIntegratedAddress(String standardAddress, String paymentId) {
-    assertNotClosed();
+    beginCall();
     try {
-      String integratedAddressJson = getIntegratedAddressJni(standardAddress, paymentId);
-      return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, integratedAddressJson, ZephyrIntegratedAddress.class);
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        String integratedAddressJson = getIntegratedAddressJni(standardAddress, paymentId);
+        return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, integratedAddressJson, ZephyrIntegratedAddress.class);
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
 
   @Override
   public ZephyrIntegratedAddress decodeIntegratedAddress(String integratedAddress) {
-    assertNotClosed();
+    beginCall();
     try {
-      String integratedAddressJson = decodeIntegratedAddressJni(integratedAddress);
-      return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, integratedAddressJson, ZephyrIntegratedAddress.class);
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        String integratedAddressJson = decodeIntegratedAddressJni(integratedAddress);
+        return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, integratedAddressJson, ZephyrIntegratedAddress.class);
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
 
   @Override
   public long getHeight() {
-    assertNotClosed();
-    return getHeightJni();
+    beginCall();
+    try {
+      return getHeightJni();
+    } finally {
+      endCall();
+    }
   }
 
   @Override
   public long getDaemonHeight() {
-    assertNotClosed();
+    beginCall();
     try {
-      return getDaemonHeightJni();
-    } catch (Exception e) {
-      throw daemonError(e);
+      try {
+        return getDaemonHeightJni();
+      } catch (Exception e) {
+        throw daemonError(e);
+      }
+    } finally {
+      endCall();
     }
   }
   
   @Override
   public long getHeightByDate(int year, int month, int day) {
-    assertNotClosed();
+    beginCall();
     try {
-      return getHeightByDateJni(year, month ,day);
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        return getHeightByDateJni(year, month ,day);
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
   
   @Override
   public ZephyrSyncResult sync(Long startHeight, ZephyrWalletListenerI listener) {
-    assertNotClosed();
-    if (startHeight == null) startHeight = Math.max(getHeight(), getRestoreHeight());
-    
-    // register listener if given
-    if (listener != null) addListener(listener);
-    
-    // sync wallet and handle exception
+    beginCall();
     try {
-      Object[] results = syncJni(startHeight);
-      return new ZephyrSyncResult((long) results[0], (boolean) results[1]);
-    } catch (Exception e) {
-      throw daemonError(e);
+      if (startHeight == null) startHeight = Math.max(getHeight(), getRestoreHeight());
+    
+      // register listener if given
+      if (listener != null) addListener(listener);
+    
+      // sync wallet and handle exception; close() from another thread ends the sync at the core's
+      // next batch of blocks (it returns, or ends in this one "Wallet is closed")
+      try {
+        Object[] results = syncJni(startHeight);
+        return new ZephyrSyncResult((long) results[0], (boolean) results[1]);
+      } catch (Exception e) {
+        if (isClosed) throw new ZephyrError("Wallet is closed");
+        throw daemonError(e);
+      } finally {
+        if (listener != null) listeners.remove(listener); // unregister listener; throws nothing, also when closed meanwhile or removed by itself
+      }
     } finally {
-      if (listener != null) removeListener(listener); // unregister listener
+      endCall();
     }
   }
   
   @Override
   public void startSyncing(Long syncPeriodInMs) {
-    assertNotClosed();
+    beginCall();
     try {
-      startSyncingJni(syncPeriodInMs == null ? DEFAULT_SYNC_PERIOD_IN_MS : syncPeriodInMs);
-    } catch (Exception e) {
-      throw daemonError(e);
+      try {
+        startSyncingJni(syncPeriodInMs == null ? DEFAULT_SYNC_PERIOD_IN_MS : syncPeriodInMs);
+      } catch (Exception e) {
+        throw daemonError(e);
+      }
+    } finally {
+      endCall();
     }
   }
   
   @Override
   public void stopSyncing() {
-    assertNotClosed();
+    beginCall();
     try {
-      stopSyncingJni();
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        stopSyncingJni();
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
   
   @Override
   public void scanTxs(Collection<String> txHashes) {
-    assertNotClosed();
-    String[] txMetadatasArr = txHashes.toArray(new String[txHashes.size()]); // convert to array for jni
+    beginCall();
     try {
-      scanTxsJni(txMetadatasArr);
-    } catch (Exception e) {
-      throw daemonError(e);
+      String[] txMetadatasArr = txHashes.toArray(new String[txHashes.size()]); // convert to array for jni
+      try {
+        scanTxsJni(txMetadatasArr);
+      } catch (Exception e) {
+        throw daemonError(e);
+      }
+    } finally {
+      endCall();
     }
   }
   
   @Override
   public void rescanSpent() {
-    assertNotClosed();
+    beginCall();
     try {
-      rescanSpentJni();
-    } catch (Exception e) {
-      throw daemonError(e);
+      try {
+        rescanSpentJni();
+      } catch (Exception e) {
+        throw daemonError(e);
+      }
+    } finally {
+      endCall();
     }
   }
 
   @Override
   public void rescanBlockchain() {
-    assertNotClosed();
+    beginCall();
     try {
-      rescanBlockchainJni();
-    } catch (Exception e) {
-      throw daemonError(e);
+      try {
+        rescanBlockchainJni();
+      } catch (Exception e) {
+        throw daemonError(e);
+      }
+    } finally {
+      endCall();
     }
   }
 
   @Override
   public List<ZephyrAccount> getAccounts(boolean includeSubaddresses, String tag) {
-    assertNotClosed();
-    String accountsJson = getAccountsJni(includeSubaddresses, tag);
-    List<ZephyrAccount> accounts = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, accountsJson, AccountsContainer.class).accounts;
-    for (ZephyrAccount account : accounts) sanitizeAccount(account);
-    return accounts;
+    beginCall();
+    try {
+      String accountsJson = getAccountsJni(includeSubaddresses, tag);
+      List<ZephyrAccount> accounts = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, accountsJson, AccountsContainer.class).accounts;
+      for (ZephyrAccount account : accounts) sanitizeAccount(account);
+      return accounts;
+    } finally {
+      endCall();
+    }
   }
   
   @Override
   public ZephyrAccount getAccount(int accountIdx, boolean includeSubaddresses) {
-    assertNotClosed();
-    String accountJson = getAccountJni(accountIdx, includeSubaddresses);
-    ZephyrAccount account = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, accountJson, ZephyrAccount.class);
-    sanitizeAccount(account);
-    return account;
+    beginCall();
+    try {
+      String accountJson = getAccountJni(accountIdx, includeSubaddresses);
+      ZephyrAccount account = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, accountJson, ZephyrAccount.class);
+      sanitizeAccount(account);
+      return account;
+    } finally {
+      endCall();
+    }
   }
 
   @Override
   public ZephyrAccount createAccount(String label) {
-    assertNotClosed();
-    String accountJson = createAccountJni(label);
-    ZephyrAccount account = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, accountJson, ZephyrAccount.class);
-    sanitizeAccount(account);
-    return account;
+    beginCall();
+    try {
+      String accountJson = createAccountJni(label);
+      ZephyrAccount account = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, accountJson, ZephyrAccount.class);
+      sanitizeAccount(account);
+      return account;
+    } finally {
+      endCall();
+    }
   }
 
   @Override
   public List<ZephyrSubaddress> getSubaddresses(int accountIdx, List<Integer> subaddressIndices) {
-    assertNotClosed();
-    String subaddresses_json = getSubaddressesJni(accountIdx, GenUtils.listToIntArray(subaddressIndices));
-    List<ZephyrSubaddress> subaddresses = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, subaddresses_json, SubaddressesContainer.class).subaddresses;
-    for (ZephyrSubaddress subaddress : subaddresses) sanitizeSubaddress(subaddress);
-    return subaddresses;
+    beginCall();
+    try {
+      String subaddresses_json = getSubaddressesJni(accountIdx, GenUtils.listToIntArray(subaddressIndices));
+      List<ZephyrSubaddress> subaddresses = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, subaddresses_json, SubaddressesContainer.class).subaddresses;
+      for (ZephyrSubaddress subaddress : subaddresses) sanitizeSubaddress(subaddress);
+      return subaddresses;
+    } finally {
+      endCall();
+    }
   }
 
   @Override
   public ZephyrSubaddress createSubaddress(int accountIdx, String label) {
-    assertNotClosed();
-    String subaddressJson = createSubaddressJni(accountIdx, label);
-    ZephyrSubaddress subaddress = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, subaddressJson, ZephyrSubaddress.class);
-    sanitizeSubaddress(subaddress);
-    return subaddress;
+    beginCall();
+    try {
+      String subaddressJson = createSubaddressJni(accountIdx, label);
+      ZephyrSubaddress subaddress = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, subaddressJson, ZephyrSubaddress.class);
+      sanitizeSubaddress(subaddress);
+      return subaddress;
+    } finally {
+      endCall();
+    }
   }
 
   @Override
   public void setSubaddressLabel(int accountIdx, int subaddressIdx, String label) {
-    assertNotClosed();
-    if (label == null) label = "";
-    setSubaddressLabelJni(accountIdx, subaddressIdx, label);
+    beginCall();
+    try {
+      if (label == null) label = "";
+      setSubaddressLabelJni(accountIdx, subaddressIdx, label);
+    } finally {
+      endCall();
+    }
   }
   
   @Override
   public String getAddress(int accountIdx, int subaddressIdx) {
-    assertNotClosed();
-    return getAddressJni(accountIdx, subaddressIdx);
+    beginCall();
+    try {
+      return getAddressJni(accountIdx, subaddressIdx);
+    } finally {
+      endCall();
+    }
   }
 
   @Override
   public ZephyrSubaddress getAddressIndex(String address) {
-    assertNotClosed();
+    beginCall();
     try {
-      String subaddressJson = getAddressIndexJni(address);
-      ZephyrSubaddress subaddress = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, subaddressJson, ZephyrSubaddress.class);
-      return sanitizeSubaddress(subaddress);
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        String subaddressJson = getAddressIndexJni(address);
+        ZephyrSubaddress subaddress = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, subaddressJson, ZephyrSubaddress.class);
+        return sanitizeSubaddress(subaddress);
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
 
   @Override
   public ZephyrBalance getBalance() {
-    assertNotClosed();
+    beginCall();
     try {
-      return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, getBalanceWalletJni(), ZephyrBalance.class);
-    } catch (ZephyrError e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, getBalanceWalletJni(), ZephyrBalance.class);
+      } catch (ZephyrError e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
   
   @Override
   public Map<Integer, ZephyrBalance> getBalance(Integer accountIdx) {
-    assertNotClosed();
+    beginCall();
     try {
-      if (accountIdx == null) throw new ZephyrError("Must provide account index");
-      return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, getBalanceAccountJni(accountIdx), new TypeReference<Map<Integer, ZephyrBalance>>(){});
-    } catch (ZephyrError e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        if (accountIdx == null) throw new ZephyrError("Must provide account index");
+        return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, getBalanceAccountJni(accountIdx), new TypeReference<Map<Integer, ZephyrBalance>>(){});
+      } catch (ZephyrError e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
   
   @Override
   public BigInteger getBalance(String assetType, Integer accountIdx, Integer subaddressIdx) {
-    assertNotClosed();
+    beginCall();
     try {
-      if (assetType == null) throw new ZephyrError("Must provide asset type");
-      if (accountIdx == null) throw new ZephyrError("Must provide account index");
-      if (subaddressIdx == null) return new BigInteger(getBalanceAssetAccountJni(assetType, accountIdx));
-      else return new BigInteger(getBalanceAssetSubaddressJni(assetType, accountIdx, subaddressIdx));
-    } catch (ZephyrError e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        if (assetType == null) throw new ZephyrError("Must provide asset type");
+        if (accountIdx == null) throw new ZephyrError("Must provide account index");
+        if (subaddressIdx == null) return new BigInteger(getBalanceAssetAccountJni(assetType, accountIdx));
+        else return new BigInteger(getBalanceAssetSubaddressJni(assetType, accountIdx, subaddressIdx));
+      } catch (ZephyrError e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
   
   @Override
   public ZephyrBalance getUnlockedBalance() {
-    assertNotClosed();
+    beginCall();
     try {
-      return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, getUnlockedBalanceWalletJni(), ZephyrBalance.class);
-    } catch (ZephyrError e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, getUnlockedBalanceWalletJni(), ZephyrBalance.class);
+      } catch (ZephyrError e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
   
   @Override
   public Map<Integer, ZephyrBalance> getUnlockedBalance(Integer accountIdx) {
-    assertNotClosed();
+    beginCall();
     try {
-      if (accountIdx == null) throw new ZephyrError("Must provide account index");
-      return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, getUnlockedBalanceAccountJni(accountIdx), new TypeReference<Map<Integer, ZephyrBalance>>(){});
-    } catch (ZephyrError e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        if (accountIdx == null) throw new ZephyrError("Must provide account index");
+        return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, getUnlockedBalanceAccountJni(accountIdx), new TypeReference<Map<Integer, ZephyrBalance>>(){});
+      } catch (ZephyrError e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
   
   @Override
   public BigInteger getUnlockedBalance(String assetType, Integer accountIdx, Integer subaddressIdx) {
-    assertNotClosed();
+    beginCall();
     try {
-      if (assetType == null) throw new ZephyrError("Must provide asset type");
-      if (accountIdx == null) throw new ZephyrError("Must provide account index");
-      if (subaddressIdx == null) return new BigInteger(getUnlockedBalanceAssetAccountJni(assetType, accountIdx));
-      else return new BigInteger(getUnlockedBalanceAssetSubaddressJni(assetType, accountIdx, subaddressIdx));
-    } catch (ZephyrError e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        if (assetType == null) throw new ZephyrError("Must provide asset type");
+        if (accountIdx == null) throw new ZephyrError("Must provide account index");
+        if (subaddressIdx == null) return new BigInteger(getUnlockedBalanceAssetAccountJni(assetType, accountIdx));
+        else return new BigInteger(getUnlockedBalanceAssetSubaddressJni(assetType, accountIdx, subaddressIdx));
+      } catch (ZephyrError e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
   
   @Override
   public ZephyrReserveInfo getReserveInfo() {
-    assertNotClosed();
+    beginCall();
     try {
-      return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, getReserveInfoJni(), ZephyrReserveInfo.class);
-    } catch (ZephyrError e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, getReserveInfoJni(), ZephyrReserveInfo.class);
+      } catch (ZephyrError e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
   
   @Override
   public Map<String, BigInteger> getCirculatingSupply() {
-    assertNotClosed();
+    beginCall();
     try {
-      return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, getCirculatingSupplyJni(), new TypeReference<Map<String, BigInteger>>(){});
-    } catch (ZephyrError e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, getCirculatingSupplyJni(), new TypeReference<Map<String, BigInteger>>(){});
+      } catch (ZephyrError e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
   
   @Override
   public List<ZephyrTxWallet> getTxs(ZephyrTxQuery query, Collection<String> missingTxHashes) {
-    assertNotClosed();
-    
-    // copy and normalize tx query up to block
-    query = query == null ? new ZephyrTxQuery() : query.copy();
-    if (query.getBlock() == null) query.setBlock(new ZephyrBlock().setTxs(query));
-    
-    // serialize query from block and fetch txs from jni
-    String blocksJson;
+    beginCall();
     try {
-      blocksJson = getTxsJni(JsonUtils.serialize(query.getBlock()));
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
-    }
     
-    // deserialize and return txs
-    return deserializeTxs(query, blocksJson, missingTxHashes);
+      // copy and normalize tx query up to block
+      query = query == null ? new ZephyrTxQuery() : query.copy();
+      if (query.getBlock() == null) query.setBlock(new ZephyrBlock().setTxs(query));
+    
+      // serialize query from block and fetch txs from jni
+      String blocksJson;
+      try {
+        blocksJson = getTxsJni(JsonUtils.serialize(query.getBlock()));
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    
+      // deserialize and return txs
+      return deserializeTxs(query, blocksJson, missingTxHashes);
+    } finally {
+      endCall();
+    }
   }
 
   @Override
   public List<ZephyrTransfer> getTransfers(ZephyrTransferQuery query) {
-    assertNotClosed();
-    
-    // copy and normalize query up to block
-    query = normalizeTransferQuery(query);
-    
-    // serialize query from block and fetch transfers from jni
-    String blocksJson;
+    beginCall();
     try {
-      blocksJson = getTransfersJni(JsonUtils.serialize(query.getTxQuery().getBlock()));
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
-    }
     
-    // deserialize and return transfers
-    return deserializeTransfers(query, blocksJson);
+      // copy and normalize query up to block
+      query = normalizeTransferQuery(query);
+    
+      // serialize query from block and fetch transfers from jni
+      String blocksJson;
+      try {
+        blocksJson = getTransfersJni(JsonUtils.serialize(query.getTxQuery().getBlock()));
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    
+      // deserialize and return transfers
+      return deserializeTransfers(query, blocksJson);
+    } finally {
+      endCall();
+    }
   }
   
   @Override
   public List<ZephyrOutputWallet> getOutputs(ZephyrOutputQuery query) {
-    assertNotClosed();
+    beginCall();
+    try {
     
-    // copy and normalize query up to block
-    if (query == null) query = new ZephyrOutputQuery();
-    else {
-      if (query.getTxQuery() == null) query = query.copy();
+      // copy and normalize query up to block
+      if (query == null) query = new ZephyrOutputQuery();
       else {
-        ZephyrTxQuery txQuery = query.getTxQuery().copy();
-        if (query.getTxQuery().getOutputQuery() == query) query = txQuery.getOutputQuery();
+        if (query.getTxQuery() == null) query = query.copy();
         else {
-          GenUtils.assertNull("Output query's tx query must be circular reference or null", query.getTxQuery().getOutputQuery());
-          query = query.copy();
-          query.setTxQuery(txQuery);
+          ZephyrTxQuery txQuery = query.getTxQuery().copy();
+          if (query.getTxQuery().getOutputQuery() == query) query = txQuery.getOutputQuery();
+          else {
+            GenUtils.assertNull("Output query's tx query must be circular reference or null", query.getTxQuery().getOutputQuery());
+            query = query.copy();
+            query.setTxQuery(txQuery);
+          }
         }
       }
+      if (query.getTxQuery() == null) query.setTxQuery(new ZephyrTxQuery());
+      query.getTxQuery().setOutputQuery(query);
+      if (query.getTxQuery().getBlock() == null) query.getTxQuery().setBlock(new ZephyrBlock().setTxs(query.getTxQuery()));
+    
+      // serialize query from block and fetch outputs from jni
+      String blocksJson = getOutputsJni(JsonUtils.serialize(query.getTxQuery().getBlock()));
+    
+      // deserialize and return outputs
+      return deserializeOutputs(query, blocksJson);
+    } finally {
+      endCall();
     }
-    if (query.getTxQuery() == null) query.setTxQuery(new ZephyrTxQuery());
-    query.getTxQuery().setOutputQuery(query);
-    if (query.getTxQuery().getBlock() == null) query.getTxQuery().setBlock(new ZephyrBlock().setTxs(query.getTxQuery()));
-    
-    // serialize query from block and fetch outputs from jni
-    String blocksJson = getOutputsJni(JsonUtils.serialize(query.getTxQuery().getBlock()));
-    
-    // deserialize and return outputs
-    return deserializeOutputs(query, blocksJson);
   }
   
   @Override
   public String exportOutputs(boolean all) {
-    assertNotClosed();
-    String outputsHex = exportOutputsJni(all);
-    return outputsHex.isEmpty() ? null : outputsHex;
+    beginCall();
+    try {
+      String outputsHex = exportOutputsJni(all);
+      return outputsHex.isEmpty() ? null : outputsHex;
+    } finally {
+      endCall();
+    }
   }
 
   @Override
   public int importOutputs(String outputsHex) {
-    assertNotClosed();
-    return importOutputsJni(outputsHex);
+    beginCall();
+    try {
+      return importOutputsJni(outputsHex);
+    } finally {
+      endCall();
+    }
   }
 
   @Override
   public List<ZephyrKeyImage> exportKeyImages(boolean all) {
-    assertNotClosed();
-    String keyImagesJson = exportKeyImagesJni(all);
-    List<ZephyrKeyImage> keyImages = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, keyImagesJson, KeyImagesContainer.class).keyImages;
-    return keyImages;
+    beginCall();
+    try {
+      String keyImagesJson = exportKeyImagesJni(all);
+      List<ZephyrKeyImage> keyImages = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, keyImagesJson, KeyImagesContainer.class).keyImages;
+      return keyImages;
+    } finally {
+      endCall();
+    }
   }
 
   @Override
   public ZephyrKeyImageImportResult importKeyImages(List<ZephyrKeyImage> keyImages) {
-    assertNotClosed();
+    beginCall();
+    try {
     
-    // wrap and serialize key images in container for jni
-    KeyImagesContainer keyImageContainer = new KeyImagesContainer(keyImages);
-    String importResultJson = importKeyImagesJni(JsonUtils.serialize(keyImageContainer));
+      // wrap and serialize key images in container for jni
+      KeyImagesContainer keyImageContainer = new KeyImagesContainer(keyImages);
+      String importResultJson = importKeyImagesJni(JsonUtils.serialize(keyImageContainer));
     
-    // deserialize response
-    return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, importResultJson, ZephyrKeyImageImportResult.class);
+      // deserialize response
+      return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, importResultJson, ZephyrKeyImageImportResult.class);
+    } finally {
+      endCall();
+    }
   }
 
   @Override
@@ -1045,307 +1288,420 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   
   @Override
   public void freezeOutput(String keyImage) {
-    assertNotClosed();
+    beginCall();
     try {
-      freezeOutputJni(keyImage);
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        freezeOutputJni(keyImage);
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
   
   @Override
   public void thawOutput(String keyImage) {
-    assertNotClosed();
+    beginCall();
     try {
-      thawOutputJni(keyImage);
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        thawOutputJni(keyImage);
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
   
   @Override
   public boolean isOutputFrozen(String keyImage) {
-    assertNotClosed();
+    beginCall();
     try {
-      return isOutputFrozenJni(keyImage);
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        return isOutputFrozenJni(keyImage);
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
   
   @Override
   public List<ZephyrTxWallet> createTxs(ZephyrTxConfig config) {
-    assertNotClosed();
-    LOGGER.fine("java createTxs(request)");
-    LOGGER.fine("Tx config: " + JsonUtils.serialize(config));
-    
-    // validate request
-    if (config == null) throw new ZephyrError("Tx config cannot be null");
-    
-    // submit tx config to JNI and get response as json rooted at tx set
-    String txSetJson;
+    beginCall();
     try {
-      txSetJson = createTxsJni(JsonUtils.serialize(config));
-      LOGGER.fine("Received createTxs() response from JNI: " + txSetJson.substring(0, Math.min(5000, txSetJson.length())) + "...");
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
-    }
+      LOGGER.fine("java createTxs(request)");
+      LOGGER.fine("Tx config: " + JsonUtils.serialize(config));
     
-    // deserialize and return txs
-    ZephyrTxSet txSet = JsonUtils.deserialize(txSetJson, ZephyrTxSet.class);
-    return txSet.getTxs();
+      // validate request
+      if (config == null) throw new ZephyrError("Tx config cannot be null");
+    
+      // submit tx config to JNI and get response as json rooted at tx set
+      String txSetJson;
+      try {
+        txSetJson = createTxsJni(JsonUtils.serialize(config));
+        LOGGER.fine("Received createTxs() response from JNI: " + txSetJson.substring(0, Math.min(5000, txSetJson.length())) + "...");
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    
+      // deserialize and return txs
+      ZephyrTxSet txSet = JsonUtils.deserialize(txSetJson, ZephyrTxSet.class);
+      return txSet.getTxs();
+    } finally {
+      endCall();
+    }
   }
   
   @Override
   public ZephyrTxWallet sweepOutput(ZephyrTxConfig config) {
-    assertNotClosed();
+    beginCall();
     try {
-      String txSetJson = sweepOutputJni(JsonUtils.serialize(config));
-      ZephyrTxSet txSet = JsonUtils.deserialize(txSetJson, ZephyrTxSet.class);
-      return txSet.getTxs().get(0);
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        String txSetJson = sweepOutputJni(JsonUtils.serialize(config));
+        ZephyrTxSet txSet = JsonUtils.deserialize(txSetJson, ZephyrTxSet.class);
+        return txSet.getTxs().get(0);
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
   
   @Override
   public List<ZephyrTxWallet> sweepUnlocked(ZephyrTxConfig config) {
-    assertNotClosed();
-    
-    // validate request
-    if (config == null) throw new ZephyrError("Send request cannot be null");
-    
-    // submit send request to JNI and get response as json rooted at tx set
-    String txSetsJson;
+    beginCall();
     try {
-      txSetsJson = sweepUnlockedJni(JsonUtils.serialize(config));
-      LOGGER.fine("Received sweepUnlocked() response from JNI: " + txSetsJson.substring(0, Math.min(5000, txSetsJson.length())) + "...");
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+    
+      // validate request
+      if (config == null) throw new ZephyrError("Send request cannot be null");
+    
+      // submit send request to JNI and get response as json rooted at tx set
+      String txSetsJson;
+      try {
+        txSetsJson = sweepUnlockedJni(JsonUtils.serialize(config));
+        LOGGER.fine("Received sweepUnlocked() response from JNI: " + txSetsJson.substring(0, Math.min(5000, txSetsJson.length())) + "...");
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    
+      // deserialize tx sets
+      List<ZephyrTxSet> txSets = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, txSetsJson, TxSetsContainer.class).txSets;
+    
+      // return txs
+      List<ZephyrTxWallet> txs = new ArrayList<ZephyrTxWallet>();
+      for (ZephyrTxSet txSet : txSets) txs.addAll(txSet.getTxs());
+      return txs;
+    } finally {
+      endCall();
     }
-    
-    // deserialize tx sets
-    List<ZephyrTxSet> txSets = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, txSetsJson, TxSetsContainer.class).txSets;
-    
-    // return txs
-    List<ZephyrTxWallet> txs = new ArrayList<ZephyrTxWallet>();
-    for (ZephyrTxSet txSet : txSets) txs.addAll(txSet.getTxs());
-    return txs;
   }
 
   @Override
   public List<ZephyrTxWallet> sweepDust(boolean relay) {
-    assertNotClosed();
+    beginCall();
     try {
-      String txSetJson = sweepDustJni(relay);
-      ZephyrTxSet txSet = JsonUtils.deserialize(txSetJson, ZephyrTxSet.class);
-      if (txSet.getTxs() == null) txSet.setTxs(new ArrayList<ZephyrTxWallet>());
-      return txSet.getTxs();
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        String txSetJson = sweepDustJni(relay);
+        ZephyrTxSet txSet = JsonUtils.deserialize(txSetJson, ZephyrTxSet.class);
+        if (txSet.getTxs() == null) txSet.setTxs(new ArrayList<ZephyrTxWallet>());
+        return txSet.getTxs();
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
   
   @Override
   public List<String> relayTxs(Collection<String> txMetadatas) {
-    assertNotClosed();
-    String[] txMetadatasArr = txMetadatas.toArray(new String[txMetadatas.size()]); // convert to array for jni
+    beginCall();
     try {
-      return Arrays.asList(relayTxsJni(txMetadatasArr));
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      String[] txMetadatasArr = txMetadatas.toArray(new String[txMetadatas.size()]); // convert to array for jni
+      try {
+        return Arrays.asList(relayTxsJni(txMetadatasArr));
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
   
   @Override
   public ZephyrTxSet describeTxSet(ZephyrTxSet txSet) {
-    assertNotClosed();
-    txSet = new ZephyrTxSet()
-            .setUnsignedTxHex(txSet.getUnsignedTxHex())
-            .setSignedTxHex(txSet.getSignedTxHex())
-            .setMultisigTxHex(txSet.getMultisigTxHex());
-    String describedTxSetJson;
+    beginCall();
     try {
-      describedTxSetJson = describeTxSetJni(JsonUtils.serialize(txSet));
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      txSet = new ZephyrTxSet()
+              .setUnsignedTxHex(txSet.getUnsignedTxHex())
+              .setSignedTxHex(txSet.getSignedTxHex())
+              .setMultisigTxHex(txSet.getMultisigTxHex());
+      String describedTxSetJson;
+      try {
+        describedTxSetJson = describeTxSetJni(JsonUtils.serialize(txSet));
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+      return JsonUtils.deserialize(describedTxSetJson, ZephyrTxSet.class);
+    } finally {
+      endCall();
     }
-    return JsonUtils.deserialize(describedTxSetJson, ZephyrTxSet.class);
   }
   
   @Override
   public String signTxs(String unsignedTxHex) {
-    assertNotClosed();
+    beginCall();
     try {
-      return signTxsJni(unsignedTxHex);
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        return signTxsJni(unsignedTxHex);
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
 
   @Override
   public List<String> submitTxs(String signedTxHex) {
-    assertNotClosed();
+    beginCall();
     try {
-      return Arrays.asList(submitTxsJni(signedTxHex));
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        return Arrays.asList(submitTxsJni(signedTxHex));
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
 
   @Override
   public ZephyrCheckTx checkTxKey(String txHash, String txKey, String address) {
-    assertNotClosed();
+    beginCall();
     try {
-      String checkStr = checkTxKeyJni(txHash, txKey, address);
-      return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, checkStr, ZephyrCheckTx.class);
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        String checkStr = checkTxKeyJni(txHash, txKey, address);
+        return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, checkStr, ZephyrCheckTx.class);
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
 
   @Override
   public String getTxProof(String txHash, String address, String message) {
-    assertNotClosed();
+    beginCall();
     try {
-      return getTxProofJni(txHash, address, message);
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        return getTxProofJni(txHash, address, message);
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
 
   @Override
   public ZephyrCheckTx checkTxProof(String txHash, String address, String message, String signature) {
-    assertNotClosed();
+    beginCall();
     try {
-      String checkStr = checkTxProofJni(txHash, address, message, signature);
-      return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, checkStr, ZephyrCheckTx.class);
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        String checkStr = checkTxProofJni(txHash, address, message, signature);
+        return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, checkStr, ZephyrCheckTx.class);
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
 
   @Override
   public String getSpendProof(String txHash, String message) {
-    assertNotClosed();
+    beginCall();
     try {
-      return getSpendProofJni(txHash, message);
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        return getSpendProofJni(txHash, message);
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
 
   @Override
   public boolean checkSpendProof(String txHash, String message, String signature) {
-    assertNotClosed();
+    beginCall();
     try {
-      return checkSpendProofJni(txHash, message, signature);
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        return checkSpendProofJni(txHash, message, signature);
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
 
   @Override
   public String getReserveProofWallet(String message) {
+    beginCall();
     try {
-      return getReserveProofWalletJni(message);
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        return getReserveProofWalletJni(message);
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
 
   @Override
   public String getReserveProofAccount(int accountIdx, BigInteger amount, String message) {
-    assertNotClosed();
+    beginCall();
     try {
-      return getReserveProofAccountJni(accountIdx, amount.toString(), message);
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage(), -1);
+      try {
+        return getReserveProofAccountJni(accountIdx, amount.toString(), message);
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage(), -1);
+      }
+    } finally {
+      endCall();
     }
   }
 
   @Override
   public ZephyrCheckReserve checkReserveProof(String address, String message, String signature) {
-    assertNotClosed();
+    beginCall();
     try {
-      String checkStr = checkReserveProofJni(address, message, signature);
-      return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, checkStr, ZephyrCheckReserve.class);
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage(), -1);
+      try {
+        String checkStr = checkReserveProofJni(address, message, signature);
+        return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, checkStr, ZephyrCheckReserve.class);
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage(), -1);
+      }
+    } finally {
+      endCall();
     }
   }
 
   @Override
   public String signMessage(String msg, ZephyrMessageSignatureType signatureType, int accountIdx, int subaddressIdx) {
-    assertNotClosed();
-    return signMessageJni(msg, signatureType.ordinal(), accountIdx, subaddressIdx);
+    beginCall();
+    try {
+      return signMessageJni(msg, signatureType.ordinal(), accountIdx, subaddressIdx);
+    } finally {
+      endCall();
+    }
   }
 
   @Override
   public ZephyrMessageSignatureResult verifyMessage(String msg, String address, String signature) {
-    assertNotClosed();
+    beginCall();
     try {
-      String resultJson = verifyMessageJni(msg, address, signature);
-      Map<String, Object> result = JsonUtils.deserialize(resultJson, new TypeReference<Map<String, Object>>(){});
-      boolean isGood = (boolean) result.get("isGood");
-      return new ZephyrMessageSignatureResult(
-          isGood,
-          !isGood ? null : (Boolean) result.get("isOld"),
-          !isGood ? null : "spend".equals(result.get("signatureType")) ? ZephyrMessageSignatureType.SIGN_WITH_SPEND_KEY : ZephyrMessageSignatureType.SIGN_WITH_VIEW_KEY,
-          !isGood ? null : (Integer) result.get("version"));
-    } catch (Exception e) {
-      return new ZephyrMessageSignatureResult(false, null, null, null); // jni can differentiate incorrect from invalid address, but rpc returns -2 for both, so returning bad result for consistency
+      try {
+        String resultJson = verifyMessageJni(msg, address, signature);
+        Map<String, Object> result = JsonUtils.deserialize(resultJson, new TypeReference<Map<String, Object>>(){});
+        boolean isGood = (boolean) result.get("isGood");
+        return new ZephyrMessageSignatureResult(
+            isGood,
+            !isGood ? null : (Boolean) result.get("isOld"),
+            !isGood ? null : "spend".equals(result.get("signatureType")) ? ZephyrMessageSignatureType.SIGN_WITH_SPEND_KEY : ZephyrMessageSignatureType.SIGN_WITH_VIEW_KEY,
+            !isGood ? null : (Integer) result.get("version"));
+      } catch (Exception e) {
+        return new ZephyrMessageSignatureResult(false, null, null, null); // jni can differentiate incorrect from invalid address, but rpc returns -2 for both, so returning bad result for consistency
+      }
+    } finally {
+      endCall();
     }
   }
 
   @Override
   public String getTxKey(String txHash) {
-    assertNotClosed();
+    beginCall();
     try {
-      return getTxKeyJni(txHash);
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        return getTxKeyJni(txHash);
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
 
   @Override
   public List<String> getTxNotes(List<String> txHashes) {
-    assertNotClosed();
-    return Arrays.asList(getTxNotesJni(txHashes.toArray(new String[txHashes.size()])));  // convert to array for jni
+    beginCall();
+    try {
+      return Arrays.asList(getTxNotesJni(txHashes.toArray(new String[txHashes.size()])));  // convert to array for jni
+    } finally {
+      endCall();
+    }
   }
 
   @Override
   public void setTxNotes(List<String> txHashes, List<String> notes) {
-    assertNotClosed();
-    setTxNotesJni(txHashes.toArray(new String[txHashes.size()]), notes.toArray(new String[notes.size()]));
+    beginCall();
+    try {
+      setTxNotesJni(txHashes.toArray(new String[txHashes.size()]), notes.toArray(new String[notes.size()]));
+    } finally {
+      endCall();
+    }
   }
 
   @Override
   public List<ZephyrAddressBookEntry> getAddressBookEntries(List<Integer> entryIndices) {
-    assertNotClosed();
-    if (entryIndices == null) entryIndices = new ArrayList<Integer>();
-    String entriesJson = getAddressBookEntriesJni(GenUtils.listToIntArray(entryIndices));
-    List<ZephyrAddressBookEntry> entries = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, entriesJson, AddressBookEntriesContainer.class).entries;
-    if (entries == null) entries = new ArrayList<ZephyrAddressBookEntry>();
-    return entries;
+    beginCall();
+    try {
+      if (entryIndices == null) entryIndices = new ArrayList<Integer>();
+      String entriesJson = getAddressBookEntriesJni(GenUtils.listToIntArray(entryIndices));
+      List<ZephyrAddressBookEntry> entries = JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, entriesJson, AddressBookEntriesContainer.class).entries;
+      if (entries == null) entries = new ArrayList<ZephyrAddressBookEntry>();
+      return entries;
+    } finally {
+      endCall();
+    }
   }
 
   @Override
   public int addAddressBookEntry(String address, String description) {
-    assertNotClosed();
-    return addAddressBookEntryJni(address, description);
+    beginCall();
+    try {
+      return addAddressBookEntryJni(address, description);
+    } finally {
+      endCall();
+    }
   }
 
   @Override
   public void editAddressBookEntry(int index, boolean setAddress, String address, boolean setDescription, String description) {
-    assertNotClosed();
-    editAddressBookEntryJni(index, setAddress, address, setDescription, description);
+    beginCall();
+    try {
+      editAddressBookEntryJni(index, setAddress, address, setDescription, description);
+    } finally {
+      endCall();
+    }
   }
 
   @Override
   public void deleteAddressBookEntry(int entryIdx) {
-    assertNotClosed();
-    deleteAddressBookEntryJni(entryIdx);
+    beginCall();
+    try {
+      deleteAddressBookEntryJni(entryIdx);
+    } finally {
+      endCall();
+    }
   }
 
   @Override
@@ -1374,140 +1730,200 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
 
   @Override
   public String getPaymentUri(ZephyrTxConfig request) {
-    assertNotClosed();
+    beginCall();
     try {
-      return getPaymentUriJni(JsonUtils.serialize(request));
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        return getPaymentUriJni(JsonUtils.serialize(request));
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
 
   @Override
   public ZephyrTxConfig parsePaymentUri(String uri) {
-    assertNotClosed();
+    beginCall();
     try {
-      String sendRequestJson = parsePaymentUriJni(uri);
-      return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, sendRequestJson, ZephyrTxConfig.class);
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        String sendRequestJson = parsePaymentUriJni(uri);
+        return JsonUtils.deserialize(ZephyrRpcConnection.MAPPER, sendRequestJson, ZephyrTxConfig.class);
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
   
   @Override
   public String getAttribute(String key) {
-    assertNotClosed();
-    return getAttributeJni(key);
+    beginCall();
+    try {
+      return getAttributeJni(key);
+    } finally {
+      endCall();
+    }
   }
 
   @Override
   public void setAttribute(String key, String val) {
-    assertNotClosed();
-    setAttributeJni(key, val);
+    beginCall();
+    try {
+      setAttributeJni(key, val);
+    } finally {
+      endCall();
+    }
   }
 
   @Override
   public void startMining(Long numThreads, Boolean backgroundMining, Boolean ignoreBattery) {
-    assertNotClosed();
+    beginCall();
     try {
-      startMiningJni(numThreads == null ? 0l : (long) numThreads, Boolean.TRUE.equals(backgroundMining), Boolean.TRUE.equals(ignoreBattery));
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        startMiningJni(numThreads == null ? 0l : (long) numThreads, Boolean.TRUE.equals(backgroundMining), Boolean.TRUE.equals(ignoreBattery));
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
 
   @Override
   public void stopMining() {
-    assertNotClosed();
+    beginCall();
     try {
-      stopMiningJni();
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        stopMiningJni();
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
   
   
   @Override
   public boolean isMultisigImportNeeded() {
-    assertNotClosed();
-    return isMultisigImportNeededJni();
+    beginCall();
+    try {
+      return isMultisigImportNeededJni();
+    } finally {
+      endCall();
+    }
   }
   
   @Override
   public ZephyrMultisigInfo getMultisigInfo() {
-    assertNotClosed();
+    beginCall();
     try {
-      String multisigInfoJson = getMultisigInfoJni();
-      return JsonUtils.deserialize(multisigInfoJson, ZephyrMultisigInfo.class);
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        String multisigInfoJson = getMultisigInfoJni();
+        return JsonUtils.deserialize(multisigInfoJson, ZephyrMultisigInfo.class);
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
 
   @Override
   public String prepareMultisig() {
-    assertNotClosed();
-    return prepareMultisigJni();
+    beginCall();
+    try {
+      return prepareMultisigJni();
+    } finally {
+      endCall();
+    }
   }
 
   @Override
   public String makeMultisig(List<String> multisigHexes, int threshold, String password) {
-    assertNotClosed();
+    beginCall();
     try {
-      return makeMultisigJni(multisigHexes.toArray(new String[multisigHexes.size()]), threshold, password);
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        return makeMultisigJni(multisigHexes.toArray(new String[multisigHexes.size()]), threshold, password);
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
 
   @Override
   public ZephyrMultisigInitResult exchangeMultisigKeys(List<String> multisigHexes, String password) {
-    assertNotClosed();
+    beginCall();
     try {
-      String initMultisigResultJson = exchangeMultisigKeysJni(multisigHexes.toArray(new String[multisigHexes.size()]), password);
-      return JsonUtils.deserialize(initMultisigResultJson, ZephyrMultisigInitResult.class);
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        String initMultisigResultJson = exchangeMultisigKeysJni(multisigHexes.toArray(new String[multisigHexes.size()]), password);
+        return JsonUtils.deserialize(initMultisigResultJson, ZephyrMultisigInitResult.class);
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
 
   @Override
   public String exportMultisigHex() {
-    assertNotClosed();
+    beginCall();
     try {
-      return exportMultisigHexJni();
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        return exportMultisigHexJni();
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
 
   @Override
   public int importMultisigHex(List<String> multisigHexes) {
-    assertNotClosed();
+    beginCall();
     try {
-      return importMultisigHexJni(multisigHexes.toArray(new String[multisigHexes.size()]));
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        return importMultisigHexJni(multisigHexes.toArray(new String[multisigHexes.size()]));
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
 
   @Override
   public ZephyrMultisigSignResult signMultisigTxHex(String multisigTxHex) {
-    assertNotClosed();
+    beginCall();
     try {
-      String signMultisigResultJson = signMultisigTxHexJni(multisigTxHex);
-      return JsonUtils.deserialize(signMultisigResultJson, ZephyrMultisigSignResult.class);
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        String signMultisigResultJson = signMultisigTxHexJni(multisigTxHex);
+        return JsonUtils.deserialize(signMultisigResultJson, ZephyrMultisigSignResult.class);
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
 
   @Override
   public List<String> submitMultisigTxHex(String signedMultisigTxHex) {
-    assertNotClosed();
+    beginCall();
     try {
-      return Arrays.asList(submitMultisigTxHexJni(signedMultisigTxHex));
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        return Arrays.asList(submitMultisigTxHexJni(signedMultisigTxHex));
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
 
@@ -1517,36 +1933,100 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
    * @return the keys and cache data, respectively
    */
   public synchronized byte[][] getData() {
-    return new byte[][] { getKeysFileBufferJni(password, isViewOnly()), getCacheFileBufferJni() };
+    beginCall();
+    try {
+      return new byte[][] { getKeysFileBufferJni(password, isViewOnly()), getCacheFileBufferJni() };
+    } finally {
+      endCall();
+    }
   }
   
   @Override
   public void changePassword(String oldPassword, String newPassword) {
+    beginCall();
     try {
-      if (!password.equals(oldPassword)) throw new RuntimeException("Invalid original password.");
-      changePasswordJni(oldPassword, newPassword);
-      password = newPassword;
-    } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      try {
+        if (!password.equals(oldPassword)) throw new RuntimeException("Invalid original password.");
+        changePasswordJni(oldPassword, newPassword);
+        password = newPassword;
+      } catch (Exception e) {
+        throw new ZephyrError(e.getMessage());
+      }
+    } finally {
+      endCall();
     }
   }
   
   @Override
   public void save() {
-    assertNotClosed();
-    saveJni();
+    beginCall();
+    try {
+      saveJni();
+    } finally {
+      endCall();
+    }
   }
   
+  /**
+   * Optionally save, then close the wallet. Returns only when the wallet is closed: new calls fail
+   * with "Wallet is closed" from the start, the listeners receive no more callbacks, the core is
+   * asked to stop syncing, and close() waits, without a time limit, until no other thread is
+   * inside a call of this wallet; a call that waits on the node ends when the core gives up on it.
+   * An interrupt does not end the wait; the thread's interrupt status is restored afterwards.
+   * Closing a closed wallet has no effect; a second thread that closes the wallet meanwhile waits
+   * for the first.
+   *
+   * <p>Throws ZephyrError when called from inside one of the wallet's own calls or listener
+   * callbacks, which close() would wait for (the wallet stays open), and when saving fails (the
+   * wallet stays closed for calls; close() can be repeated).</p>
+   *
+   * @param save specifies if the wallet should be saved before being closed
+   */
   @Override
   public void close(boolean save) {
-    if (isClosed) return; // closing a closed wallet has no effect
-    isClosed = true;
-    password = null;
-    refreshListening();
+    if (callLock.getReadHoldCount() > 0 || jniListener.inCallback()) {
+      throw new ZephyrError("Cannot close the wallet from inside one of its own calls or listener callbacks");
+    }
+    synchronized (closeLock) {
+      if (isFreed) return; // closed already
+      isClosed = true;     // new calls fail, callbacks return at once
+      boolean interrupted = false;
+      try {
+        stopSyncingQuietly(); // a running refresh ends at its next batch of blocks
+        while (true) {
+          try {
+            if (callLock.writeLock().tryLock(100, TimeUnit.MILLISECONDS)) break;
+          } catch (InterruptedException e) {
+            interrupted = true; // remembered; the wait goes on
+          }
+          stopSyncingQuietly(); // again: a stop that comes before a refresh starts is lost
+        }
+        try {
+          closeJni(save);
+        } catch (Exception e) {
+          throw new ZephyrError(e.getMessage());
+        } finally {
+          callLock.writeLock().unlock();
+        }
+        isFreed = true;
+        password = null;
+        listeners.clear();
+      } finally {
+        if (interrupted) Thread.currentThread().interrupt();
+      }
+    }
+  }
+  
+  /**
+   * Asks the core to stop syncing, from close() only: without the call lock, which close() is
+   * waiting for, and safe because only close() frees the native wallet. A failure is ignored, as
+   * close() goes on regardless.
+   */
+  private void stopSyncingQuietly() {
     try {
-      closeJni(save);
+      stopSyncingJni();
     } catch (Exception e) {
-      throw new ZephyrError(e.getMessage());
+      LOGGER.fine("stopSyncing while closing failed: " + e.getMessage());
     }
   }
   
@@ -2083,16 +2563,37 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   // ---------------------------- PRIVATE HELPERS -----------------------------
   
   /**
-   * Enables or disables listening in the c++ wallet.
+   * Registers the native listener with the core at the first addListener(); it stays registered
+   * until close() frees it after the core, so that a listener removed from inside a callback cannot
+   * free the native listener that delivers it. Called inside the call lock.
    */
-  private void refreshListening() {
-    boolean isEnabled = listeners.size() > 0;
-    if (jniListenerHandle == 0 && !isEnabled || jniListenerHandle > 0 && isEnabled) return; // no difference
-    jniListenerHandle = setListenerJni(isEnabled ? jniListener : null);
+  private void initListening() {
+    synchronized (jniListener) {
+      if (jniListenerHandle == 0) jniListenerHandle = setListenerJni(jniListener);
+    }
   }
   
   private void assertNotClosed() {
     if (isClosed) throw new ZephyrError("Wallet is closed");
+  }
+  
+  /**
+   * Starts a call that uses the native wallet: close() cannot free it before endCall(). Reads do
+   * not block each other, and a thread that is inside a call already (a listener called from a
+   * foreground sync) enters again. The read side is only tried, never waited for: it is
+   * unavailable only while close() holds the write side, and the wallet is closed by then.
+   */
+  private void beginCall() {
+    assertNotClosed();
+    if (!callLock.readLock().tryLock()) throw new ZephyrError("Wallet is closed");
+    if (isClosed) {
+      callLock.readLock().unlock();
+      throw new ZephyrError("Wallet is closed");
+    }
+  }
+  
+  private void endCall() {
+    callLock.readLock().unlock();
   }
   
   private static ZephyrAccount sanitizeAccount(ZephyrAccount account) {
