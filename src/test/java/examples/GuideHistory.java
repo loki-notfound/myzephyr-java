@@ -6,7 +6,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import zephyr.wallet.ZephyrWallet;
-import zephyr.wallet.model.ZephyrCheckTx;
 import zephyr.wallet.model.ZephyrDestination;
 import zephyr.wallet.model.ZephyrIncomingTransfer;
 import zephyr.wallet.model.ZephyrOutgoingTransfer;
@@ -24,21 +23,19 @@ import zephyr.wallet.model.ZephyrTxWallet;
  */
 public class GuideHistory {
 
-  // checkTxKey returns amount 0: the receiver checks the key, then reads the amount from its own history
-  static Map<String, BigInteger> receivedPerAsset(ZephyrWallet wallet, String txHash, String txKey, String address, long minConfirmations) {
-    ZephyrCheckTx check = wallet.checkTxKey(txHash, txKey, address);
-    if (!check.isGood()) throw new IllegalStateException("the transaction does not pay " + address);
-    if (check.getNumConfirmations() < minConfirmations) throw new IllegalStateException("only " + check.getNumConfirmations() + " confirmations");
-    // check.getReceivedAmount() is 0 for every current transaction: do not use it
+  // checkTxKey returns amount 0: the receiver reads what it received from its own history
+  static Map<String, BigInteger> receivedPerAsset(ZephyrWallet wallet, String txHash, String address, long minConfirmations) {
     Map<String, BigInteger> received = new HashMap<>();
-    for (ZephyrTxWallet tx : wallet.getTxs(txHash)) {
+    for (ZephyrTxWallet tx : wallet.getTxs(txHash)) {  // throws when the wallet does not know the transaction
+      Long confirmations = tx.getNumConfirmations();
+      if (confirmations == null || confirmations < minConfirmations) throw new IllegalStateException("only " + confirmations + " confirmations");
       if (tx.getIncomingTransfers() == null) continue;
       for (ZephyrIncomingTransfer transfer : tx.getIncomingTransfers()) {
         if (!address.equals(transfer.getAddress())) continue;  // only what this address received
         received.merge(transfer.getAssetType(), transfer.getAmount(), BigInteger::add);
       }
     }
-    return received;
+    return received;  // empty: the transaction paid nothing to this address
   }
 
   // checkTxKey returns amount 0: the sender has the amount in the destinations of its outgoing transfer

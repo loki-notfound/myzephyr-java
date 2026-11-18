@@ -98,7 +98,8 @@ The converted funds unlock like received funds, 10 blocks after the conversion i
 
 `setTxNote(hash, note)` stores a note for a transaction; `getTxNote(hash)` and
 `getTxNotes(hashes)` read notes back. `getTxKey(hash)` returns the secret key of a transaction the
-wallet sent; the receiver checks a payment with it ([checkTxKey returns amount 0](#checktxkey-returns-amount-0)).
+wallet sent. In monero-java the receiver checks a payment with it; in zephyr-java that check
+shows nothing ([checkTxKey returns amount 0](#checktxkey-returns-amount-0)).
 
 ```java examples/GuideHistory.java
 wallet.setTxNote(txHash, "rent, November");
@@ -116,30 +117,41 @@ has neither.
 `receivedAmount = 0` for every current transaction. On mainnet on 2026-11-07, `checkTxKey` on a
 confirmed 10 ZPH transfer returned `good = true`, the right number of confirmations and amount 0.
 
+> [!CAUTION]
+> **Do not accept a payment because `checkTxKey` returned.** In the full wallet its `isGood()` is
+> true whenever the call does not throw, also when the transaction pays nothing to the address
+> (read in the core's code, not run). With the amount always 0, the result does not show that a
+> payment was made, or how much.
+
 **Why.** The core reads the received amount of the asset `ZEPH` only, from a map that holds the
 amount per asset. Since hard fork 11 (height 536,000) no new output can be `ZEPH`, so the entry is
-always empty.
+always empty. The core also sets `good` to true before it looks at the outputs, and its key check
+does not fail when no output of the transaction belongs to the address. A key of valid form that
+does not belong to the transaction therefore gives `good = true` as well. This is read in the
+core's code; it was not run.
 
-**Workaround.** Trust the check for `isGood()` and the confirmations, and read the amount from the
-wallet's own history, where every transfer carries its asset. The receiver checks the key it got
-from the sender and sums, per asset, the incoming transfers to the checked address. A transaction
-can pay several addresses of the same wallet, so the filter on the address matters:
+`checkTxProof` differs in one point: there `isGood()` is the result of the signature check (read
+in the code, not run). Its amount is 0 for the same reason.
+
+**Workaround.** The receiver does not need the key: its own wallet knows what it received. Read
+the transaction from the wallet's history, where every transfer carries its asset, and sum, per
+asset, the incoming transfers to the address. A transaction can pay several addresses of the same
+wallet, so the filter on the address matters. An empty result means the transaction paid nothing
+to that address:
 
 ```java examples/GuideHistory.java
-static Map<String, BigInteger> receivedPerAsset(ZephyrWallet wallet, String txHash, String txKey, String address, long minConfirmations) {
-  ZephyrCheckTx check = wallet.checkTxKey(txHash, txKey, address);
-  if (!check.isGood()) throw new IllegalStateException("the transaction does not pay " + address);
-  if (check.getNumConfirmations() < minConfirmations) throw new IllegalStateException("only " + check.getNumConfirmations() + " confirmations");
-  // check.getReceivedAmount() is 0 for every current transaction: do not use it
+static Map<String, BigInteger> receivedPerAsset(ZephyrWallet wallet, String txHash, String address, long minConfirmations) {
   Map<String, BigInteger> received = new HashMap<>();
-  for (ZephyrTxWallet tx : wallet.getTxs(txHash)) {
+  for (ZephyrTxWallet tx : wallet.getTxs(txHash)) {  // throws when the wallet does not know the transaction
+    Long confirmations = tx.getNumConfirmations();
+    if (confirmations == null || confirmations < minConfirmations) throw new IllegalStateException("only " + confirmations + " confirmations");
     if (tx.getIncomingTransfers() == null) continue;
     for (ZephyrIncomingTransfer transfer : tx.getIncomingTransfers()) {
       if (!address.equals(transfer.getAddress())) continue;  // only what this address received
       received.merge(transfer.getAssetType(), transfer.getAmount(), BigInteger::add);
     }
   }
-  return received;
+  return received;  // empty: the transaction paid nothing to this address
 }
 ```
 
@@ -164,9 +176,10 @@ synced past it. The destinations are local data of the sending wallet: a wallet 
 mnemonic does not have them. For a conversion, the destination shows the destination amount only
 once the transaction is confirmed ([Conversions in the history](#conversions-in-the-history)).
 
-**Not possible.** A third party without the receiving or sending wallet cannot learn the amount
-from the key or the proof. It learns that the transaction paid the address and how many
-confirmations it has. *Status:* core behaviour, confirmed on mainnet on 2026-11-07; `checkTxProof`
+**Not possible.** A third party without the receiving or sending wallet cannot check a payment
+with the transaction key: `checkTxKey` shows neither that the transaction paid the address nor
+the amount. With a proof (`checkTxProof`) it gets the signature check and the confirmations, not
+the amount. *Status:* core behaviour, confirmed on mainnet on 2026-11-07; `checkTxProof`
 uses the same code (read in the code, not tested). A core fix would read the destination asset's
 entry; it is not a security fix, so the backports leave it. Through `ZephyrWalletRpc` the amount
 comes back `null` for a different reason ([ZephyrWalletRpc](11-the-rpc-classes.md#zephyrwalletrpc)).

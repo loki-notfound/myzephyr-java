@@ -95,7 +95,8 @@ headers.
 but reads something the Zephyr core does not deliver:
 
 - `checkTxKey` (and `checkTxProof`): monero-java returns the received amount. In zephyr-java's
-  full wallet the amount is 0, and the amount comes from the transaction in `getTxs(hash)`
+  full wallet the amount is 0 and `checkTxKey` reports `good` for any key of valid form, so it
+  cannot confirm a payment. What was received comes from the transaction in `getTxs(hash)`
   ([checkTxKey returns amount 0](06-history.md#checktxkey-returns-amount-0)).
 - `getOutputs()`: monero-java's outputs have no asset concept. zephyr-java's outputs have an
   `assetType` field, but `getOutputs()` leaves it `null`. The asset comes from the output's

@@ -210,8 +210,9 @@ The guide's [Known limitations](docs/guide/13-known-limitations.md) lists every 
   hashes ([Logging safely](docs/guide/09-errors.md#logging-safely),
   [The native log](docs/guide/09-errors.md#the-native-log)).
 - **Amounts and assets the core does not report.** `checkTxKey` returns amount 0 for every
-  current transaction, and `getOutputs()` reports no asset. Read the amount from the wallet's
-  history and the asset with `getOutputAssetType`
+  current transaction and reports `good` whenever it does not throw, so it cannot confirm a
+  payment; `getOutputs()` reports no asset. Read what was received from the wallet's history and
+  the asset with `getOutputAssetType`
   ([checkTxKey returns amount 0](docs/guide/06-history.md#checktxkey-returns-amount-0),
   [getOutputs() reports no asset](docs/guide/06-history.md#getoutputs-reports-no-asset)).
 

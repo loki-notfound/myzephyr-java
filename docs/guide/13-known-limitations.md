@@ -17,7 +17,7 @@ Status words:
 
 | Limitation | Status | Details |
 |---|---|---|
-| `checkTxKey` and `checkTxProof` return amount 0 for every current transaction | core, open; confirmed on mainnet on 2026-11-07 | [checkTxKey returns amount 0](06-history.md#checktxkey-returns-amount-0) |
+| `checkTxKey` and `checkTxProof` return amount 0 for every current transaction, and `checkTxKey` reports `good` whenever it does not throw: it cannot confirm a payment | core, open; the amount confirmed on mainnet on 2026-11-07, `good` read in the code | [checkTxKey returns amount 0](06-history.md#checktxkey-returns-amount-0) |
 | `getOutputs()` reports no asset | core, open; `getOutputAssetType` from `java.2` takes it from the transaction | [getOutputs() reports no asset](06-history.md#getoutputs-reports-no-asset) |
 | `getOutputAssetType` reads a split conversion to one's own account as the source asset | core, open | [getOutputs() reports no asset](06-history.md#getoutputs-reports-no-asset) |
 | the asset of an output notification in the pool is empty | core, stays; observed on mainnet on 2026-11-07 | [Outputs in the pool carry no asset](04-threads-and-listeners.md#outputs-in-the-pool-carry-no-asset) |
