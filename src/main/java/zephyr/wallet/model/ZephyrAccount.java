@@ -16,6 +16,9 @@ public class ZephyrAccount {
   private String tag;
   private List<ZephyrSubaddress> subaddresses;
   
+  /**
+   * Creates an empty account model.
+   */
   public ZephyrAccount() {
     super();
   }
@@ -38,18 +41,39 @@ public class ZephyrAccount {
     this.subaddresses = subaddresses;
   }
   
+  /**
+   * Returns the index of the account in the wallet; account 0 holds the wallet's primary address.
+   *
+   * @return the account index
+   */
   public Integer getIndex() {
     return index;
   }
   
+  /**
+   * Sets the index of the account.
+   *
+   * @param index is the account index
+   */
   public void setIndex(Integer index) {
     this.index = index;
   }
   
+  /**
+   * Returns the primary address of the account: its subaddress 0, for account 0 the wallet's
+   * primary address.
+   *
+   * @return the primary address
+   */
   public String getPrimaryAddress() {
     return primaryAddress;
   }
 
+  /**
+   * Sets the primary address of the account.
+   *
+   * @param primaryAddress is the address
+   */
   public void setPrimaryAddress(String primaryAddress) {
     this.primaryAddress = primaryAddress;
   }
@@ -91,18 +115,40 @@ public class ZephyrAccount {
     this.unlockedBalance = unlockedBalance;
   }
   
+  /**
+   * Returns the tag of the account. {@code ZephyrWalletFull} never fills it (read in the core's
+   * code).
+   *
+   * @return the tag, null if none
+   */
   public String getTag() {
     return tag;
   }
 
+  /**
+   * Sets the tag of this account object.
+   *
+   * @param tag is the tag
+   */
   public void setTag(String tag) {
     this.tag = tag;
   }
   
+  /**
+   * Returns the subaddresses of the account, when they were asked for ({@code getAccounts(true)},
+   * {@code getAccount(accountIdx, true)}).
+   *
+   * @return the subaddresses, null if they were not asked for
+   */
   public List<ZephyrSubaddress> getSubaddresses() {
     return subaddresses;
   }
   
+  /**
+   * Sets the subaddresses of the account and sets each one's account index to this account's index.
+   *
+   * @param subaddresses are the subaddresses
+   */
   public void setSubaddresses(List<ZephyrSubaddress> subaddresses) {
     this.subaddresses = subaddresses;
     if (subaddresses != null) {
@@ -116,6 +162,12 @@ public class ZephyrAccount {
     return toString(0);
   }
   
+  /**
+   * Returns the fields of this account that are set, one per line, indented.
+   *
+   * @param indent is the indentation in levels of two spaces
+   * @return the description
+   */
   public String toString(int indent) {
     StringBuilder sb = new StringBuilder();
     sb.append(GenUtils.kvLine("Index", this.getIndex(), indent));

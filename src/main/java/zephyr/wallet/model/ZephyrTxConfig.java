@@ -33,6 +33,12 @@ public class ZephyrTxConfig {
   private String sourceCurrency;
   private String destinationCurrency;
   
+  /**
+   * Creates an empty configuration. A send needs at least a destination, the account to send from
+   * and the currency pair ({@link #setSourceCurrency(String)},
+   * {@link #setDestinationCurrency(String)}). See the user guide, {@code docs/guide/07-sending.md},
+   * section "The currency pair on every send".
+   */
   public ZephyrTxConfig() {
     // necessary for deserialization
   }
@@ -59,6 +65,11 @@ public class ZephyrTxConfig {
     this.destinationCurrency = config.destinationCurrency;
   }
   
+  /**
+   * Returns a copy of this configuration with copies of its destinations.
+   *
+   * @return the copy
+   */
   public ZephyrTxConfig copy() {
     return new ZephyrTxConfig(this);
   }
@@ -121,82 +132,195 @@ public class ZephyrTxConfig {
     return this.destinations.get(0).getAmount();
   }
   
+  /**
+   * Adds a destination. Several destinations in one transaction are inherited from monero-java; not
+   * tested against Zephyr.
+   *
+   * @param address is the recipient's address
+   * @param amount is the amount in atomic units of the source currency
+   * @return this configuration for chaining
+   */
   public ZephyrTxConfig addDestination(String address, BigInteger amount) {
     return addDestination(new ZephyrDestination(address, amount));
   }
   
+  /**
+   * Adds a destination. Its asset type does not select anything: the currency pair of this
+   * configuration holds for every destination. Several destinations in one transaction are
+   * inherited from monero-java; not tested against Zephyr.
+   *
+   * @param destination is the destination, its amount in atomic units of the source currency
+   * @return this configuration for chaining
+   */
   public ZephyrTxConfig addDestination(ZephyrDestination destination) {
     if (this.destinations == null) this.destinations = new ArrayList<ZephyrDestination>();
     this.destinations.add(destination);
     return this;
   }
   
+  /**
+   * Returns the destinations; {@link #setAddress(String)} and {@link #setAmount(BigInteger)} edit
+   * the first one.
+   *
+   * @return the destinations, null if none was set
+   */
   public List<ZephyrDestination> getDestinations() {
     return destinations;
   }
   
+  /**
+   * Replaces all destinations. Several destinations in one transaction are inherited from
+   * monero-java; not tested against Zephyr.
+   *
+   * @param destinations are the destinations, their amounts in atomic units of the source currency
+   * @return this configuration for chaining
+   */
   @JsonProperty("destinations")
   public ZephyrTxConfig setDestinations(List<ZephyrDestination> destinations) {
     this.destinations = destinations;
     return this;
   }
   
+  /**
+   * Replaces all destinations, as {@link #setDestinations(List)} does.
+   *
+   * @param destinations are the destinations
+   * @return this configuration for chaining
+   */
   public ZephyrTxConfig setDestinations(ZephyrDestination... destinations) {
     this.destinations = GenUtils.arrayToList(destinations);
     return this;
   }
   
+  /**
+   * Returns the payment ID, see {@link #setPaymentId(String)}.
+   *
+   * @return the payment ID, null if none
+   */
   public String getPaymentId() {
     return paymentId;
   }
   
+  /**
+   * Sets a payment ID. In {@code ZephyrWalletFull} the core rejects every standalone payment ID:
+   * {@code createTxs} throws "Standalone payment IDs are obsolete. Use subaddresses or integrated
+   * addresses instead", and the sweeps fail on the same check (read in the core's code). Send to an
+   * integrated address instead. A payment URI ({@code getPaymentUri}) carries it.
+   *
+   * @param paymentId is the payment ID as hex
+   * @return this configuration for chaining
+   */
   public ZephyrTxConfig setPaymentId(String paymentId) {
     this.paymentId = paymentId;
     return this;
   }
   
+  /**
+   * Returns the fee priority.
+   *
+   * @return the priority, null for the default
+   */
   public ZephyrTxPriority getPriority() {
     return priority;
   }
   
+  /**
+   * Sets the fee priority. Null or {@link ZephyrTxPriority#DEFAULT} lets the core choose; the other
+   * priorities are inherited from monero-java; not tested against Zephyr. See the user guide,
+   * {@code docs/guide/07-sending.md}, section "Fees and priorities".
+   *
+   * @param priority is the priority, null for the default
+   * @return this configuration for chaining
+   */
   public ZephyrTxConfig setPriority(ZephyrTxPriority priority) {
     this.priority = priority;
     return this;
   }
   
+  /**
+   * Returns the fee set on this configuration, see {@link #setFee(BigInteger)}.
+   *
+   * @return the fee, null if none
+   */
   public BigInteger getFee() {
     return fee;
   }
   
+  /**
+   * Sets a fee. {@code ZephyrWalletFull} does not use it: the core never reads it and computes the
+   * fee itself (read in the core's code). The fee of a built transaction is its {@code getFee()}.
+   *
+   * @param fee is the fee in atomic units
+   * @return this configuration for chaining
+   */
   public ZephyrTxConfig setFee(BigInteger fee) {
     this.fee = fee;
     return this;
   }
   
+  /**
+   * Returns the index of the account to send from.
+   *
+   * @return the account index, null if not set
+   */
   public Integer getAccountIndex() {
     return accountIndex;
   }
   
+  /**
+   * Sets the index of the account to send from. {@code createTxs} requires it ("Must specify
+   * account index to send from"). {@code sweepUnlocked} without it sweeps every account that has an
+   * unlocked balance in the source asset, so always set it. See the user guide,
+   * {@code docs/guide/07-sending.md}, section "Sweeping".
+   *
+   * @param accountIndex is the account index
+   * @return this configuration for chaining
+   */
   public ZephyrTxConfig setAccountIndex(Integer accountIndex) {
     this.accountIndex = accountIndex;
     return this;
   }
   
+  /**
+   * Returns the subaddresses of the account to spend from.
+   *
+   * @return the subaddress indices, null to let the core choose within the whole account
+   */
   public List<Integer> getSubaddressIndices() {
     return subaddressIndices;
   }
   
+  /**
+   * Sets one subaddress of the account to spend from, as a list of one.
+   *
+   * @param subaddressIndex is the subaddress index
+   * @return this configuration for chaining
+   */
   public ZephyrTxConfig setSubaddressIndex(int subaddressIndex) {
     setSubaddressIndices(subaddressIndex);
     return this;
   }
   
+  /**
+   * Sets the subaddresses of the account to spend from.
+   *
+   * @param subaddressIndices are the subaddress indices, null to let the core choose within the
+   * whole account
+   * @return this configuration for chaining
+   */
   @JsonProperty("subaddressIndices")
   public ZephyrTxConfig setSubaddressIndices(List<Integer> subaddressIndices) {
     this.subaddressIndices = subaddressIndices;
     return this;
   }
   
+  /**
+   * Sets the subaddresses of the account to spend from, as {@link #setSubaddressIndices(List)}
+   * does.
+   *
+   * @param subaddressIndices are the subaddress indices
+   * @return this configuration for chaining
+   */
   public ZephyrTxConfig setSubaddressIndices(Integer... subaddressIndices) {
     this.subaddressIndices = GenUtils.arrayToList(subaddressIndices);
     return this;
@@ -226,64 +350,155 @@ public class ZephyrTxConfig {
     return this;
   }
 
+  /**
+   * Returns whether the core may split the send into several transactions.
+   *
+   * @return the setting, null if not set (splitting allowed)
+   */
   public Boolean getCanSplit() {
     return canSplit;
   }
   
+  /**
+   * Sets whether the core may split the send into several transactions. With false,
+   * {@code createTxs} throws when one transaction is not enough; {@code createTx} sets false
+   * itself. Null allows splitting. This setting is inherited from monero-java; not tested against
+   * Zephyr.
+   *
+   * @param canSplit is false to forbid splitting
+   * @return this configuration for chaining
+   */
   public ZephyrTxConfig setCanSplit(Boolean canSplit) {
     this.canSplit = canSplit;
     return this;
   }
   
+  /**
+   * Returns whether the transactions are relayed when they are built.
+   *
+   * @return the setting, null if not set (not relayed)
+   */
   public Boolean getRelay() {
     return relay;
   }
   
+  /**
+   * Sets whether {@code createTxs} and the sweeps relay the transactions right away. Null or false
+   * builds them without relaying, so the app can show the fee and then call {@code relayTxs}; true
+   * builds and relays in one call, without a review. See the user guide,
+   * {@code docs/guide/07-sending.md}, section "Create, then relay".
+   *
+   * @param relay is true to relay at once
+   * @return this configuration for chaining
+   */
   public ZephyrTxConfig setRelay(Boolean relay) {
     this.relay = relay;
     return this;
   }
   
+  /**
+   * Returns the note of a payment URI, see {@link #setNote(String)}.
+   *
+   * @return the note, null if none
+   */
   public String getNote() {
     return note;
   }
   
+  /**
+   * Sets the note of a payment URI ({@code getPaymentUri}; {@code parsePaymentUri} reads it back).
+   * {@code createTxs} does not store it as a transaction note: the core reads it only for payment
+   * URIs (read in the core's code). Use {@code setTxNote} after the send.
+   *
+   * @param note is the note
+   * @return this configuration for chaining
+   */
   public ZephyrTxConfig setNote(String note) {
     this.note = note;
     return this;
   }
   
+  /**
+   * Returns the recipient name of a payment URI.
+   *
+   * @return the recipient name, null if none
+   */
   public String getRecipientName() {
     return recipientName;
   }
   
+  /**
+   * Sets the recipient name of a payment URI ({@code getPaymentUri}; {@code parsePaymentUri} reads
+   * it back). The core does not use it when sending (read in the core's code).
+   *
+   * @param recipientName is the recipient name
+   * @return this configuration for chaining
+   */
   public ZephyrTxConfig setRecipientName(String recipientName) {
     this.recipientName = recipientName;
     return this;
   }
   
+  /**
+   * Returns the bound of a sweep, see {@link #setBelowAmount(BigInteger)}.
+   *
+   * @return the bound, null for none
+   */
   public BigInteger getBelowAmount() {
     return belowAmount;
   }
   
+  /**
+   * Sets a bound for {@code sweepUnlocked}: only unlocked outputs with an amount strictly below it
+   * are swept (read in the core's code).
+   *
+   * @param belowAmount is the bound in atomic units of the source asset, null or 0 for no bound
+   * @return this configuration for chaining
+   */
   public ZephyrTxConfig setBelowAmount(BigInteger belowAmount) {
     this.belowAmount = belowAmount;
     return this;
   }
   
+  /**
+   * Returns the sweep-each-subaddress setting, see {@link #setSweepEachSubaddress(Boolean)}.
+   *
+   * @return the setting, null if not set
+   */
   public Boolean getSweepEachSubaddress() {
     return sweepEachSubaddress;
   }
   
+  /**
+   * Sets whether {@code sweepUnlocked} sweeps each subaddress in transactions of its own.
+   * {@code ZephyrWalletFull} ignores it: the core sets it to false before it sweeps (read in the
+   * core's code).
+   *
+   * @param sweepEachSubaddress is true to sweep each subaddress on its own
+   * @return this configuration for chaining
+   */
   public ZephyrTxConfig setSweepEachSubaddress(Boolean sweepEachSubaddress) {
     this.sweepEachSubaddress = sweepEachSubaddress;
     return this;
   }
   
+  /**
+   * Returns the key image of the output to sweep, see {@link #setKeyImage(String)}.
+   *
+   * @return the key image, null if none
+   */
   public String getKeyImage() {
     return keyImage;
   }
   
+  /**
+   * Sets the key image of the output that {@code sweepOutput} sweeps; {@code sweepUnlocked} refuses
+   * it. {@code sweepOutput} validates with {@code ZEPH} and is most likely unusable on mainnet. See
+   * the user guide, {@code docs/guide/07-sending.md}, section "Sweeping".
+   *
+   * @param keyImage is the key image as hex
+   * @return this configuration for chaining
+   */
   public ZephyrTxConfig setKeyImage(String keyImage) {
     this.keyImage = keyImage;
     return this;

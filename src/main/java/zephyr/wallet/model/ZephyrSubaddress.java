@@ -20,50 +20,111 @@ public class ZephyrSubaddress {
   private Boolean isUsed;
   private Long numBlocksToUnlock;
   
+  /**
+   * Creates an empty subaddress model.
+   */
   public ZephyrSubaddress() {
     // nothing to construct
   }
   
+  /**
+   * Creates a subaddress model with only its address.
+   *
+   * @param address is the address
+   */
   public ZephyrSubaddress(String address) {
     this.address = address;
   }
   
+  /**
+   * Creates a subaddress model with only its account index and index.
+   *
+   * @param accountIndex is the index of the account
+   * @param index is the index of the subaddress within the account
+   */
   public ZephyrSubaddress(int accountIndex, int index) {
     this.accountIndex = accountIndex;
     this.index = index;
   }
   
+  /**
+   * Returns the index of the account the subaddress belongs to.
+   *
+   * @return the account index
+   */
   public Integer getAccountIndex() {
     return accountIndex;
   }
   
+  /**
+   * Sets the index of the account the subaddress belongs to.
+   *
+   * @param accountIndex is the account index
+   * @return this subaddress for chaining
+   */
   public ZephyrSubaddress setAccountIndex(Integer accountIndex) {
     this.accountIndex = accountIndex;
     return this;
   }
   
+  /**
+   * Returns the index of the subaddress within its account; index 0 is the account's primary
+   * address.
+   *
+   * @return the subaddress index
+   */
   public Integer getIndex() {
     return index;
   }
   
+  /**
+   * Sets the index of the subaddress within its account.
+   *
+   * @param index is the subaddress index
+   * @return this subaddress for chaining
+   */
   public ZephyrSubaddress setIndex(Integer index) {
     this.index = index;
     return this;
   }
   
+  /**
+   * Returns the address of the subaddress.
+   *
+   * @return the address
+   */
   public String getAddress() {
     return address;
   }
   
+  /**
+   * Sets the address of the subaddress.
+   *
+   * @param address is the address
+   * @return this subaddress for chaining
+   */
   public ZephyrSubaddress setAddress(String address) {
     this.address = address;
     return this;
   }
   
+  /**
+   * Returns the label of the subaddress. A label is text from the wallet file: show it as plain
+   * text. See the user guide, {@code docs/guide/05-assets-and-balances.md}, section "Accounts and
+   * subaddresses".
+   *
+   * @return the label, null if it is empty
+   */
   public String getLabel() {
     return label;
   }
   
+  /**
+   * Sets the label of this subaddress object; {@code setSubaddressLabel} changes it in the wallet.
+   *
+   * @param label is the label
+   * @return this subaddress for chaining
+   */
   public ZephyrSubaddress setLabel(String label) {
     this.label = label;
     return this;
@@ -110,29 +171,66 @@ public class ZephyrSubaddress {
     return this;
   }
   
+  /**
+   * Returns the number of the wallet's unspent outputs received at this subaddress, all assets
+   * together. A view-only wallet does not see its spends and counts spent outputs too.
+   *
+   * @return the number of unspent outputs
+   */
   public Long getNumUnspentOutputs() {
     return numUnspentOutputs;
   }
   
+  /**
+   * Sets the number of unspent outputs.
+   *
+   * @param numUnspentOutputs is the number of unspent outputs
+   * @return this subaddress for chaining
+   */
   public ZephyrSubaddress setNumUnspentOutputs(Long numUnspentOutputs) {
     this.numUnspentOutputs = numUnspentOutputs;
     return this;
   }
   
+  /**
+   * Returns whether the wallet has ever received an output at this subaddress.
+   *
+   * @return true if used
+   */
   @JsonProperty("isUsed")
   public Boolean isUsed() {
     return isUsed;
   }
   
+  /**
+   * Sets whether the subaddress has received an output.
+   *
+   * @param isUsed is true if used
+   * @return this subaddress for chaining
+   */
   public ZephyrSubaddress setIsUsed(Boolean isUsed) {
     this.isUsed = isUsed;
     return this;
   }
 
+  /**
+   * Returns the number of blocks until the locked funds of the subaddress unlock.
+   * {@code ZephyrWalletFull} always reports 0, whatever is locked: the core does not compute it
+   * (read in the core's code). Compare {@link #getBalance()} with {@link #getUnlockedBalance()}
+   * instead.
+   *
+   * @return the number of blocks, 0 from {@code ZephyrWalletFull}
+   */
   public Long getNumBlocksToUnlock() {
     return numBlocksToUnlock;
   }
 
+  /**
+   * Sets the number of blocks until the locked funds unlock.
+   *
+   * @param numBlocksToUnlock is the number of blocks
+   * @return this subaddress for chaining
+   */
   public ZephyrSubaddress setNumBlocksToUnlock(Long numBlocksToUnlock) {
     this.numBlocksToUnlock = numBlocksToUnlock;
     return this;
@@ -142,6 +240,12 @@ public class ZephyrSubaddress {
     return toString(0);
   }
   
+  /**
+   * Returns the fields of this subaddress that are set, one per line, indented.
+   *
+   * @param indent is the indentation in levels of two spaces
+   * @return the description
+   */
   public String toString(int indent) {
     StringBuilder sb = new StringBuilder();
     sb.append(GenUtils.kvLine("Account index", this.getAccountIndex(), indent));
