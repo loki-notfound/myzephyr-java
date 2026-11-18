@@ -76,7 +76,7 @@
 <table>
 <thead><tr><th scope="col">Limitation</th><th scope="col">Status</th><th scope="col">Details</th></tr></thead>
 <tbody>
-<tr><td><code>checkTxKey</code> and <code>checkTxProof</code> return amount 0 for every current transaction</td><td>core, open; confirmed on mainnet on 2026-11-07</td><td><a href="06-history.html#checktxkey-returns-amount-0">checkTxKey returns amount 0</a></td></tr>
+<tr><td><code>checkTxKey</code> and <code>checkTxProof</code> return amount 0 for every current transaction, and <code>checkTxKey</code> reports <code>good</code> whenever it does not throw: it cannot confirm a payment</td><td>core, open; the amount confirmed on mainnet on 2026-11-07, <code>good</code> read in the code</td><td><a href="06-history.html#checktxkey-returns-amount-0">checkTxKey returns amount 0</a></td></tr>
 <tr><td><code>getOutputs()</code> reports no asset</td><td>core, open; <code>getOutputAssetType</code> from <code>java.2</code> takes it from the transaction</td><td><a href="06-history.html#getoutputs-reports-no-asset">getOutputs() reports no asset</a></td></tr>
 <tr><td><code>getOutputAssetType</code> reads a split conversion to one's own account as the source asset</td><td>core, open</td><td><a href="06-history.html#getoutputs-reports-no-asset">getOutputs() reports no asset</a></td></tr>
 <tr><td>the asset of an output notification in the pool is empty</td><td>core, stays; observed on mainnet on 2026-11-07</td><td><a href="04-threads-and-listeners.html#outputs-in-the-pool-carry-no-asset">Outputs in the pool carry no asset</a></td></tr>
@@ -156,7 +156,7 @@
 </main>
 <footer class="lt-footer">
 <div class="lt-wrap lt-wrap-wide">
-<p>Guide for zephyr-java 2.3.0-sec.2-java.4, built from commit <code>e59843ad</code> (2026-11-17 UTC).</p>
+<p>Guide for zephyr-java 2.3.0-sec.2-java.4, built from commit <code>7b926ce9</code> (2026-11-18 UTC).</p>
 <p>zephyr-java and this site are a <a href="https://lateo.dev/">lateo</a> project by an independent operator, not affiliated with or endorsed by ZephyrProtocol. Source: <a href="https://github.com/loki-notfound/myzephyr-java">github.com/loki-notfound/myzephyr-java</a>.</p>
 <p>The library and the guide are under the MIT licence of the repository; the stylesheet is BSD 3-Clause; the lateo name, mark and favicons are not covered by either and all rights in them are reserved by their owner (<a href="../assets/NOTICE.txt">notice</a>).</p>
 </div>

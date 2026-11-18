@@ -130,7 +130,7 @@ List&lt;ZephyrTxWallet&gt; txs = wallet.getTxs(hashes, missing);  // getTxs(hash
 <ul><li>The <strong>outgoing transfer's</strong> amount is the source amount (50 ZPH), in the source asset.</li><li>The outgoing <strong>destination</strong> shows the <strong>destination amount</strong> in the destination currency (52.60432 ZRS). On the transaction that <code>createTxs</code> returned, the same destination still shows the source amount (50 ZPH). Code that compares the two must expect that.</li><li>An <strong>incoming transfer</strong> in the destination currency carries the minted amount, with account and subaddress set once confirmed.</li></ul>
 <p>The converted funds unlock like received funds, 10 blocks after the conversion is mined (<a href="05-assets-and-balances.html#locked-and-unlocked">Locked and unlocked</a>).</p>
 <h2 id="notes-and-transaction-keys">Notes and transaction keys<a class="heading-anchor" href="#notes-and-transaction-keys" aria-label="Link to this section">#</a></h2>
-<p><code>setTxNote(hash, note)</code> stores a note for a transaction; <code>getTxNote(hash)</code> and <code>getTxNotes(hashes)</code> read notes back. <code>getTxKey(hash)</code> returns the secret key of a transaction the wallet sent; the receiver checks a payment with it (<a href="#checktxkey-returns-amount-0">checkTxKey returns amount 0</a>).</p>
+<p><code>setTxNote(hash, note)</code> stores a note for a transaction; <code>getTxNote(hash)</code> and <code>getTxNotes(hashes)</code> read notes back. <code>getTxKey(hash)</code> returns the secret key of a transaction the wallet sent. In monero-java the receiver checks a payment with it; in zephyr-java that check shows nothing (<a href="#checktxkey-returns-amount-0">checkTxKey returns amount 0</a>).</p>
 <div class="lt-code-block">
 <div class="lt-code-head"><span>Java, compiled</span></div>
 <pre><code>wallet.setTxNote(txHash, &quot;rent, November&quot;);
@@ -140,24 +140,27 @@ String txKey = wallet.getTxKey(txHash);  // the secret key of a transaction this
 <p>Notes and transaction keys exist only in the wallet's cache. Save the wallet after a send and after a note (<a href="02-wallets.html#when-to-save">When to save</a>); a wallet restored from its mnemonic has neither.</p>
 <h2 id="checktxkey-returns-amount-0">checkTxKey returns amount 0<a class="heading-anchor" href="#checktxkey-returns-amount-0" aria-label="Link to this section">#</a></h2>
 <p><strong>What you see.</strong> In the full wallet (<code>ZephyrWalletFull</code>), <code>checkTxKey</code> and <code>checkTxProof</code> return <code>receivedAmount = 0</code> for every current transaction. On mainnet on 2026-11-07, <code>checkTxKey</code> on a confirmed 10 ZPH transfer returned <code>good = true</code>, the right number of confirmations and amount 0.</p>
-<p><strong>Why.</strong> The core reads the received amount of the asset <code>ZEPH</code> only, from a map that holds the amount per asset. Since hard fork 11 (height 536,000) no new output can be <code>ZEPH</code>, so the entry is always empty.</p>
-<p><strong>Workaround.</strong> Trust the check for <code>isGood()</code> and the confirmations, and read the amount from the wallet's own history, where every transfer carries its asset. The receiver checks the key it got from the sender and sums, per asset, the incoming transfers to the checked address. A transaction can pay several addresses of the same wallet, so the filter on the address matters:</p>
+<div class="lt-callout lt-callout-danger" role="note">
+<p class="lt-callout-title">Do not accept a payment because <code>checkTxKey</code> returned.</p>
+<p>In the full wallet its <code>isGood()</code> is true whenever the call does not throw, also when the transaction pays nothing to the address (read in the core's code, not run). With the amount always 0, the result does not show that a payment was made, or how much.</p>
+</div>
+<p><strong>Why.</strong> The core reads the received amount of the asset <code>ZEPH</code> only, from a map that holds the amount per asset. Since hard fork 11 (height 536,000) no new output can be <code>ZEPH</code>, so the entry is always empty. The core also sets <code>good</code> to true before it looks at the outputs, and its key check does not fail when no output of the transaction belongs to the address. A key of valid form that does not belong to the transaction therefore gives <code>good = true</code> as well. This is read in the core's code; it was not run.</p>
+<p><code>checkTxProof</code> differs in one point: there <code>isGood()</code> is the result of the signature check (read in the code, not run). Its amount is 0 for the same reason.</p>
+<p><strong>Workaround.</strong> The receiver does not need the key: its own wallet knows what it received. Read the transaction from the wallet's history, where every transfer carries its asset, and sum, per asset, the incoming transfers to the address. A transaction can pay several addresses of the same wallet, so the filter on the address matters. An empty result means the transaction paid nothing to that address:</p>
 <div class="lt-code-block">
 <div class="lt-code-head"><span>Java, compiled</span></div>
-<pre><code>static Map&lt;String, BigInteger&gt; receivedPerAsset(ZephyrWallet wallet, String txHash, String txKey, String address, long minConfirmations) {
-  ZephyrCheckTx check = wallet.checkTxKey(txHash, txKey, address);
-  if (!check.isGood()) throw new IllegalStateException(&quot;the transaction does not pay &quot; + address);
-  if (check.getNumConfirmations() &lt; minConfirmations) throw new IllegalStateException(&quot;only &quot; + check.getNumConfirmations() + &quot; confirmations&quot;);
-  // check.getReceivedAmount() is 0 for every current transaction: do not use it
+<pre><code>static Map&lt;String, BigInteger&gt; receivedPerAsset(ZephyrWallet wallet, String txHash, String address, long minConfirmations) {
   Map&lt;String, BigInteger&gt; received = new HashMap&lt;&gt;();
-  for (ZephyrTxWallet tx : wallet.getTxs(txHash)) {
+  for (ZephyrTxWallet tx : wallet.getTxs(txHash)) {  // throws when the wallet does not know the transaction
+    Long confirmations = tx.getNumConfirmations();
+    if (confirmations == null || confirmations &lt; minConfirmations) throw new IllegalStateException(&quot;only &quot; + confirmations + &quot; confirmations&quot;);
     if (tx.getIncomingTransfers() == null) continue;
     for (ZephyrIncomingTransfer transfer : tx.getIncomingTransfers()) {
       if (!address.equals(transfer.getAddress())) continue;  // only what this address received
       received.merge(transfer.getAssetType(), transfer.getAmount(), BigInteger::add);
     }
   }
-  return received;
+  return received;  // empty: the transaction paid nothing to this address
 }</code></pre>
 </div>
 <p>The sender has the amount in the destinations of its outgoing transfer:</p>
@@ -176,7 +179,7 @@ String txKey = wallet.getTxKey(txHash);  // the secret key of a transaction this
 }</code></pre>
 </div>
 <p><code>getTxs(hash)</code> throws when the transaction is not in the wallet, so the receiver's wallet must be synced past it. The destinations are local data of the sending wallet: a wallet restored from its mnemonic does not have them. For a conversion, the destination shows the destination amount only once the transaction is confirmed (<a href="#conversions-in-the-history">Conversions in the history</a>).</p>
-<p><strong>Not possible.</strong> A third party without the receiving or sending wallet cannot learn the amount from the key or the proof. It learns that the transaction paid the address and how many confirmations it has. <em>Status:</em> core behaviour, confirmed on mainnet on 2026-11-07; <code>checkTxProof</code> uses the same code (read in the code, not tested). A core fix would read the destination asset's entry; it is not a security fix, so the backports leave it. Through <code>ZephyrWalletRpc</code> the amount comes back <code>null</code> for a different reason (<a href="11-the-rpc-classes.html#zephyrwalletrpc">ZephyrWalletRpc</a>).</p>
+<p><strong>Not possible.</strong> A third party without the receiving or sending wallet cannot check a payment with the transaction key: <code>checkTxKey</code> shows neither that the transaction paid the address nor the amount. With a proof (<code>checkTxProof</code>) it gets the signature check and the confirmations, not the amount. <em>Status:</em> core behaviour, confirmed on mainnet on 2026-11-07; <code>checkTxProof</code> uses the same code (read in the code, not tested). A core fix would read the destination asset's entry; it is not a security fix, so the backports leave it. Through <code>ZephyrWalletRpc</code> the amount comes back <code>null</code> for a different reason (<a href="11-the-rpc-classes.html#zephyrwalletrpc">ZephyrWalletRpc</a>).</p>
 <h2 id="getoutputs-reports-no-asset">getOutputs() reports no asset<a class="heading-anchor" href="#getoutputs-reports-no-asset" aria-label="Link to this section">#</a></h2>
 <p><strong>What you see.</strong> In the full wallet, every <code>ZephyrOutputWallet</code> that <code>getOutputs()</code> returns has <code>getAssetType() == null</code>. On mainnet on 2026-11-08, all five outputs of a test wallet that had held ZPH and ZRS came back without an asset.</p>
 <p><strong>Why.</strong> The core keeps an output's asset but does not serialize it in the output query. Balances, transfers and the listener's confirmed-output callbacks carry the asset; only the output query lacks it.</p>
@@ -205,7 +208,7 @@ String txKey = wallet.getTxKey(txHash);  // the secret key of a transaction this
 </main>
 <footer class="lt-footer">
 <div class="lt-wrap lt-wrap-wide">
-<p>Guide for zephyr-java 2.3.0-sec.2-java.4, built from commit <code>e59843ad</code> (2026-11-17 UTC).</p>
+<p>Guide for zephyr-java 2.3.0-sec.2-java.4, built from commit <code>7b926ce9</code> (2026-11-18 UTC).</p>
 <p>zephyr-java and this site are a <a href="https://lateo.dev/">lateo</a> project by an independent operator, not affiliated with or endorsed by ZephyrProtocol. Source: <a href="https://github.com/loki-notfound/myzephyr-java">github.com/loki-notfound/myzephyr-java</a>.</p>
 <p>The library and the guide are under the MIT licence of the repository; the stylesheet is BSD 3-Clause; the lateo name, mark and favicons are not covered by either and all rights in them are reserved by their owner (<a href="../assets/NOTICE.txt">notice</a>).</p>
 </div>
