@@ -168,11 +168,17 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *jvm, void *reserved) {
 //  class_ArrayList = static_cast<jclass>(env->NewGlobalRef(env->FindClass("java/util/ArrayList")));
 //  class_TransactionInfo = static_cast<jclass>(env->NewGlobalRef(env->FindClass("com/m2049r/xmrwallet/model/TransactionInfo")));
 //  class_Transfer = static_cast<jclass>(env->NewGlobalRef(env->FindClass("com/m2049r/xmrwallet/model/Transfer")));
-  class_WalletListener = static_cast<jclass>(env->NewGlobalRef(env->FindClass("zephyr/wallet/ZephyrWalletFull$WalletJniListener")));
+  // each lookup is checked before the next JNI call: with NoClassDefFoundError pending, the library does not load
+  jclass wallet_listener = env->FindClass("zephyr/wallet/ZephyrWalletFull$WalletJniListener");
+  if (env->ExceptionCheck() || wallet_listener == nullptr) return JNI_ERR;
+  class_WalletListener = static_cast<jclass>(env->NewGlobalRef(wallet_listener));
+  env->DeleteLocalRef(wallet_listener);
+  if (class_WalletListener == nullptr) return JNI_ERR;
   jclass zephyr_error = env->FindClass("zephyr/common/ZephyrError");
-  if (env->ExceptionCheck() || zephyr_error == nullptr) return JNI_ERR; // NoClassDefFoundError pending: the library does not load
+  if (env->ExceptionCheck() || zephyr_error == nullptr) return JNI_ERR;
   class_ZephyrError = static_cast<jclass>(env->NewGlobalRef(zephyr_error));
   env->DeleteLocalRef(zephyr_error);
+  if (class_ZephyrError == nullptr) return JNI_ERR;
 //  class_Ledger = static_cast<jclass>(env->NewGlobalRef(env->FindClass("com/m2049r/xmrwallet/ledger/Ledger")));
   return JNI_VERSION_1_6;
 }

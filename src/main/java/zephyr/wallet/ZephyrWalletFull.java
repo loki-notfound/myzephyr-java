@@ -96,10 +96,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   private static final long DEFAULT_SYNC_PERIOD_IN_MS = 10000; // default period betweeen syncs in ms
   
   // instance variables
-  private long jniWalletHandle;                 // memory address of the wallet in c++; this variable is read directly by name in c++
-  private long jniListenerHandle;               // memory address of the wallet listener in c++; this variable is read directly by name in c++
+  private long jniWalletHandle;                 // memory address of the wallet in c++; read and written by name in c++ (kept by the R8 consumer rules)
+  private long jniListenerHandle;               // memory address of the wallet listener in c++; set by name in c++ only (kept by the R8 consumer rules)
   private WalletJniListener jniListener;        // receives notifications from jni c++
-  private String password;
+  private volatile String password;             // written by changePassword(), read by other calls on other threads
   private volatile boolean isClosed;            // whether or not wallet is closed; read by the callbacks on the core's threads
   private boolean isFreed;                      // whether the native wallet is freed; guarded by closeLock
   private final ReentrantReadWriteLock callLock = new ReentrantReadWriteLock(); // native calls hold the read side, close() the write side
@@ -2595,9 +2595,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
    * set, a thread-local flag, a volatile closed flag).
    *
    * <p>Nothing escapes to the native caller: a listener's Throwable is caught and logged at
-   * WARNING (with the listener's class and the callback's name, not the callback's data), and the
-   * other listeners are still called; callback data that cannot be read is logged and dropped the
-   * same way. Once the wallet is closed (or closing), every callback returns at once.</p>
+   * WARNING (with the listener's class and the callback's name, not the callback's data; at FINE
+   * for the "Wallet is closed" of a listener that calls the wallet while it closes), and the other
+   * listeners are still called; callback data that cannot be read is logged and dropped the same
+   * way. Once the wallet is closed (or closing), every callback returns at once.</p>
    */
   @SuppressWarnings("unused") // called directly from jni c++
   private class WalletJniListener {
@@ -2632,7 +2633,9 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
         try {
           call.accept(listener);
         } catch (Throwable t) {
-          LOGGER.log(Level.WARNING, "Wallet listener " + listener.getClass().getName() + " threw from " + callback + "; ignored", t);
+          // a listener that calls the wallet while close() runs gets "Wallet is closed": expected then
+          Level level = isClosed && t instanceof ZephyrError ? Level.FINE : Level.WARNING;
+          LOGGER.log(level, "Wallet listener " + listener.getClass().getName() + " threw from " + callback + "; ignored", t);
         }
       }
     }

@@ -10,9 +10,20 @@
 # and calls onSyncProgress, onNewBlock, onBalancesChanged, onOutputReceived and onOutputSpent by
 # name and signature (GetMethodID). It also looks up zephyr.common.ZephyrError by name (FindClass
 # in JNI_OnLoad) and throws it with its String constructor; the zephyr.common rule below keeps
-# both. The bridge's other lookups are java.* classes only; its com/m2049r lookups are commented
-# out.
+# both. The bridge's other class lookups are java.* classes only; its com/m2049r lookups are
+# commented out. Its field lookups follow below.
 -keep class zephyr.wallet.ZephyrWalletFull$WalletJniListener { *; }
+
+# The bridge also reads and writes two private fields of the wallet by name (GetFieldID
+# "jniWalletHandle" and "jniListenerHandle", type long): the native addresses of the wallet and of
+# its listener. Java reads neither (the listener's is written by the bridge alone), so without this
+# rule R8 could rename or remove them, and the first native call would fail with NoSuchFieldError.
+# A -keepclassmembers rule without allow modifiers keeps both, under these names, whenever the
+# class is kept.
+-keepclassmembers class zephyr.wallet.ZephyrWalletFull {
+    private long jniWalletHandle;
+    private long jniListenerHandle;
+}
 
 # Jackson maps the native JSON to these classes by reflection: constructors, setters, getters
 # and field names must survive.
