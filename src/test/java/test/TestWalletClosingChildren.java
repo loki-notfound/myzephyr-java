@@ -280,6 +280,20 @@ public class TestWalletClosingChildren {
     run("h2-" + repetition.getCurrentRepetition(), true, "h2").check();
   }
 
+  /** H3: calls from inside a callback of a foreground sync(): sync() and relaying calls refused, reads work. */
+  @Test
+  public void callsFromACallbackOfForegroundSync() throws Exception {
+    assumeNodeAndWallet();
+    run("h3-fg", true, "h3", "fg").check();
+  }
+
+  /** H3 with the callback of background syncing. */
+  @Test
+  public void callsFromACallbackOfBackgroundSync() throws Exception {
+    assumeNodeAndWallet();
+    run("h3-bg", true, "h3", "bg").check();
+  }
+
   /**
    * T4: main returns while background syncing runs and the wallet is still open: exit status 0, no
    * crash report. Twenty runs. Known to fail: while the core's sync thread is inside a refresh, the

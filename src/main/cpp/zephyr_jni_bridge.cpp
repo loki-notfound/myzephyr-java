@@ -247,18 +247,24 @@ jmethodID callback_method(JNIEnv* env, const char* name, const char* signature) 
  * Listens for wallet notifications and notifies the listener in Java. Created once per wallet,
  * when its first Java listener is added, and deleted by closeJni after the core, which can then
  * no longer call it.
+ *
+ * No lock is held across the call into Java. jlistener is set by the constructor and cleared by
+ * the destructor only, and the destructor runs only when no callback can run: closeJni deletes
+ * this listener after the core has joined its sync thread and released its notification pool,
+ * while close() holds the call lock's write side, so no Java thread is inside a call that could
+ * deliver a notification either. A callback may therefore call the wallet, and with it the core,
+ * again on its own thread. Callbacks of different threads (the core's sync thread and a thread
+ * that relays) can overlap; the Java side is safe for that.
  */
 struct wallet_jni_listener : public monero_wallet_listener {
 
   jobject jlistener;
-  std::mutex _listenerMutex;
 
   wallet_jni_listener(JNIEnv* env, jobject listener) {
     jlistener = env->NewGlobalRef(listener);
   }
 
   ~wallet_jni_listener() {
-    std::lock_guard<std::mutex> lock(_listenerMutex);
     JNIEnv* env;
     int envStat = attachJVM(&env); // a JNIEnv is valid only on its own thread: use the current one's
     if (envStat == JNI_ERR) return;
@@ -268,7 +274,6 @@ struct wallet_jni_listener : public monero_wallet_listener {
   };
 
   void on_sync_progress(uint64_t height, uint64_t start_height, uint64_t end_height, double percent_done, const string& message) override {
-    std::lock_guard<std::mutex> lock(_listenerMutex);
     if (jlistener == nullptr) return;
     JNIEnv *env;
     int envStat = attachJVM(&env);
@@ -283,7 +288,6 @@ struct wallet_jni_listener : public monero_wallet_listener {
   }
 
   void on_new_block(uint64_t height) override {
-    std::lock_guard<std::mutex> lock(_listenerMutex);
     if (jlistener == nullptr) return;
     JNIEnv *env;
     int envStat = attachJVM(&env);
@@ -296,7 +300,6 @@ struct wallet_jni_listener : public monero_wallet_listener {
   }
 
   void on_balances_changed(uint64_t new_balance, uint64_t new_unlocked_balance, const std::string& asset_type) override {
-    std::lock_guard<std::mutex> lock(_listenerMutex);
     if (jlistener == nullptr) return;
     JNIEnv *env;
     int envStat = attachJVM(&env);
@@ -313,7 +316,6 @@ struct wallet_jni_listener : public monero_wallet_listener {
   }
 
   void on_output_received(const monero_output_wallet& output) override {
-    std::lock_guard<std::mutex> lock(_listenerMutex);
     if (jlistener == nullptr) return;
     JNIEnv *env;
     int envStat = attachJVM(&env);
@@ -335,7 +337,6 @@ struct wallet_jni_listener : public monero_wallet_listener {
   }
 
   void on_output_spent(const monero_output_wallet& output) override {
-    std::lock_guard<std::mutex> lock(_listenerMutex);
     if (jlistener == nullptr) return;
     JNIEnv *env;
     int envStat = attachJVM(&env);

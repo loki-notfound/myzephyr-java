@@ -49,6 +49,8 @@ public class ClosingChild {
   static final long H1_LIMIT_MS = 3000;
   /** H2: how long before close(true) returns the wallet file may have been written. */
   static final long H2_GAP_LIMIT_MS = 500;
+  /** H3: how long a call from inside a callback may take before the thread counts as stuck. */
+  static final long STUCK_MS = 30000;
 
   private static void log(String message) {
     System.out.println(String.format("[%8.3f s] [%s] %s", (System.currentTimeMillis() - T0) / 1000.0, Thread.currentThread().getName(), message));
@@ -58,6 +60,17 @@ public class ClosingChild {
   private static void fail(String reason) {
     log("FAIL " + reason);
     System.exit(2);
+  }
+
+  /** For a thread that is stuck: its stack and every other thread's, then the process ends at once. */
+  private static void failStuck(String reason) {
+    log("FAIL " + reason);
+    for (java.util.Map.Entry<Thread, StackTraceElement[]> entry : Thread.getAllStackTraces().entrySet()) {
+      StringBuilder trace = new StringBuilder("stack of '" + entry.getKey().getName() + "' (" + entry.getKey().getState() + "):");
+      for (StackTraceElement element : entry.getValue()) trace.append("\n    at ").append(element);
+      log(trace.toString());
+    }
+    Runtime.getRuntime().halt(2);
   }
 
   public static void main(String[] args) throws Exception {
@@ -71,6 +84,7 @@ public class ClosingChild {
       case "silent": silent(); break;
       case "h1": h1(args[1], args[2], args[3]); break;
       case "h2": h2(args[1]); break;
+      case "h3": h3(args[1], args[2]); break;
       case "exitopen": exitOpen(args[1]); break;
       default: fail("unknown scenario " + args[0]);
     }
@@ -431,6 +445,79 @@ public class ClosingChild {
     log("reopened offline: height " + height + ", restore height " + restoreHeight);
     if (height <= restoreHeight) fail("the saved wallet holds no scanned block: height " + height);
     assertCallbackThreadsEnded(listener.threads);
+  }
+
+  private interface Call {
+    String run() throws Exception;
+  }
+
+  /** One wallet call from inside a callback: its result, or the Throwable it ended with. */
+  private static String attempt(String name, Call call) {
+    try {
+      return name + ": " + call.run();
+    } catch (Throwable t) {
+      return name + ": " + t.getClass().getSimpleName() + ": " + t.getMessage();
+    }
+  }
+
+  /**
+   * H3: wallet calls from inside a callback of a running sync ("fg": the caller's sync(); "bg":
+   * startSyncing()). sync(), scanTxs() and rescanBlockchain() would lock the core's sync mutex,
+   * which the refresh that delivers the callback holds, and the thread would wait for itself; these
+   * and every relaying call are refused with ZephyrError, before anything is built. Reads work. A
+   * call that has not returned after 30 s counts as stuck: the stacks of all threads are printed
+   * and the process ends.
+   */
+  private static void h3(String path, String mode) throws Exception {
+    ZephyrWalletFull wallet = open(path);
+    List<String> outcomes = new CopyOnWriteArrayList<String>();
+    AtomicBoolean entered = new AtomicBoolean();
+    CountDownLatch inCallback = new CountDownLatch(1);
+    CountDownLatch done = new CountDownLatch(1);
+    Set<Thread> callbackThreads = ConcurrentHashMap.newKeySet();
+    String unknownHash = String.join("", java.util.Collections.nCopies(64, "0"));
+    wallet.addListener(new ZephyrWalletListener() {
+      @Override public void onSyncProgress(long height, long startHeight, long endHeight, double percentDone, String message) {
+        callbackThreads.add(Thread.currentThread());
+        if (!entered.compareAndSet(false, true)) return;
+        log("in the first onSyncProgress on thread '" + Thread.currentThread().getName() + "'");
+        inCallback.countDown();
+        outcomes.add(attempt("getHeight()", () -> "height " + wallet.getHeight()));
+        outcomes.add(attempt("sync()", () -> "returned blocks fetched " + wallet.sync().getNumBlocksFetched()));
+        outcomes.add(attempt("scanTxs()", () -> { wallet.scanTxs(Arrays.asList(unknownHash)); return "returned"; }));
+        outcomes.add(attempt("rescanBlockchain()", () -> { wallet.rescanBlockchain(); return "returned"; }));
+        outcomes.add(attempt("startSyncing()", () -> { wallet.startSyncing(); return "returned"; }));
+        outcomes.add(attempt("createTx(relay)", () -> { wallet.createTx(new ZephyrTxConfig().setRelay(true)); return "returned"; }));
+        outcomes.add(attempt("getBalance()", () -> "returned " + (wallet.getBalance() != null)));
+        for (String outcome : outcomes) log("from the callback: " + outcome);
+        done.countDown();
+      }
+    });
+    Thread syncer = null;
+    AtomicReference<String> syncOutcome = new AtomicReference<String>();
+    if (mode.equals("fg")) {
+      syncer = new Thread(() -> syncOutcome.set(attempt("sync() of the syncer", () -> "returned blocks fetched " + wallet.sync().getNumBlocksFetched())), "syncer");
+      syncer.start();
+    } else {
+      wallet.startSyncing(1000L);
+    }
+    if (!inCallback.await(WAIT_MS, TimeUnit.MILLISECONDS)) fail("no onSyncProgress within " + WAIT_MS + " ms");
+    if (!done.await(STUCK_MS, TimeUnit.MILLISECONDS)) failStuck("the calls from inside the callback have not returned after " + STUCK_MS + " ms; so far: " + outcomes);
+    if (!outcomes.get(0).startsWith("getHeight(): height ")) fail("a read from the callback: " + outcomes.get(0));
+    if (!outcomes.get(6).equals("getBalance(): returned true")) fail("a read from the callback: " + outcomes.get(6));
+    for (String outcome : outcomes.subList(1, 6)) {
+      if (!outcome.contains("ZephyrError: ") || !outcome.contains("from inside a listener callback")) fail("not refused from the callback: " + outcome);
+    }
+    if (syncer != null) {
+      syncer.join(WAIT_MS);
+      if (syncer.isAlive()) failStuck("the syncer did not end");
+      log(syncOutcome.get());
+      if (!syncOutcome.get().startsWith("sync() of the syncer: returned")) fail(syncOutcome.get());
+    } else {
+      wallet.stopSyncing();
+    }
+    timedClose(wallet);
+    if (syncer == null) assertCallbackThreadsEnded(callbackThreads);
   }
 
   /**

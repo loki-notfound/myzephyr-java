@@ -612,6 +612,19 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   
   // -------------------------- COMMON WALLET METHODS -------------------------
   
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Callbacks run on the thread of the sync that delivers them (the caller of {@code sync()},
+   * the core's own thread for {@code startSyncing()}) or of a call that relays; callbacks of
+   * different threads can overlap. From inside a callback the wallet can be read, and listeners
+   * added or removed; the calls that cannot run there throw ZephyrError: every {@code sync},
+   * {@code startSyncing}, {@code scanTxs}, {@code rescanSpent}, {@code rescanBlockchain},
+   * {@code makeMultisig}, {@code exchangeMultisigKeys}, every call that relays
+   * ({@code createTx}, {@code createTxs}, {@code sweepUnlocked}, {@code sweepOutput},
+   * {@code sweepDust} with relay; {@code relayTx}, {@code relayTxs}, {@code submitTxs}) and
+   * {@code close}.</p>
+   */
   @Override
   public void addListener(ZephyrWalletListenerI listener) {
     beginCall();
@@ -918,6 +931,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   
   @Override
   public ZephyrSyncResult sync(Long startHeight, ZephyrWalletListenerI listener) {
+    refuseInCallback("sync()");
     beginCall();
     try {
       if (startHeight == null) startHeight = Math.max(getHeight(), getRestoreHeight());
@@ -945,6 +959,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   
   @Override
   public void startSyncing(Long syncPeriodInMs) {
+    refuseInCallback("startSyncing()");
     beginCall();
     try {
       try {
@@ -977,6 +992,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   
   @Override
   public void scanTxs(Collection<String> txHashes) {
+    refuseInCallback("scanTxs()");
     beginCall();
     try {
       String[] txMetadatasArr = txHashes.toArray(new String[txHashes.size()]); // convert to array for jni
@@ -994,6 +1010,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   
   @Override
   public void rescanSpent() {
+    refuseInCallback("rescanSpent()");
     beginCall();
     try {
       try {
@@ -1010,6 +1027,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
 
   @Override
   public void rescanBlockchain() {
+    refuseInCallback("rescanBlockchain()");
     beginCall();
     try {
       try {
@@ -1492,6 +1510,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   
   @Override
   public List<ZephyrTxWallet> createTxs(ZephyrTxConfig config) {
+    if (config != null && Boolean.TRUE.equals(config.getRelay())) refuseInCallback("createTx() or createTxs() with relay");
     beginCall();
     try {
       // validate request
@@ -1519,6 +1538,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   
   @Override
   public ZephyrTxWallet sweepOutput(ZephyrTxConfig config) {
+    if (config != null && Boolean.TRUE.equals(config.getRelay())) refuseInCallback("sweepOutput() with relay");
     beginCall();
     try {
       try {
@@ -1537,6 +1557,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   
   @Override
   public List<ZephyrTxWallet> sweepUnlocked(ZephyrTxConfig config) {
+    if (config != null && Boolean.TRUE.equals(config.getRelay())) refuseInCallback("sweepUnlocked() with relay");
     beginCall();
     try {
     
@@ -1568,6 +1589,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
 
   @Override
   public List<ZephyrTxWallet> sweepDust(boolean relay) {
+    if (relay) refuseInCallback("sweepDust() with relay");
     beginCall();
     try {
       try {
@@ -1587,6 +1609,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   
   @Override
   public List<String> relayTxs(Collection<String> txMetadatas) {
+    refuseInCallback("relayTx() or relayTxs()");
     beginCall();
     try {
       String[] txMetadatasArr = txMetadatas.toArray(new String[txMetadatas.size()]); // convert to array for jni
@@ -1642,6 +1665,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
 
   @Override
   public List<String> submitTxs(String signedTxHex) {
+    refuseInCallback("submitTxs()");
     beginCall();
     try {
       try {
@@ -2074,6 +2098,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
 
   @Override
   public String makeMultisig(List<String> multisigHexes, int threshold, String password) {
+    refuseInCallback("makeMultisig()");
     beginCall();
     try {
       try {
@@ -2090,6 +2115,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
 
   @Override
   public ZephyrMultisigInitResult exchangeMultisigKeys(List<String> multisigHexes, String password) {
+    refuseInCallback("exchangeMultisigKeys()");
     beginCall();
     try {
       try {
@@ -2523,8 +2549,11 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   // -------------------------------- LISTENER --------------------------------
   
   /**
-   * Receives notifications directly from jni c++, on the thread that runs the core's sync: the
-   * caller's thread for {@code sync()}, the core's own thread for {@code startSyncing()}.
+   * Receives notifications directly from jni c++, on the thread that runs the core's sync (the
+   * caller's thread for {@code sync()}, the core's own thread for {@code startSyncing()}) or the
+   * thread of a call that relays. The bridge holds no lock while it calls in here, so callbacks of
+   * different threads can overlap: the state used here is thread-safe (a copy-on-write listener
+   * set, a thread-local flag, a volatile closed flag).
    *
    * <p>Nothing escapes to the native caller: a listener's Throwable is caught and logged at
    * WARNING (with the listener's class and the callback's name, not the callback's data), and the
@@ -2834,6 +2863,16 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     synchronized (jniListener) {
       if (jniListenerHandle == 0) jniListenerHandle = setListenerJni(jniListener);
     }
+  }
+
+  /**
+   * Refuses, on a thread that is delivering a listener callback, a call that cannot run there: a
+   * sync or scan would lock the core's sync mutex, which the refresh that delivers the callback
+   * holds (the thread would wait for itself), and a relaying call makes the core notify the
+   * listeners again from inside the running notification. Called before anything else of the call.
+   */
+  private void refuseInCallback(String call) {
+    if (jniListener.inCallback()) throw new ZephyrError("Cannot call " + call + " from inside a listener callback; call it after the callback has returned");
   }
   
   /**

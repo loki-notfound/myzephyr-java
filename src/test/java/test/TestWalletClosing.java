@@ -463,4 +463,80 @@ public class TestWalletClosing {
       assertTrue(ms < TimeUnit.SECONDS.toMillis(30), "round " + round + ": close() took " + ms + " ms");
     }
   }
+
+  private interface Call {
+    Object run() throws Exception;
+  }
+
+  /** A call's outcome: "returned", or the class and message of what it threw. */
+  private static String outcome(Call call) {
+    try {
+      call.run();
+      return "returned";
+    } catch (Throwable t) {
+      return t.getClass().getSimpleName() + ": " + t.getMessage();
+    }
+  }
+
+  /**
+   * The calls that cannot run inside a listener callback are refused there with ZephyrError,
+   * before anything reaches the core: every sync, startSyncing(), scanTxs(), rescanSpent() and
+   * rescanBlockchain(), the multisig calls that lock the core's sync mutex, and every call that
+   * relays (the core notifies the listeners inline). Reads and the same calls without relay keep
+   * working. Offline, on an in-memory wallet without funds: nothing could be built or sent.
+   */
+  @Test
+  public void callsThatCannotRunInACallbackAreRefused() throws Exception {
+    ZephyrWalletFull wallet = inMemoryWallet();
+    String address = wallet.getPrimaryAddress();
+    String hash = String.join("", Collections.nCopies(64, "0"));
+    Map<String, Call> refused = new LinkedHashMap<String, Call>();
+    refused.put("sync()", wallet::sync);
+    refused.put("sync(listener)", () -> wallet.sync(new ZephyrWalletListener()));
+    refused.put("sync(startHeight)", () -> wallet.sync(1L));
+    refused.put("sync(startHeight, listener)", () -> wallet.sync(1L, new ZephyrWalletListener()));
+    refused.put("startSyncing()", () -> { wallet.startSyncing(); return null; });
+    refused.put("startSyncing(period)", () -> { wallet.startSyncing(5000L); return null; });
+    refused.put("scanTxs", () -> { wallet.scanTxs(Arrays.asList(hash)); return null; });
+    refused.put("rescanSpent", () -> { wallet.rescanSpent(); return null; });
+    refused.put("rescanBlockchain", () -> { wallet.rescanBlockchain(); return null; });
+    refused.put("makeMultisig", () -> wallet.makeMultisig(Arrays.asList("not multisig info"), 2, "closing-test"));
+    refused.put("exchangeMultisigKeys", () -> wallet.exchangeMultisigKeys(Arrays.asList("not multisig info"), "closing-test"));
+    refused.put("createTx(relay)", () -> wallet.createTx(new ZephyrTxConfig().setAccountIndex(0).setAddress(address).setAmount(BigInteger.ONE).setRelay(true)));
+    refused.put("createTxs(relay)", () -> wallet.createTxs(new ZephyrTxConfig().setAccountIndex(0).setAddress(address).setAmount(BigInteger.ONE).setRelay(true)));
+    refused.put("sweepUnlocked(relay)", () -> wallet.sweepUnlocked(new ZephyrTxConfig().setAccountIndex(0).setAddress(address).setRelay(true)));
+    refused.put("sweepOutput(relay)", () -> wallet.sweepOutput(new ZephyrTxConfig().setAddress(address).setKeyImage(hash).setRelay(true)));
+    refused.put("sweepDust(true)", () -> wallet.sweepDust(true));
+    refused.put("relayTx", () -> wallet.relayTx("00"));
+    refused.put("relayTxs", () -> wallet.relayTxs(Arrays.asList("00")));
+    refused.put("submitTxs", () -> wallet.submitTxs("00"));
+    Map<String, Call> allowed = new LinkedHashMap<String, Call>();
+    allowed.put("getHeight", wallet::getHeight);
+    allowed.put("getBalance", wallet::getBalance);
+    allowed.put("getAccounts", () -> wallet.getAccounts(true));
+    allowed.put("stopSyncing", () -> { wallet.stopSyncing(); return null; });
+    allowed.put("createTxs(no relay)", () -> wallet.createTxs(new ZephyrTxConfig().setAccountIndex(0).setAddress(address).setAmount(BigInteger.ONE).setRelay(false)));
+    allowed.put("sweepDust(false)", () -> wallet.sweepDust(false));
+    Map<String, String> inCallback = new LinkedHashMap<String, String>();
+    wallet.addListener(new ZephyrWalletListener() {
+      @Override public void onNewBlock(long height) {
+        for (Map.Entry<String, Call> call : refused.entrySet()) inCallback.put(call.getKey(), outcome(call.getValue()));
+        for (Map.Entry<String, Call> call : allowed.entrySet()) inCallback.put(call.getKey(), outcome(call.getValue()));
+      }
+    });
+    assertEquals(null, deliverNewBlock(wallet), "the callback threw");
+    List<String> notRefused = new ArrayList<String>();
+    for (String name : refused.keySet()) {
+      String result = inCallback.get(name);
+      if (!result.startsWith("ZephyrError: ") || !result.contains("from inside a listener callback")) notRefused.add(name + " -> " + result);
+    }
+    assertTrue(notRefused.isEmpty(), "not refused inside a callback: " + notRefused);
+    for (String name : Arrays.asList("getHeight", "getBalance", "getAccounts", "stopSyncing")) assertEquals("returned", inCallback.get(name), name + " inside a callback");
+    for (String name : Arrays.asList("createTxs(no relay)", "sweepDust(false)")) {
+      assertFalse(inCallback.get(name).contains("from inside a listener callback"), name + " was refused: " + inCallback.get(name));
+    }
+    // outside a callback the same calls reach the core (offline, so they fail there)
+    String outside = outcome(wallet::sync);
+    assertFalse(outside.contains("from inside a listener callback"), "sync() outside a callback: " + outside);
+  }
 }
