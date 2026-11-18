@@ -49,6 +49,8 @@ public class ClosingChild {
   static final long H1_LIMIT_MS = 3000;
   /** H2: how long before close(true) returns the wallet file may have been written. */
   static final long H2_GAP_LIMIT_MS = 500;
+  /** W1: threads the JVM may start during a background scan with no listener registered. */
+  static final long W1_THREAD_LIMIT = 50;
   /** H3: how long a call from inside a callback may take before the thread counts as stuck. */
   static final long STUCK_MS = 30000;
 
@@ -85,6 +87,7 @@ public class ClosingChild {
       case "h1": h1(args[1], args[2], args[3]); break;
       case "h2": h2(args[1]); break;
       case "h3": h3(args[1], args[2]); break;
+      case "w1": w1(args[1]); break;
       case "exitopen": exitOpen(args[1]); break;
       default: fail("unknown scenario " + args[0]);
     }
@@ -518,6 +521,43 @@ public class ClosingChild {
     }
     timedClose(wallet);
     if (syncer == null) assertCallbackThreadsEnded(callbackThreads);
+  }
+
+  /**
+   * W1: a listener added and removed again leaves no native listener registered with the core, so a
+   * background scan with no listener makes no callback upcalls. Every upcall from the core's thread
+   * attaches it as a new java.lang.Thread, so the count of threads the JVM started during the scan
+   * shows them. A listener added during the scan receives callbacks again.
+   */
+  private static void w1(String path) throws Exception {
+    ZephyrWalletFull wallet = open(path);
+    long from = Math.max(wallet.getHeight(), wallet.getRestoreHeight());
+    long daemonHeight = wallet.getDaemonHeight();
+    Counting removed = new Counting("none");
+    wallet.addListener(removed);
+    wallet.removeListener(removed);
+    ThreadMXBean threadBean = ManagementFactory.getThreadMXBean();
+    long startedBefore = threadBean.getTotalStartedThreadCount();
+    wallet.startSyncing(1000L);
+    long target = Math.min(from + 2500, daemonHeight - 1);
+    long end = System.currentTimeMillis() + WAIT_MS;
+    while (wallet.getHeight() < target) {
+      if (System.currentTimeMillis() > end) fail("the scan did not reach height " + target + " within " + WAIT_MS + " ms");
+      Thread.sleep(50);
+    }
+    long started = threadBean.getTotalStartedThreadCount() - startedBefore;
+    long scanned = wallet.getHeight() - from;
+    log("W1-THREADS-STARTED " + started + " while " + scanned + " blocks were scanned with no listener registered");
+    Counting added = new Counting("none");
+    wallet.addListener(added);
+    awaitFirstProgress(added);
+    log("the listener added during the scan got callbacks: " + added.counts());
+    wallet.removeListener(added);
+    wallet.stopSyncing();
+    timedClose(wallet);
+    if (removed.progress.get() + removed.blocks.get() + removed.balances.get() > 0) fail("the removed listener got callbacks: " + removed.counts());
+    if (started > W1_THREAD_LIMIT) fail(started + " threads started during a scan of " + scanned + " blocks with no listener: the native listener stayed registered with the core");
+    assertCallbackThreadsEnded(added.threads);
   }
 
   /**

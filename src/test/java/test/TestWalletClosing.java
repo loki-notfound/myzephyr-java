@@ -539,4 +539,33 @@ public class TestWalletClosing {
     String outside = outcome(wallet::sync);
     assertFalse(outside.contains("from inside a listener callback"), "sync() outside a callback: " + outside);
   }
+
+  /**
+   * The native listener is created once and kept until close(): removing the last Java listener
+   * takes it out of the core's listeners without freeing it (also from inside a callback), adding a
+   * listener registers the same native listener again, and close() frees it.
+   */
+  @Test
+  public void nativeListenerIsKeptWhileUnregistered() throws Exception {
+    ZephyrWalletFull wallet = inMemoryWallet();
+    Recorder first = new Recorder();
+    wallet.addListener(first);
+    long handle = (Long) field(wallet, "jniListenerHandle");
+    assertNotEquals(0L, handle, "no native listener after addListener");
+    assertEquals(Boolean.TRUE, field(wallet, "nativeListenerRegistered"));
+    wallet.removeListener(first);
+    assertEquals(Boolean.FALSE, field(wallet, "nativeListenerRegistered"), "registered with no Java listener");
+    assertEquals(handle, field(wallet, "jniListenerHandle"), "the native listener changed");
+    wallet.addListener(new ZephyrWalletListener() {
+      @Override public void onNewBlock(long height) { wallet.removeListener(this); }
+    });
+    assertEquals(Boolean.TRUE, field(wallet, "nativeListenerRegistered"));
+    assertEquals(null, deliverNewBlock(wallet), "the callback threw");
+    assertEquals(Boolean.FALSE, field(wallet, "nativeListenerRegistered"), "registered after the last listener removed itself");
+    wallet.addListener(first);
+    assertEquals(Boolean.TRUE, field(wallet, "nativeListenerRegistered"));
+    assertEquals(handle, field(wallet, "jniListenerHandle"), "the native listener changed");
+    wallet.close();
+    assertEquals(0L, field(wallet, "jniListenerHandle"), "the native listener was not freed by close()");
+  }
 }

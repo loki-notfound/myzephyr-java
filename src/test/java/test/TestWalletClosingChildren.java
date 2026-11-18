@@ -295,6 +295,16 @@ public class TestWalletClosingChildren {
   }
 
   /**
+   * W1: after the last listener is removed, a background scan makes no callback upcalls (counted
+   * by the threads the JVM starts); a listener added during the scan receives callbacks again.
+   */
+  @Test
+  public void noUpcallsWithoutAListener() throws Exception {
+    assumeNodeAndWallet();
+    run("w1", true, "w1").check();
+  }
+
+  /**
    * T4: main returns while background syncing runs and the wallet is still open: exit status 0, no
    * crash report. Twenty runs. Known to fail: while the core's sync thread is inside a refresh, the
    * JVM does not finish exiting (it exits once that thread waits between two syncs), so the test

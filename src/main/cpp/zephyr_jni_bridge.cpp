@@ -779,23 +779,34 @@ JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getAddressIndexJni
 }
 
 /**
- * Registers the wallet's one JNI listener, which stays registered until closeJni deletes it after
- * the core: a Java listener removed from inside a callback cannot delete the native listener that
- * is delivering that callback. Returns the existing listener when there is one.
+ * Adds the wallet's one JNI listener to the core's listeners, or removes it from them. The listener
+ * is created on the first registration and its handle stored at once; it is never deleted here,
+ * only by closeJni after the core, also while it is not registered: a Java listener removed from
+ * inside a callback cannot delete the native listener that is delivering that callback. A failed
+ * registration is undone in the core and leaves the listener unregistered (and freed at close).
  */
-JNIEXPORT jlong JNICALL Java_zephyr_wallet_ZephyrWalletFull_setListenerJni(JNIEnv *env, jobject instance, jobject jlistener) {
+JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_setListenerJni(JNIEnv *env, jobject instance, jobject jlistener, jboolean registered) {
   MTRACE("Java_zephyr_wallet_ZephyrWalletFull_setListenerJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   wallet_jni_listener* listener = get_handle<wallet_jni_listener>(env, instance, JNI_LISTENER_HANDLE);
-  if (listener != nullptr) return reinterpret_cast<jlong>(listener);
-  if (jlistener == nullptr) return 0;
   try {
-    listener = new wallet_jni_listener(env, jlistener);
-    wallet->add_listener(*listener);
-    return reinterpret_cast<jlong>(listener);
+    if (listener == nullptr) {
+      if (!registered || jlistener == nullptr) return;
+      listener = new wallet_jni_listener(env, jlistener);
+      env->SetLongField(instance, get_handle_field(env, instance, JNI_LISTENER_HANDLE), reinterpret_cast<jlong>(listener));
+    }
+    if (!registered) {
+      wallet->remove_listener(*listener);
+      return;
+    }
+    try {
+      wallet->add_listener(*listener);
+    } catch (...) {
+      try { wallet->remove_listener(*listener); } catch (...) { } // not left in the core's listeners
+      throw;
+    }
   } catch (...) {
     rethrow_cpp_exception_as_java_exception(env);
-    return 0;
   }
 }
 
