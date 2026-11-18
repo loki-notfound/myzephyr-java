@@ -9,6 +9,11 @@ public class ZephyrCheck {
 
   public Boolean isGood;
 
+  /**
+   * Creates an empty check result.
+   */
+  public ZephyrCheck() { }
+
   @JsonProperty("isGood")
   public Boolean isGood() {
     return isGood;

@@ -25,6 +25,11 @@ public class ZephyrTxSet {
   private String unsignedTxHex;
   private String signedTxHex;
   
+  /**
+   * Creates an empty transaction set.
+   */
+  public ZephyrTxSet() { }
+  
   @JsonManagedReference("tx_set")
   public List<ZephyrTxWallet> getTxs() {
     return txs;

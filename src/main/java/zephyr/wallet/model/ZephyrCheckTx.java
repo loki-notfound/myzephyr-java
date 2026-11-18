@@ -11,6 +11,11 @@ public class ZephyrCheckTx extends ZephyrCheck {
   public Long numConfirmations;
   public BigInteger receivedAmount;
   
+  /**
+   * Creates an empty transaction check result.
+   */
+  public ZephyrCheckTx() { }
+  
   public Boolean inTxPool() {
     return inTxPool;
   }

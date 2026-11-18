@@ -28,6 +28,11 @@ public class ZephyrWalletConfig {
   private byte[] keysData;
   private byte[] cacheData;
   
+  /**
+   * Creates an empty wallet configuration.
+   */
+  public ZephyrWalletConfig() { }
+  
   public String getPath() {
     return path;
   }
