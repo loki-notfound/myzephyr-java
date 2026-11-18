@@ -361,6 +361,54 @@ public class TestZephyrUtils {
     assertEquals(1.25, ZephyrUtils.fromAtomicUnits(new BigInteger("1250000000000")));
   };
   
+  /**
+   * Amounts measured on java.4 and what they give now: values that Double.toString prints in
+   * scientific notation (below 0.001, from 10^7) threw NumberFormatException up to java.4 and
+   * convert now; plain values convert as before; decimals beyond the twelfth are dropped as before,
+   * except that java.4 computed a wrong amount when Double.toString printed 19 or more decimals.
+   * Every row runs; the failures are reported together.
+   */
+  @Test
+  public void testToAtomicUnitsTable() {
+    Object[][] rows = {
+      // amount, expected atomic units, note
+      { 0.0001, "100000000", "threw: Illegal embedded sign character" },
+      { 0.000999, "999000000", "threw: Illegal embedded sign character" },
+      { 0.001, "1000000000", "as before" },
+      { 9999999.999, "9999999999000000000", "as before" },
+      { 1e7, "10000000000000000000", "threw: For input string \"10E7\"" },
+      { 12345678.9, "12345678900000000000", "threw: For input string \"3456789E7\"" },
+      { 1.5, "1500000000000", "as before" },
+      { 0.1, "100000000000", "as before" },
+      { 1.0000000000001, "1000000000000", "as before: the 13th decimal is dropped" },
+      { 0.1 + 0.2, "300000000000", "as before: 0.30000000000000004 truncated" },
+      { 0.0033783819253452307, "3378381925", "java.4 gave 3662849022: with 19 decimals its divisor 10^19 overflowed a long" },
+      { ZephyrUtils.fromAtomicUnits(BigInteger.ONE), "1", "threw: 1.0E-12, the double of 1 atomic unit" },
+      { 0.0, "0", "as before" },
+      { -1.5, "-1500000000000", "as before: a negative amount converts" },
+    };
+    List<String> failures = new ArrayList<String>();
+    for (Object[] row : rows) {
+      double amount = (Double) row[0];
+      try {
+        String actual = ZephyrUtils.toAtomicUnits(amount).toString();
+        if (!row[1].equals(actual)) failures.add(amount + ": expected " + row[1] + ", got " + actual + " (" + row[2] + ")");
+      } catch (Throwable e) {
+        failures.add(amount + ": expected " + row[1] + ", threw " + e + " (" + row[2] + ")");
+      }
+    }
+    for (double amount : new double[] { Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY }) {
+      try {
+        failures.add(amount + ": expected ZephyrError, got " + ZephyrUtils.toAtomicUnits(amount));
+      } catch (ZephyrError e) {
+        if (!e.getMessage().equals("Amount is not a finite number: " + amount)) failures.add(amount + ": message " + e.getMessage());
+      } catch (Throwable e) {
+        failures.add(amount + ": expected ZephyrError, threw " + e);
+      }
+    }
+    assertEquals(new ArrayList<String>(), failures);
+  }
+  
   // ---------------------------- PRIVATE HELPERS -----------------------------
   
   // replaces the character at the given index with another base58 character

@@ -10,6 +10,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.math.RoundingMode;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -669,20 +670,22 @@ public class ZephyrUtils {
   }
   
   /**
-   * Convert coins to atomic units.
+   * Convert coins to atomic units (10^12 per coin).
+   * 
+   * <p>The amount is read as the decimal that {@code Double.toString} prints for it, in
+   * plain or scientific notation alike (0.0001 and 1e7 convert), times 10^12; decimals beyond the
+   * twelfth are dropped (truncated toward zero): 1.0000000000001 gives
+   * 1000000000000, and 0.1 + 0.2, which is 0.30000000000000004 as a double, gives 300000000000. A
+   * negative amount converts to a negative number as before. For exact amounts, work with
+   * {@code BigDecimal} or with atomic units throughout.</p>
    * 
    * @param amount amount in coins to convert to atomic units
    * @return amount in atomic units
+   * @throws ZephyrError if the amount is NaN or infinite
    */
   public static BigInteger toAtomicUnits(double amount) {
-    double decimalDivisor = 1;
-    String amountStr = "" + amount;
-    int decimalIdx = amountStr.indexOf('.');
-    if (decimalIdx > -1) {
-      decimalDivisor = Math.pow(10, amountStr.length() - decimalIdx - 1);
-      amountStr = amountStr.substring(0, decimalIdx) + amountStr.substring(decimalIdx + 1);
-    }
-    return new BigInteger(amountStr).multiply(BigInteger.valueOf(ZephyrUtils.AU_PER_COIN)).divide(BigInteger.valueOf((long) decimalDivisor));
+    if (Double.isNaN(amount) || Double.isInfinite(amount)) throw new ZephyrError("Amount is not a finite number: " + amount);
+    return BigDecimal.valueOf(amount).movePointRight(12).setScale(0, RoundingMode.DOWN).toBigIntegerExact();
   }
   
   /**
