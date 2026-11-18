@@ -71,27 +71,6 @@ void rethrow_cpp_exception_as_java_exception(JNIEnv* env) {
   }
 }
 
-void rethrow_java_exception_as_cpp_exception(JNIEnv* env, jthrowable jexception) {
-
-  // print stacktrace to the console
-  env->ExceptionDescribe();
-
-  // clear the exception
-  //env->ExceptionClear();
-
-  // get the exception's message
-  jclass throwableClass = env->FindClass("java/lang/Throwable");
-  jmethodID throwableClass_getMessage = env->GetMethodID(throwableClass, "getMessage", "()Ljava/lang/String;");
-  jstring jmsg = (jstring) env->CallObjectMethod(jexception, throwableClass_getMessage);
-  const char* _msg = jmsg == 0 ? 0 : env->GetStringUTFChars(jmsg, NULL);
-  string msg = string(_msg == 0 ? "" : _msg);
-  if (jmsg) env->ReleaseStringUTFChars(jmsg, _msg);
-
-  // throw exception in c++
-  MERROR("Exception occurred in Java: " << msg);
-  throw runtime_error(msg);
-}
-
 void set_daemon_connection(JNIEnv *env, monero_wallet* wallet, jstring juri, jstring jusername, jstring jpassword) {
 
   // collect and release string params
@@ -190,10 +169,14 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *jvm, void *reserved) {
 }
 #endif
 
+// Attaches a native thread of the core (the background sync thread) for the length of one
+// callback, as a daemon thread: should a thread ever stay attached, it cannot keep the JVM alive.
+// Returns the thread's state before (JNI_OK: attached already, JNI_EDETACHED: attached now), or
+// JNI_ERR.
 int attachJVM(JNIEnv **env) {
   int envStat = cachedJVM->GetEnv((void **) env, JNI_VERSION_1_6);
   if (envStat == JNI_EDETACHED) {
-    if (cachedJVM->AttachCurrentThread((void **) env, nullptr) != 0) {
+    if (cachedJVM->AttachCurrentThreadAsDaemon((void **) env, nullptr) != 0) {
       return JNI_ERR;
     }
   } else if (envStat == JNI_EVERSION) {
@@ -202,60 +185,90 @@ int attachJVM(JNIEnv **env) {
   return envStat;
 }
 
+// Ends a callback: a pending Java exception is printed and cleared (nothing is rethrown into the
+// core), then a thread attached by attachJVM() is detached again.
 void detachJVM(JNIEnv *env, int envStat) {
   if (env->ExceptionCheck()) {
-    env->ExceptionDescribe();
+    env->ExceptionDescribe(); // prints and clears
+    env->ExceptionClear();
+    MERROR("Exception in a Java wallet listener callback; ignored");
   }
   if (envStat == JNI_EDETACHED) {
     cachedJVM->DetachCurrentThread();
   }
 }
 
+// The end of every callback, also when the core's data throws a C++ exception on the way: declared
+// right after attachJVM(), it runs last (detachJVM()), so a callback never leaves its thread
+// attached.
+struct callback_scope {
+  JNIEnv* env;
+  int envStat;
+  callback_scope(JNIEnv* env, int envStat) : env(env), envStat(envStat) { }
+  ~callback_scope() { detachJVM(env, envStat); }
+};
+
+// The local references a callback makes, deleted before it returns (before callback_scope
+// detaches): the callbacks of a foreground sync run inside the syncJni native frame, where local
+// references would otherwise pile up until sync() returns.
+struct callback_local_refs {
+  JNIEnv* env;
+  std::vector<jobject> refs;
+  explicit callback_local_refs(JNIEnv* env) : env(env) { }
+  ~callback_local_refs() { for (jobject ref : refs) env->DeleteLocalRef(ref); }
+
+  // a new Java string, or nullptr when it fails or an exception is pending already
+  jstring str(const std::string& value) {
+    if (env->ExceptionCheck()) return nullptr;
+    jstring jvalue = env->NewStringUTF(value.c_str());
+    if (jvalue != nullptr) refs.push_back(jvalue);
+    return jvalue;
+  }
+};
+
+// The listener's method, or nullptr when an exception is pending or the lookup fails.
+jmethodID callback_method(JNIEnv* env, const char* name, const char* signature) {
+  if (env->ExceptionCheck()) return nullptr;
+  return env->GetMethodID(class_WalletListener, name, signature);
+}
+
 /**
- * Listens for wallet notifications and notifies the listener in Java.
+ * Listens for wallet notifications and notifies the listener in Java. Created once per wallet,
+ * when its first Java listener is added, and deleted by closeJni after the core, which can then
+ * no longer call it.
  */
 struct wallet_jni_listener : public monero_wallet_listener {
 
   jobject jlistener;
-  JNIEnv* m_env;
   std::mutex _listenerMutex;
 
-  // TODO: use this env instead of attaching each time? performance improvement?
   wallet_jni_listener(JNIEnv* env, jobject listener) {
     jlistener = env->NewGlobalRef(listener);
-    m_env = env;
   }
 
   ~wallet_jni_listener() {
     std::lock_guard<std::mutex> lock(_listenerMutex);
-    m_env->DeleteGlobalRef(jlistener);
+    JNIEnv* env;
+    int envStat = attachJVM(&env); // a JNIEnv is valid only on its own thread: use the current one's
+    if (envStat == JNI_ERR) return;
+    env->DeleteGlobalRef(jlistener);
     jlistener = nullptr;
+    detachJVM(env, envStat);
   };
 
   void on_sync_progress(uint64_t height, uint64_t start_height, uint64_t end_height, double percent_done, const string& message) override {
     std::lock_guard<std::mutex> lock(_listenerMutex);
     if (jlistener == nullptr) return;
     JNIEnv *env;
-    int envStat = attachJVM(&env); // TODO: necessary to attach every time?
+    int envStat = attachJVM(&env);
     if (envStat == JNI_ERR) return;
-
-    // prepare callback arguments
-    jlong jheight = static_cast<jlong>(height);
-    jlong jstart_height = static_cast<jlong>(start_height);
-    jlong jend_height = static_cast<jlong>(end_height);
-    jdouble jpercent_done = static_cast<jdouble>(percent_done);
-    jstring jmessage = env->NewStringUTF(message.c_str());
+    callback_scope scope(env, envStat);
+    callback_local_refs refs(env);
 
     // invoke Java listener's onSyncProgress()
-    jmethodID listenerClass_onSyncProgress = env->GetMethodID(class_WalletListener, "onSyncProgress", "(JJJDLjava/lang/String;)V");
-    env->CallVoidMethod(jlistener, listenerClass_onSyncProgress, jheight, jstart_height, jend_height, jpercent_done, jmessage);
-    env->DeleteLocalRef(jmessage);
-
-    // check for and rethrow Java exception
-    jthrowable jexception = env->ExceptionOccurred();
-    if (jexception) rethrow_java_exception_as_cpp_exception(env, jexception); // TODO: does not detach JVM
-
-    detachJVM(env, envStat);
+    jstring jmessage = refs.str(message);
+    jmethodID method = callback_method(env, "onSyncProgress", "(JJJDLjava/lang/String;)V");
+    if (jmessage != nullptr && method != nullptr) env->CallVoidMethod(jlistener, method, static_cast<jlong>(height), static_cast<jlong>(start_height), static_cast<jlong>(end_height), static_cast<jdouble>(percent_done), jmessage);
   }
 
   void on_new_block(uint64_t height) override {
@@ -264,17 +277,11 @@ struct wallet_jni_listener : public monero_wallet_listener {
     JNIEnv *env;
     int envStat = attachJVM(&env);
     if (envStat == JNI_ERR) return;
+    callback_scope scope(env, envStat);
 
     // invoke Java listener's onNewBlock()
-    jlong jheight = static_cast<jlong>(height);
-    jmethodID listenerClass_onNewBlock = env->GetMethodID(class_WalletListener, "onNewBlock", "(J)V");
-    env->CallVoidMethod(jlistener, listenerClass_onNewBlock, jheight);
-
-    // check for and rethrow Java exception
-    jthrowable jexception = env->ExceptionOccurred();
-    if (jexception) rethrow_java_exception_as_cpp_exception(env, jexception); // TODO: does not detach JVM
-
-    detachJVM(env, envStat);
+    jmethodID method = callback_method(env, "onNewBlock", "(J)V");
+    if (method != nullptr) env->CallVoidMethod(jlistener, method, static_cast<jlong>(height));
   }
 
   void on_balances_changed(uint64_t new_balance, uint64_t new_unlocked_balance, const std::string& asset_type) override {
@@ -283,19 +290,15 @@ struct wallet_jni_listener : public monero_wallet_listener {
     JNIEnv *env;
     int envStat = attachJVM(&env);
     if (envStat == JNI_ERR) return;
+    callback_scope scope(env, envStat);
+    callback_local_refs refs(env);
 
     // invoke Java listener's onBalancesChanged()
-    jstring jbalance_str = env->NewStringUTF(to_string(new_balance).c_str());
-    jstring junlocked_balance_str = env->NewStringUTF(to_string(new_unlocked_balance).c_str());
-    jstring jasset_type = env->NewStringUTF(asset_type.c_str());
-    jmethodID listenerClass_onBalanceChanged = env->GetMethodID(class_WalletListener, "onBalancesChanged", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
-    env->CallVoidMethod(jlistener, listenerClass_onBalanceChanged, jbalance_str, junlocked_balance_str, jasset_type);
-
-    // check for and rethrow Java exception
-    jthrowable jexception = env->ExceptionOccurred();
-    if (jexception) rethrow_java_exception_as_cpp_exception(env, jexception); // TODO: does not detach JVM
-
-    detachJVM(env, envStat);
+    jstring jbalance_str = refs.str(to_string(new_balance));
+    jstring junlocked_balance_str = refs.str(to_string(new_unlocked_balance));
+    jstring jasset_type = refs.str(asset_type);
+    jmethodID method = callback_method(env, "onBalancesChanged", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
+    if (jbalance_str != nullptr && junlocked_balance_str != nullptr && jasset_type != nullptr && method != nullptr) env->CallVoidMethod(jlistener, method, jbalance_str, junlocked_balance_str, jasset_type);
   }
 
   void on_output_received(const monero_output_wallet& output) override {
@@ -304,24 +307,20 @@ struct wallet_jni_listener : public monero_wallet_listener {
     JNIEnv *env;
     int envStat = attachJVM(&env);
     if (envStat == JNI_ERR) return;
+    callback_scope scope(env, envStat);
+    callback_local_refs refs(env);
 
     // prepare parameters to invoke Java listener
     boost::optional<uint64_t> height = output.m_tx->get_height();
-    jstring jtx_hash = env->NewStringUTF(output.m_tx->m_hash.get().c_str());
-    jstring jamount_str = env->NewStringUTF(to_string(*output.m_amount).c_str());
-    jstring jasset_type = env->NewStringUTF(output.m_asset_type.c_str());
+    jstring jtx_hash = refs.str(output.m_tx->m_hash.get());
+    jstring jamount_str = refs.str(to_string(*output.m_amount));
+    jstring jasset_type = refs.str(output.m_asset_type);
     int version = output.m_tx->m_version == boost::none ? 2 : *output.m_tx->m_version; // TODO: version not present in unlocked output notification, defaulting to 2
     bool is_locked = std::static_pointer_cast<monero_tx_wallet>(output.m_tx)->m_is_locked.get();
 
     // invoke Java listener's onOutputReceived()
-    jmethodID listenerClass_onOutputReceived = env->GetMethodID(class_WalletListener, "onOutputReceived", "(JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;IIIJZ)V");
-    env->CallVoidMethod(jlistener, listenerClass_onOutputReceived, height == boost::none ? 0 : *height, jtx_hash, jamount_str, jasset_type, *output.m_account_index, *output.m_subaddress_index, version, *output.m_tx->m_unlock_height, is_locked);
-
-    // check for and rethrow Java exception
-    jthrowable jexception = env->ExceptionOccurred();
-    if (jexception) rethrow_java_exception_as_cpp_exception(env, jexception); // TODO: does not detach JVM
-
-    detachJVM(env, envStat);
+    jmethodID method = callback_method(env, "onOutputReceived", "(JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;IIIJZ)V");
+    if (jtx_hash != nullptr && jamount_str != nullptr && jasset_type != nullptr && method != nullptr) env->CallVoidMethod(jlistener, method, height == boost::none ? 0 : *height, jtx_hash, jamount_str, jasset_type, *output.m_account_index, *output.m_subaddress_index, version, *output.m_tx->m_unlock_height, is_locked);
   }
 
   void on_output_spent(const monero_output_wallet& output) override {
@@ -330,26 +329,22 @@ struct wallet_jni_listener : public monero_wallet_listener {
     JNIEnv *env;
     int envStat = attachJVM(&env);
     if (envStat == JNI_ERR) return;
+    callback_scope scope(env, envStat);
+    callback_local_refs refs(env);
 
     // prepare parameters to invoke Java listener
     boost::optional<uint64_t> height = output.m_tx->get_height();
-    jstring jtx_hash = env->NewStringUTF(output.m_tx->m_hash.get().c_str());
-    jstring jamount_str = env->NewStringUTF(to_string(*output.m_amount).c_str());
-    jstring jasset_type = env->NewStringUTF(output.m_asset_type.c_str());
-    jstring jaccount_idx_str = env->NewStringUTF(output.m_account_index == boost::none ? "" : to_string(*output.m_account_index).c_str()); // TODO: subaddress indices not known for some inputs (e.g. after tx creation)
-    jstring jsubaddress_idx_str = env->NewStringUTF(output.m_subaddress_index == boost::none ? "" : to_string(*output.m_subaddress_index).c_str());
+    jstring jtx_hash = refs.str(output.m_tx->m_hash.get());
+    jstring jamount_str = refs.str(to_string(*output.m_amount));
+    jstring jasset_type = refs.str(output.m_asset_type);
+    jstring jaccount_idx_str = refs.str(output.m_account_index == boost::none ? "" : to_string(*output.m_account_index)); // TODO: subaddress indices not known for some inputs (e.g. after tx creation)
+    jstring jsubaddress_idx_str = refs.str(output.m_subaddress_index == boost::none ? "" : to_string(*output.m_subaddress_index));
     int version = output.m_tx->m_version == boost::none ? 2 : *output.m_tx->m_version; // TODO: version not present in unlocked output notification, defaulting to 2
     bool is_locked = std::static_pointer_cast<monero_tx_wallet>(output.m_tx)->m_is_locked.get();
 
     // invoke Java listener's onOutputSpent()
-    jmethodID listenerClass_onOutputSpent = env->GetMethodID(class_WalletListener, "onOutputSpent", "(JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IJZ)V");
-    env->CallVoidMethod(jlistener, listenerClass_onOutputSpent, height == boost::none ? 0 : *height, jtx_hash, jamount_str, jasset_type, jaccount_idx_str, jsubaddress_idx_str, version, *output.m_tx->m_unlock_height, is_locked);
-
-    // check for and rethrow Java exception
-    jthrowable jexception = env->ExceptionOccurred();
-    if (jexception) rethrow_java_exception_as_cpp_exception(env, jexception); // TODO: does not detach JVM
-
-    detachJVM(env, envStat);
+    jmethodID method = callback_method(env, "onOutputSpent", "(JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IJZ)V");
+    if (jtx_hash != nullptr && jamount_str != nullptr && jasset_type != nullptr && jaccount_idx_str != nullptr && jsubaddress_idx_str != nullptr && method != nullptr) env->CallVoidMethod(jlistener, method, height == boost::none ? 0 : *height, jtx_hash, jamount_str, jasset_type, jaccount_idx_str, jsubaddress_idx_str, version, *output.m_tx->m_unlock_height, is_locked);
   }
 };
 
@@ -772,25 +767,24 @@ JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getAddressIndexJni
 }
 
 /**
- * Only one listener needs to subscribe over JNI, so this removes the previously registered listener
- * and registers the new listener.
+ * Registers the wallet's one JNI listener, which stays registered until closeJni deletes it after
+ * the core: a Java listener removed from inside a callback cannot delete the native listener that
+ * is delivering that callback. Returns the existing listener when there is one.
  */
 JNIEXPORT jlong JNICALL Java_zephyr_wallet_ZephyrWalletFull_setListenerJni(JNIEnv *env, jobject instance, jobject jlistener) {
   MTRACE("Java_zephyr_wallet_ZephyrWalletFull_setListenerJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
-
-  // remove old listener
-  wallet_jni_listener* old_listener = get_handle<wallet_jni_listener>(env, instance, JNI_LISTENER_HANDLE);
-  if (old_listener != nullptr) {
-    wallet->remove_listener(*old_listener);
-    delete old_listener;
-  }
-
-  // add new listener
+  wallet_jni_listener* listener = get_handle<wallet_jni_listener>(env, instance, JNI_LISTENER_HANDLE);
+  if (listener != nullptr) return reinterpret_cast<jlong>(listener);
   if (jlistener == nullptr) return 0;
-  wallet_jni_listener* listener = new wallet_jni_listener(env, jlistener);
-  wallet->add_listener(*listener);
-  return reinterpret_cast<jlong>(listener);
+  try {
+    listener = new wallet_jni_listener(env, jlistener);
+    wallet->add_listener(*listener);
+    return reinterpret_cast<jlong>(listener);
+  } catch (...) {
+    rethrow_cpp_exception_as_java_exception(env);
+    return 0;
+  }
 }
 
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getIntegratedAddressJni(JNIEnv *env, jobject instance, jstring jstandard_address, jstring jpayment_id) {
@@ -2424,12 +2418,21 @@ JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_saveJni(JNIEnv* env, 
   }
 }
 
+// Called by close() alone, while it holds the call lock's write side: no other call of this wallet
+// runs. A failed save throws and frees nothing, so close() can be retried.
 JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_closeJni(JNIEnv* env, jobject instance, jboolean save) {
   MTRACE("Java_zephyr_wallet_ZephyrWalletFull_CloseJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
-  if (save) wallet->save();
-  delete wallet;
-  wallet = nullptr;
+  if (wallet == nullptr) return;
+  try {
+    if (save) wallet->save();
+    delete wallet; // the core stops its sync and joins its sync thread: no callback runs after this
+    env->SetLongField(instance, get_handle_field(env, instance, JNI_WALLET_HANDLE), 0);
+    delete get_handle<wallet_jni_listener>(env, instance, JNI_LISTENER_HANDLE);
+    env->SetLongField(instance, get_handle_field(env, instance, JNI_LISTENER_HANDLE), 0);
+  } catch (...) {
+    rethrow_cpp_exception_as_java_exception(env);
+  }
 }
 
 JNIEXPORT jbyteArray JNICALL Java_zephyr_wallet_ZephyrWalletFull_getKeysFileBufferJni(JNIEnv* env, jobject instance, jstring jpassword, jboolean view_only) {
