@@ -18,6 +18,9 @@ import zephyr.common.ZephyrError;
  */
 public class ZephyrTransferQuery extends ZephyrTransfer implements Filter<ZephyrTransfer> {
 
+  /**
+   * The transaction query that the transaction of a matching transfer meets, or null.
+   */
   protected ZephyrTxQuery txQuery;
   private Boolean isIncoming;
   private String address;
@@ -27,10 +30,18 @@ public class ZephyrTransferQuery extends ZephyrTransfer implements Filter<Zephyr
   private List<ZephyrDestination> destinations;
   private Boolean hasDestinations;
   
+  /**
+   * Creates a query that every transfer meets.
+   */
   public ZephyrTransferQuery() {
     
   }
   
+  /**
+   * Creates a copy of the given query; the copy refers to the same transaction query.
+   *
+   * @param query is the query to copy
+   */
   public ZephyrTransferQuery(final ZephyrTransferQuery query) {
     super(query);
     this.isIncoming = query.isIncoming;
@@ -52,100 +63,228 @@ public class ZephyrTransferQuery extends ZephyrTransfer implements Filter<Zephyr
     return new ZephyrTransferQuery(this);
   }
   
+  /**
+   * Returns the transaction query that the transaction of a matching transfer meets.
+   *
+   * @return the transaction query, null if none
+   */
   @JsonIgnore
   public ZephyrTxQuery getTxQuery() {
     return txQuery;
   }
 
+  /**
+   * Sets the transaction query that the transaction of a matching transfer meets, and makes this
+   * query its transfer query.
+   *
+   * @param txQuery is the transaction query, null for none
+   * @return this query for chaining
+   */
   public ZephyrTransferQuery setTxQuery(ZephyrTxQuery txQuery) {
     this.txQuery = txQuery;
     if (txQuery != null) txQuery.transferQuery = this;
     return this;
   }
 
+  /**
+   * Returns the direction to match: true for incoming transfers only, false for outgoing ones only.
+   *
+   * @return the direction, null for both
+   */
   @Override
   public Boolean isIncoming() {
     return isIncoming;
   }
 
+  /**
+   * Sets the direction to match: true for incoming transfers only, false for outgoing ones only.
+   *
+   * @param isIncoming is the direction, null for both
+   * @return this query for chaining
+   */
   public ZephyrTransferQuery setIsIncoming(Boolean isIncoming) {
     this.isIncoming = isIncoming;
     return this;
   }
   
+  /**
+   * Returns the direction to match: true for outgoing transfers only, false for incoming ones only.
+   *
+   * @return the direction, null for both
+   */
   @Override
   public Boolean isOutgoing() {
     return isIncoming == null ? null : !isIncoming;
   }
   
+  /**
+   * Sets the direction to match: true for outgoing transfers only, false for incoming ones only.
+   *
+   * @param isOutgoing is the direction, null for both
+   * @return this query for chaining
+   */
   public ZephyrTransferQuery setIsOutgoing(Boolean isOutgoing) {
     isIncoming = isOutgoing == null ? null : !isOutgoing;
     return this;
   }
 
+  /**
+   * Returns the address to match, see {@link #setAddress(String)}.
+   *
+   * @return the address, null for any
+   */
   public String getAddress() {
     return address;
   }
 
+  /**
+   * Sets the address to match: an incoming transfer matches if it was received at this address, an
+   * outgoing transfer if it spent from this address (one of its {@code getAddresses()}).
+   *
+   * @param address is the address, null for any
+   * @return this query for chaining
+   */
   public ZephyrTransferQuery setAddress(String address) {
     this.address = address;
     return this;
   }
 
+  /**
+   * Returns the addresses to match, see {@link #setAddresses(List)}.
+   *
+   * @return the addresses, null for any
+   */
   public List<String> getAddresses() {
     return addresses;
   }
 
+  /**
+   * Sets the addresses to match: an incoming transfer matches if it was received at one of them, an
+   * outgoing transfer if it spent from one of them. {@code ZephyrWalletFull} does not support it:
+   * the core throws "monero_transfer_query addresses deserialization not implemented" for a query
+   * that sets it (read in the core's code). Use {@link #setAddress(String)} or filter in the app.
+   *
+   * @param addresses are the addresses, null for any
+   * @return this query for chaining
+   */
   public ZephyrTransferQuery setAddresses(List<String> addresses) {
     this.addresses = addresses;
     return this;
   }
   
+  /**
+   * Sets the addresses to match, as {@link #setAddresses(List)} does.
+   *
+   * @param addresses are the addresses
+   * @return this query for chaining
+   */
   public ZephyrTransferQuery setAddresses(String... addresses) {
     this.addresses = GenUtils.arrayToList(addresses);
     return this;
   }
 
+  /**
+   * Returns the subaddress index to match, see {@link #setSubaddressIndex(Integer)}.
+   *
+   * @return the subaddress index, null for any
+   */
   public Integer getSubaddressIndex() {
     return subaddressIndex;
   }
 
+  /**
+   * Sets the subaddress index to match: an incoming transfer matches if it was received at this
+   * subaddress, an outgoing transfer if it spent from it. A negative index throws a
+   * {@code ZephyrError}.
+   *
+   * @param subaddressIndex is the subaddress index, null for any
+   * @return this query for chaining
+   */
   public ZephyrTransferQuery setSubaddressIndex(Integer subaddressIndex) {
     this.subaddressIndex = subaddressIndex;
     validate();
     return this;
   }
 
+  /**
+   * Returns the subaddress indices to match, see {@link #setSubaddressIndices(List)}.
+   *
+   * @return the subaddress indices, null for any
+   */
   public List<Integer> getSubaddressIndices() {
     return subaddressIndices;
   }
 
+  /**
+   * Sets the subaddress indices to match: an incoming transfer matches if it was received at one of
+   * them, an outgoing transfer if it spent from one of them. A negative index throws a
+   * {@code ZephyrError}.
+   *
+   * @param subaddressIndices are the subaddress indices, null for any
+   * @return this query for chaining
+   */
   public ZephyrTransferQuery setSubaddressIndices(List<Integer> subaddressIndices) {
     this.subaddressIndices = subaddressIndices;
     validate();
     return this;
   }
   
+  /**
+   * Sets the subaddress indices to match, as {@link #setSubaddressIndices(List)} does.
+   *
+   * @param subaddressIndices are the subaddress indices
+   * @return this query for chaining
+   */
   public ZephyrTransferQuery setSubaddressIndices(Integer... subaddressIndices) {
     this.subaddressIndices = GenUtils.arrayToList(subaddressIndices);
     validate();
     return this;
   }
 
+  /**
+   * Returns the destinations set on this query, which are not a criterion, see
+   * {@link #setDestinations(List)}.
+   *
+   * @return the destinations, null if none
+   */
   public List<ZephyrDestination> getDestinations() {
     return destinations;
   }
 
+  /**
+   * Sets destinations on this query. They are not a criterion:
+   * {@link #meetsCriteria(ZephyrTransfer)} ignores them. {@code ZephyrWalletFull} does not support
+   * it: the core throws "monero_transfer_query destinations deserialization not implemented" for a
+   * query that sets it (read in the core's code).
+   *
+   * @param destinations are the destinations
+   * @return this query for chaining
+   */
   public ZephyrTransferQuery setDestinations(List<ZephyrDestination> destinations) {
     this.destinations = destinations;
     return this;
   }
 
+  /**
+   * Returns whether a matching outgoing transfer must have destinations (true) or must have none
+   * (false), see {@link #setHasDestinations(Boolean)}.
+   *
+   * @return the requirement, null for either
+   */
   @JsonProperty("hasDestinations")
   public Boolean hasDestinations() {
     return hasDestinations;
   }
 
+  /**
+   * Sets whether a matching outgoing transfer must have destinations (true) or must have none
+   * (false). In {@code ZephyrWalletFull} no incoming transfer matches once it is set, to either
+   * value (read in the core's code); {@link #meetsCriteria(ZephyrTransfer)} leaves out incoming
+   * transfers only for true.
+   *
+   * @param hasDestinations is the requirement, null for either
+   * @return this query for chaining
+   */
   public ZephyrTransferQuery setHasDestinations(Boolean hasDestinations) {
     this.hasDestinations = hasDestinations;
     return this;
@@ -156,6 +295,13 @@ public class ZephyrTransferQuery extends ZephyrTransfer implements Filter<Zephyr
     return meetsCriteria(transfer, true);
   }
 
+  /**
+   * Returns whether the given transfer meets this query, evaluated in Java.
+   *
+   * @param transfer is the transfer to test
+   * @param queryParent is true to apply the transaction query to the transfer's transaction too
+   * @return true if the transfer meets the query
+   */
   protected boolean meetsCriteria(ZephyrTransfer transfer, boolean queryParent) {
     GenUtils.assertNotNull("transfer is null", transfer);
     

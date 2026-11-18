@@ -17,15 +17,26 @@ import zephyr.daemon.model.ZephyrTx;
  */
 public class ZephyrOutputQuery extends ZephyrOutputWallet implements Filter<ZephyrOutputWallet> {
 
+  /**
+   * The transaction query that the transaction of a matching output meets, or null.
+   */
   protected ZephyrTxQuery txQuery;
   private List<Integer> subaddressIndices;
   private BigInteger minAmount;
   private BigInteger maxAmount;
   
+  /**
+   * Creates a query that every wallet output meets.
+   */
   public ZephyrOutputQuery() {
     super();
   }
   
+  /**
+   * Creates a copy of the given query; the copy refers to the same transaction query.
+   *
+   * @param query is the query to copy
+   */
   public ZephyrOutputQuery(final ZephyrOutputQuery query) {
     super(query);
     if (query.getMinAmount() != null) this.minAmount = query.getMinAmount();
@@ -39,44 +50,97 @@ public class ZephyrOutputQuery extends ZephyrOutputWallet implements Filter<Zeph
     return new ZephyrOutputQuery(this);
   }
   
+  /**
+   * Returns the smallest output amount to match, in atomic units, inclusive.
+   *
+   * @return the amount, null for no lower bound
+   */
   public BigInteger getMinAmount() {
     return minAmount;
   }
 
+  /**
+   * Sets the smallest output amount to match, in atomic units, inclusive. The outputs carry no
+   * asset in {@code ZephyrWalletFull}, so the bound applies to outputs of every asset alike.
+   *
+   * @param minAmount is the amount, null for no lower bound
+   * @return this query for chaining
+   */
   public ZephyrOutputQuery setMinAmount(BigInteger minAmount) {
     this.minAmount = minAmount;
     return this;
   }
 
+  /**
+   * Returns the largest output amount to match, in atomic units, inclusive.
+   *
+   * @return the amount, null for no upper bound
+   */
   public BigInteger getMaxAmount() {
     return maxAmount;
   }
 
+  /**
+   * Sets the largest output amount to match, in atomic units, inclusive. The outputs carry no asset
+   * in {@code ZephyrWalletFull}, so the bound applies to outputs of every asset alike.
+   *
+   * @param maxAmount is the amount, null for no upper bound
+   * @return this query for chaining
+   */
   public ZephyrOutputQuery setMaxAmount(BigInteger maxAmount) {
     this.maxAmount = maxAmount;
     return this;
   }
 
+  /**
+   * Returns the transaction query that the transaction of a matching output meets.
+   *
+   * @return the transaction query, null if none
+   */
   @JsonIgnore
   public ZephyrTxQuery getTxQuery() {
     return txQuery;
   }
 
+  /**
+   * Sets the transaction query that the transaction of a matching output meets, and makes this
+   * query its output query.
+   *
+   * @param txQuery is the transaction query, null for none
+   * @return this query for chaining
+   */
   public ZephyrOutputQuery setTxQuery(ZephyrTxQuery txQuery) {
     this.txQuery = txQuery;
     if (txQuery != null) txQuery.outputQuery = this;
     return this;
   }
   
+  /**
+   * Returns the subaddress indices to match: an output matches if it was received at one of them.
+   *
+   * @return the subaddress indices, null for any
+   */
   public List<Integer> getSubaddressIndices() {
     return subaddressIndices;
   }
 
+  /**
+   * Sets the subaddress indices to match: an output matches if it was received at one of them.
+   *
+   * @param subaddressIndices are the subaddress indices, null for any
+   * @return this query for chaining
+   */
   public ZephyrOutputQuery setSubaddressIndices(List<Integer> subaddressIndices) {
     this.subaddressIndices = subaddressIndices;
     return this;
   }
   
+  /**
+   * Sets the subaddress indices to match, as {@link #setSubaddressIndices(List)} does.
+   *
+   * @param subaddressIndices are the subaddress indices
+   * @return this query for chaining
+   */
   public ZephyrOutputQuery setSubaddressIndices(Integer... subaddressIndices) {
     this.subaddressIndices = GenUtils.arrayToList(subaddressIndices);
     return this;
@@ -87,6 +151,13 @@ public class ZephyrOutputQuery extends ZephyrOutputWallet implements Filter<Zeph
     return meetsCriteria(output, true);
   }
     
+  /**
+   * Returns whether the given output meets this query, evaluated in Java.
+   *
+   * @param output is the output to test
+   * @param queryParent is not used: the transaction query, if there is one, is always applied
+   * @return true if the output meets the query
+   */
   protected boolean meetsCriteria(ZephyrOutputWallet output, boolean queryParent) {
 
     if (!(output instanceof ZephyrOutputWallet)) return false;

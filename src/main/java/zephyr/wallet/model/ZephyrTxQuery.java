@@ -29,14 +29,31 @@ public class ZephyrTxQuery extends ZephyrTxWallet implements Filter<ZephyrTxWall
   private Long minHeight;
   private Long maxHeight;
   private Boolean includeOutputs;
+  /**
+   * The transfer query that at least one transfer of a matching transaction meets, or null.
+   */
   protected ZephyrTransferQuery transferQuery;
+  /**
+   * The output query that at least one input of a matching transaction meets, or null.
+   */
   protected ZephyrOutputQuery inputQuery;
+  /**
+   * The output query that at least one output of a matching transaction meets, or null.
+   */
   protected ZephyrOutputQuery outputQuery;
   
+  /**
+   * Creates a query that every transaction meets.
+   */
   public ZephyrTxQuery() {
     
   }
   
+  /**
+   * Creates a deep copy of the given query, its transfer, input and output queries included.
+   *
+   * @param query is the query to copy
+   */
   public ZephyrTxQuery(final ZephyrTxQuery query) {
     super(query);
     this.isOutgoing = query.isOutgoing;
@@ -58,135 +75,300 @@ public class ZephyrTxQuery extends ZephyrTxWallet implements Filter<ZephyrTxWall
     return new ZephyrTxQuery(this);
   }
   
+  /**
+   * Returns whether a matching transaction must have an outgoing transfer (true) or must have none
+   * (false).
+   *
+   * @return the requirement, null for either
+   */
   @Override
   @JsonProperty("isOutgoing")
   public Boolean isOutgoing() {
     return isOutgoing;
   }
 
+  /**
+   * Sets whether a matching transaction must have an outgoing transfer (true) or must have none
+   * (false).
+   *
+   * @param isOutgoing is the requirement, null for either
+   * @return this query for chaining
+   */
   @Override
   public ZephyrTxQuery setIsOutgoing(Boolean isOutgoing) {
     this.isOutgoing = isOutgoing;
     return this;
   }
 
+  /**
+   * Returns whether a matching transaction must have an incoming transfer (true) or must have none
+   * (false).
+   *
+   * @return the requirement, null for either
+   */
   @Override
   @JsonProperty("isIncoming")
   public Boolean isIncoming() {
     return isIncoming;
   }
 
+  /**
+   * Sets whether a matching transaction must have an incoming transfer (true) or must have none
+   * (false).
+   *
+   * @param isIncoming is the requirement, null for either
+   * @return this query for chaining
+   */
   @Override
   public ZephyrTxQuery setIsIncoming(Boolean isIncoming) {
     this.isIncoming = isIncoming;
     return this;
   }
   
+  /**
+   * Sets the one transaction hash to match; it also sets {@link #getHashes()} to this hash alone.
+   *
+   * @param hash is the hash
+   * @return this query for chaining
+   */
   @Override
   public ZephyrTxQuery setHash(String hash) {
     super.setHash(hash);
     return setHashes(Arrays.asList(hash));
   }
 
+  /**
+   * Returns the hashes of the transactions to match.
+   *
+   * @return the hashes, null for any transaction
+   */
   public List<String> getHashes() {
     return hashes;
   }
 
+  /**
+   * Sets the hashes of the transactions to match. {@code getTxs} with this query throws for a hash
+   * the wallet does not know; {@code getTxs(hashes, missing)} collects such hashes instead. See the
+   * user guide, {@code docs/guide/06-history.md}, section "Transactions and transfers".
+   *
+   * @param hashes are the hashes, null for any transaction
+   * @return this query for chaining
+   */
   public ZephyrTxQuery setHashes(List<String> hashes) {
     this.hashes = hashes;
     return this;
   }
   
+  /**
+   * Sets the hashes of the transactions to match, as {@link #setHashes(List)} does.
+   *
+   * @param hashes are the hashes
+   * @return this query for chaining
+   */
   public ZephyrTxQuery setHashes(String... hashes) {
     this.hashes = GenUtils.arrayToList(hashes);
     return this;
   }
   
+  /**
+   * Returns whether a matching transaction must have a payment ID (true) or must have none (false).
+   *
+   * @return the requirement, null for either
+   */
   @JsonProperty("hasPaymentId")
   public Boolean hasPaymentId() {
     return hasPaymentId;
   }
 
+  /**
+   * Sets whether a matching transaction must have a payment ID (true) or must have none (false).
+   *
+   * @param hasPaymentId is the requirement, null for either
+   * @return this query for chaining
+   */
   public ZephyrTxQuery setHasPaymentId(Boolean hasPaymentId) {
     this.hasPaymentId = hasPaymentId;
     return this;
   }
 
+  /**
+   * Returns the payment IDs to match: a transaction matches if its payment ID is one of them.
+   *
+   * @return the payment IDs, null for any
+   */
   public List<String> getPaymentIds() {
     return paymentIds;
   }
 
+  /**
+   * Sets the payment IDs to match: a transaction matches if its payment ID is one of them.
+   *
+   * @param paymentIds are the payment IDs as hex, null for any
+   * @return this query for chaining
+   */
   public ZephyrTxQuery setPaymentIds(List<String> paymentIds) {
     this.paymentIds = paymentIds;
     return this;
   }
   
+  /**
+   * Sets the one payment ID to match, as a list of one in {@link #getPaymentIds()}.
+   *
+   * @param paymentId is the payment ID as hex
+   * @return this query for chaining
+   */
   @Override
   public ZephyrTxQuery setPaymentId(String paymentId) {
     return setPaymentIds(Arrays.asList(paymentId));
   }
   
+  /**
+   * Returns the height of the block a matching transaction must be in.
+   *
+   * @return the height, null for any
+   */
   @Override
   public Long getHeight() {
     return height;
   }
 
+  /**
+   * Sets the height of the block a matching transaction must be in; a transaction in no block does
+   * not match.
+   *
+   * @param height is the block height, null for any
+   * @return this query for chaining
+   */
   public ZephyrTxQuery setHeight(Long height) {
     this.height = height;
     return this;
   }
 
+  /**
+   * Returns the lowest block height to match, inclusive.
+   *
+   * @return the height, null for no lower bound
+   */
   public Long getMinHeight() {
     return minHeight;
   }
 
+  /**
+   * Sets the lowest block height to match, inclusive. In {@code ZephyrWalletFull} the core then
+   * leaves out the transactions that are in no block, such as those in the pool (read in the core's
+   * code); {@link #meetsCriteria(ZephyrTxWallet)} keeps them.
+   *
+   * @param minHeight is the height, null for no lower bound
+   * @return this query for chaining
+   */
   public ZephyrTxQuery setMinHeight(Long minHeight) {
     this.minHeight = minHeight;
     return this;
   }
 
+  /**
+   * Returns the highest block height to match, inclusive.
+   *
+   * @return the height, null for no upper bound
+   */
   public Long getMaxHeight() {
     return maxHeight;
   }
 
+  /**
+   * Sets the highest block height to match, inclusive; a transaction in no block does not match.
+   *
+   * @param maxHeight is the height, null for no upper bound
+   * @return this query for chaining
+   */
   public ZephyrTxQuery setMaxHeight(Long maxHeight) {
     this.maxHeight = maxHeight;
     return this;
   }
 
+  /**
+   * Returns whether {@code getTxs} fills the outputs of each transaction.
+   *
+   * @return true to fill them, null or false otherwise
+   */
   public Boolean getIncludeOutputs() {
     return includeOutputs;
   }
 
+  /**
+   * Sets whether {@code getTxs} fills the outputs of each transaction: the wallet's own outputs of
+   * it, from the same data as {@code getOutputs()}, so without an asset. See the user guide,
+   * {@code docs/guide/06-history.md}, section "getOutputs() reports no asset".
+   *
+   * @param includeOutputs is true to fill them
+   * @return this query for chaining
+   */
   public ZephyrTxQuery setIncludeOutputs(Boolean includeOutputs) {
     this.includeOutputs = includeOutputs;
     return this;
   }
 
+  /**
+   * Returns the transfer query that at least one transfer of a matching transaction meets.
+   *
+   * @return the transfer query, null if none
+   */
   public ZephyrTransferQuery getTransferQuery() {
     return transferQuery;
   }
 
+  /**
+   * Sets the transfer query that at least one transfer of a matching transaction meets, and makes
+   * this query the transfer query's transaction query.
+   *
+   * @param transferQuery is the transfer query, null for none
+   * @return this query for chaining
+   */
   public ZephyrTxQuery setTransferQuery(ZephyrTransferQuery transferQuery) {
     this.transferQuery = transferQuery;
     if (transferQuery != null) transferQuery.txQuery = this;
     return this;
   }
   
+  /**
+   * Returns the output query that at least one input of a matching transaction meets.
+   *
+   * @return the input query, null if none
+   */
   public ZephyrOutputQuery getInputQuery() {
     return inputQuery;
   }
   
+  /**
+   * Sets the output query that at least one input of a matching transaction meets, and makes this
+   * query its transaction query. In {@code ZephyrWalletFull} the transactions of the history carry
+   * no inputs, so a query with an input query matches none (read in the core's code).
+   *
+   * @param inputQuery is the input query, null for none
+   * @return this query for chaining
+   */
   public ZephyrTxQuery setInputQuery(ZephyrOutputQuery inputQuery) {
     this.inputQuery = inputQuery;
     if (inputQuery != null) inputQuery.txQuery = this;
     return this;
   }
   
+  /**
+   * Returns the output query that at least one output of a matching transaction meets.
+   *
+   * @return the output query, null if none
+   */
   public ZephyrOutputQuery getOutputQuery() {
     return outputQuery;
   }
 
+  /**
+   * Sets the output query that at least one output of a matching transaction meets, and makes this
+   * query its transaction query.
+   *
+   * @param outputQuery is the output query, null for none
+   * @return this query for chaining
+   */
   public ZephyrTxQuery setOutputQuery(ZephyrOutputQuery outputQuery) {
     this.outputQuery = outputQuery;
     if (outputQuery != null) outputQuery.txQuery = this;
@@ -198,6 +380,13 @@ public class ZephyrTxQuery extends ZephyrTxWallet implements Filter<ZephyrTxWall
     return meetsCriteria(tx, true);
   }
   
+  /**
+   * Returns whether the given transaction meets this query, evaluated in Java.
+   *
+   * @param tx is the transaction to test
+   * @param queryChildren is true to apply the transfer, input and output queries too
+   * @return true if the transaction meets the query
+   */
   protected boolean meetsCriteria(ZephyrTxWallet tx, boolean queryChildren) {
     if (tx == null) throw new ZephyrError("No tx given to ZephyrTxQuery.meetsCriteria()");
     
