@@ -2,7 +2,7 @@
 #
 # Builds libzephyr-java for Linux from pinned sources with zephyr's own contrib/depends, one
 # library per architecture, linked against the static depends libraries only (boost, OpenSSL,
-# unbound, expat, sodium, hidapi, libusb, eudev, protobuf) and the static libstdc++ and libgcc,
+# unbound, expat, sodium, hidapi with libusb and eudev) and the static libstdc++ and libgcc,
 # so the library needs nothing from the host but the C runtime. This is the release build of the
 # Linux natives; bin/build_libzephyr_java.sh stays the quick developer build against the system
 # libraries.
@@ -19,13 +19,18 @@
 #      0004-openssl-openssldir      needed (OPENSSLDIR /etc/ssl instead of the depends prefix)
 # 3. Builds contrib/depends for the host triplet into contrib/depends/<triplet>/ (this downloads
 #    the package sources; depends checks their sha256). A stalled download fails after 120 s below
-#    1000 bytes/s, and depends retries it from downloads.getmonero.org.
+#    1000 bytes/s, and depends retries it from downloads.getmonero.org. protobuf and its native
+#    protoc are left out of depends' package list (they serve only zephyr's Trezor support, which
+#    is off, step 4); hidapi, libusb and eudev stay (hidapi, for zephyr's Ledger code in its
+#    device library, links libusb and libudev).
 #      0005-neutral-engines-and-unbound-sysconfdir  needed (no depends-prefix paths in OpenSSL
 #                                                   and unbound)
 #      0006-openssl-android-environment             no code change (OpenSSL is rebuilt; its
 #                                                   patch removes the Android branch only)
 # 4. Builds zephyr's library targets with the depends toolchain in build/<triplet>/release of the
-#    zephyr tree (configured afresh every time; make rebuilds only what changed).
+#    zephyr tree (configured afresh every time; make rebuilds only what changed), with
+#    USE_DEVICE_TREZOR=OFF: the Java API cannot reach a hardware device, so zephyr builds
+#    libdevice_trezor.a from its stub and neither protobuf nor Trezor's libusb transport is linked.
 # 5. Builds the JNI library in build-linux/<arch>/ (CMakeLists.txt of this repo, with
 #    DEPENDS_PREFIX set, configured afresh every time) and copies it to
 #    build/natives/linux-<arch>/libzephyr-java.so, with build/natives/linux-<arch>/build-env
@@ -118,8 +123,11 @@ for ARCH in $ARCHES; do
   # are depends' own defaults (DOWNLOAD_CONNECT_TIMEOUT:=30, DOWNLOAD_RETRIES:=5), written out:
   # no $(...) in a command-line variable, because make passes it on to every sub-make unexpanded,
   # and ncurses' Android build starts its sub-makes from a shell line, which /bin/sh then rejects.
+  # hardware_packages and hardware_native_packages (packages/packages.mk) without protobuf and
+  # native_protobuf: only zephyr's Trezor support uses them, and it is off (step 4).
   make -C "$Z/contrib/depends" HOST="$TRIPLET" -j"$(nproc)" \
-    build_linux_DOWNLOAD='curl --location --fail --connect-timeout 30 --retry 5 --speed-limit 1000 --speed-time 120 -o'
+    build_linux_DOWNLOAD='curl --location --fail --connect-timeout 30 --retry 5 --speed-limit 1000 --speed-time 120 -o' \
+    hardware_packages='hidapi libusb' hardware_native_packages=
   TOOLCHAIN="$PREFIX/share/toolchain.cmake"
   # gcc: -ffile-prefix-map covers __FILE__ and the debug information; the later map wins for
   # the depends prefix, which lies inside the checkout
@@ -131,11 +139,12 @@ for ARCH in $ARCHES; do
   # platform's initial flags (on Android -funwind-tables -no-canonical-prefixes, on armeabi-v7a
   # also -march, -marm, -mfpu, -mfloat-abi), which -DCMAKE_C_FLAGS on a first configure would
   # replace; zephyr's CMakeLists.txt only appends to CMAKE_C_FLAGS/CMAKE_CXX_FLAGS. Objects whose
-  # flags did not change are not rebuilt.
+  # flags did not change are not rebuilt. USE_DEVICE_TREZOR=OFF: see the header.
   wipe_if_other_source "$ZB" "$ROOT/$Z"
   mkdir -p "$ZB" && cd "$ZB"
   rm -f CMakeCache.txt
-  CFLAGS="$PREFIX_MAPS" CXXFLAGS="$PREFIX_MAPS" cmake -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DCMAKE_BUILD_TYPE=Release -DUSE_CCACHE=ON ../../..
+  CFLAGS="$PREFIX_MAPS" CXXFLAGS="$PREFIX_MAPS" cmake -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DCMAKE_BUILD_TYPE=Release -DUSE_CCACHE=ON \
+    -DUSE_DEVICE_TREZOR=OFF ../../..
   make -j"$(nproc)" wallet cryptonote_protocol
   cd "$ROOT"
 

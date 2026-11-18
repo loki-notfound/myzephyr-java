@@ -65,8 +65,14 @@ OpenSSL's own source:
 | `0005-neutral-engines-and-unbound-sysconfdir` | neutral `ENGINESDIR`, `MODULESDIR` and unbound `sysconfdir` | they embedded the build directory, which breaks reproducibility across paths |
 | `0006-openssl-android-environment` | on Android, OpenSSL's `OPENSSL_issetugid()` compares the user and group ids instead of asking `getauxval(AT_SECURE)` | `AT_SECURE` is set in every Android app process, so OpenSSL ignored `SSL_CERT_FILE` and `SSL_CERT_DIR` there and the native wallet could not verify an `https://` node |
 
-Two more build-layer settings:
+Three more build-layer settings:
 
+- zephyr is configured with `USE_DEVICE_TREZOR=OFF`, and depends leaves out protobuf and its
+  compiler `protoc`. The Java API cannot reach a hardware device, so the Trezor code and protobuf
+  are not linked; zephyr builds its `device_trezor` library as the stub it provides for that case.
+  On Linux, hidapi with libusb and eudev is still built and linked, because zephyr's device library
+  compiles its Ledger code when hidapi is available. ZephyrProtocol's original `v2.3.0` has the
+  same CMake and depends files for this, so the setting applies there unchanged;
 - the JNI library is compiled with `-include map`, because zephyr-cpp's model header relies on
   boost to include `<map>` and newer boost does not;
 - zephyr's dead `blocks` library is not linked, because the pinned tree never builds it.
@@ -84,7 +90,7 @@ git submodule update --init external/zephyr-cpp
 There are four entry points:
 
 - **`bin/build_libzephyr_java.sh`**, the developer build. It builds zephyr and the JNI library
-  against the host's shared libraries (boost, OpenSSL, unbound, sodium, hidapi, protobuf) into
+  against the host's shared libraries (boost, OpenSSL, unbound, sodium, hidapi) into
   `build/`, where `mvn test` finds it. Quick, but the result runs only on hosts like the one that
   built it. The CI workflow's "System libraries of the developer build" step lists the packages it
   needs on Ubuntu 24.04.

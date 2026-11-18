@@ -14,8 +14,12 @@
 # 3. Builds contrib/depends for the ABI's host triplet into contrib/depends/<triplet>/ (this
 #    downloads the NDK and the package sources; depends checks their sha256). A stalled download
 #    fails after 120 s below 1000 bytes/s, and depends retries it from downloads.getmonero.org.
+#    protobuf and its native protoc are left out of depends' package list (they serve only
+#    zephyr's Trezor support, which is off, step 4; depends builds no hidapi or libusb for Android).
 # 4. Builds zephyr's library targets with the depends toolchain in build/<triplet>/release of the
-#    zephyr tree (configured afresh every time; make rebuilds only what changed).
+#    zephyr tree (configured afresh every time; make rebuilds only what changed), with
+#    USE_DEVICE_TREZOR=OFF: the Java API cannot reach a hardware device, so zephyr builds
+#    libdevice_trezor.a from its stub and protobuf is not linked.
 # 5. Builds the JNI library in build-android/<abi>/ (CMakeLists.txt of this repo, Android branch)
 #    and copies it to build/android/<abi>/libzephyr-java.so, and writes
 #    build/debug/android-<abi>/build-env (bin/android_build_env.sh: container image or none,
@@ -106,8 +110,11 @@ for ABI in $ABIS; do
   # are depends' own defaults (DOWNLOAD_CONNECT_TIMEOUT:=30, DOWNLOAD_RETRIES:=5), written out:
   # no $(...) in a command-line variable, because make passes it on to every sub-make unexpanded,
   # and ncurses' Android build starts its sub-makes from a shell line, which /bin/sh then rejects.
+  # android_packages and hardware_native_packages (packages/packages.mk) without protobuf and
+  # native_protobuf: only zephyr's Trezor support uses them, and it is off (step 4).
   make -C "$Z/contrib/depends" HOST="$TRIPLET" -j"$(nproc)" \
-    build_linux_DOWNLOAD='curl --location --fail --connect-timeout 30 --retry 5 --speed-limit 1000 --speed-time 120 -o'
+    build_linux_DOWNLOAD='curl --location --fail --connect-timeout 30 --retry 5 --speed-limit 1000 --speed-time 120 -o' \
+    android_packages='ncurses readline' hardware_native_packages=
   PREFIX="$ROOT/$Z/contrib/depends/$TRIPLET"
   TOOLCHAIN="$PREFIX/share/toolchain.cmake"
   # clang 7.0.2: debug information only, see the header (__FILE__ stays absolute)
@@ -119,11 +126,12 @@ for ABI in $ABIS; do
   # platform's initial flags (on Android -funwind-tables -no-canonical-prefixes, on armeabi-v7a
   # also -march, -marm, -mfpu, -mfloat-abi), which -DCMAKE_C_FLAGS on a first configure would
   # replace; zephyr's CMakeLists.txt only appends to CMAKE_C_FLAGS/CMAKE_CXX_FLAGS. Objects whose
-  # flags did not change are not rebuilt.
+  # flags did not change are not rebuilt. USE_DEVICE_TREZOR=OFF: see the header.
   wipe_if_other_source "$ZB" "$ROOT/$Z"
   mkdir -p "$ZB" && cd "$ZB"
   rm -f CMakeCache.txt
-  CFLAGS="$PREFIX_MAPS" CXXFLAGS="$PREFIX_MAPS" cmake -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DBUILD_TESTS=OFF -DUSE_CCACHE=ON ../../..
+  CFLAGS="$PREFIX_MAPS" CXXFLAGS="$PREFIX_MAPS" cmake -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DBUILD_TESTS=OFF -DUSE_CCACHE=ON \
+    -DUSE_DEVICE_TREZOR=OFF ../../..
   make -j"$(nproc)" wallet cryptonote_protocol
   cd "$ROOT"
 

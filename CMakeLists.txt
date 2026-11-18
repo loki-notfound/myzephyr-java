@@ -113,28 +113,13 @@ endif()
 message(STATUS EXTRA_LIBRARIES: ${EXTRA_LIBRARIES})
 
 ############
-# Protobuf
+# Trezor, protobuf, libusb
 ############
 
-# Android: zephyr builds without Trezor, hidapi and libusb there; no protobuf, libusb or HIDAPI
-if (NOT APPLE AND NOT ANDROID)
-  include(FindProtobuf)
-  find_package(Protobuf)
-  message(STATUS "Protobuf lib: ${Protobuf_LIBRARY}, inc: ${Protobuf_INCLUDE_DIR}, protoc: ${Protobuf_PROTOC_EXECUTABLE}")
-  include_directories(${Protobuf_INCLUDE_DIR})
-endif()
-
-############
-# LibUSB
-############
-
-if (LINUX_DEPENDS)
-  set(usb_LIBRARY "${DEPENDS_PREFIX}/lib/libusb-1.0.a")
-  set(LibUSB_LIBRARIES ${usb_LIBRARY})
-elseif (NOT ANDROID)
-  find_library(usb_LIBRARY NAMES usb-1.0 libusb usb)
-  set(LibUSB_LIBRARIES ${usb_LIBRARY})
-endif()
+# The build scripts configure zephyr with USE_DEVICE_TREZOR=OFF: the Java API cannot reach a
+# hardware device, so zephyr builds libdevice_trezor.a from its stub (register_all() only, which
+# wallet2 calls) and neither protobuf nor Trezor's libusb transport is linked here. libusb still
+# comes in on Linux as a dependency of hidapi (HIDAPI_LIBRARIES, below).
 
 ############
 # Boost
@@ -204,6 +189,9 @@ if(APPLE)
   endif()
 endif()
 
+# Linux: zephyr's device library compiles its Ledger code with hidapi when it finds it (zephyr's
+# depends builds hidapi with libusb and eudev for Linux, not for Android); FindHIDAPI adds
+# libusb-1.0 and libudev for a depends build
 if (NOT ANDROID)
   find_package(HIDAPI REQUIRED)
   message(STATUS "Using HIDAPI include dir at ${HIDAPI_INCLUDE_DIR}")
@@ -322,13 +310,10 @@ add_library(device STATIC IMPORTED)
 set_target_properties(device PROPERTIES IMPORTED_LOCATION
     ${MONERO_PROJECT_BUILD}/src/device/libdevice.a)
 
-# Android: device_trezor (built without hardware support there) is linked only if its archive exists
-if (NOT ANDROID OR EXISTS ${MONERO_PROJECT_BUILD}/src/device_trezor/libdevice_trezor.a)
-  add_library(device_trezor STATIC IMPORTED)
-  set_target_properties(device_trezor PROPERTIES IMPORTED_LOCATION
-      ${MONERO_PROJECT_BUILD}/src/device_trezor/libdevice_trezor.a)
-  set(device_trezor_lib device_trezor)
-endif()
+# device_trezor: the stub zephyr builds with USE_DEVICE_TREZOR=OFF (see above)
+add_library(device_trezor STATIC IMPORTED)
+set_target_properties(device_trezor PROPERTIES IMPORTED_LOCATION
+    ${MONERO_PROJECT_BUILD}/src/device_trezor/libdevice_trezor.a)
 
 add_library(multisig STATIC IMPORTED)
 set_target_properties(multisig PROPERTIES IMPORTED_LOCATION
@@ -376,9 +361,7 @@ target_compile_options(zephyr-java PRIVATE -include map)
 # carries visibility("default") itself, so the bridge's entry points and JNI_OnLoad stay exported.
 target_compile_options(zephyr-java PRIVATE -fvisibility=hidden -fvisibility-inlines-hidden)
 
-# Android and Linux with depends: OpenSSL comes only from the depends prefix (OPENSSL_LIBRARIES);
-# protobuf is the depends libprotobuf.a that the toolchain file sets as Protobuf_LIBRARY (on
-# Android zephyr builds device_trezor with protobuf, without libusb and hidapi)
+# Android and Linux with depends: OpenSSL comes only from the depends prefix (OPENSSL_LIBRARIES)
 if (ANDROID OR LINUX_DEPENDS)
   set(JNI_SSL_NAMES "")
 else()
@@ -406,7 +389,7 @@ target_link_libraries(zephyr-java
     blockchain_db
     checkpoints
     device
-    ${device_trezor_lib}
+    device_trezor
     multisig
     version
     randomx
@@ -417,8 +400,6 @@ target_link_libraries(zephyr-java
 
     ${UNBOUND_LIBRARIES}
     ${Boost_LIBRARIES}
-    ${Protobuf_LIBRARY}
-    ${LibUSB_LIBRARIES}
     ${OPENSSL_LIBRARIES}
     ${SODIUM_LIBRARY}
     ${HIDAPI_LIBRARIES}
@@ -453,8 +434,8 @@ endif()
 # which would have failed only at the first sync)
 if (UNIX AND NOT APPLE)
   target_link_options(zephyr-java PRIVATE -Wl,--no-undefined)
-  # zephyr's liboracle.a (pricing records; not in zephyr-cpp's import list) and, after
-  # device_trezor, cncrypto again (hmac_keccak_hash); then what liboracle.a needs
+  # zephyr's liboracle.a (pricing records; not in zephyr-cpp's import list) and cncrypto again
+  # (the full device_trezor needed hmac_keccak_hash after itself; kept); then what liboracle.a needs
   add_library(oracle STATIC IMPORTED)
   set_target_properties(oracle PROPERTIES IMPORTED_LOCATION
       ${MONERO_PROJECT_BUILD}/src/oracle/liboracle.a)

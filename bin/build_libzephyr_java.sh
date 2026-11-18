@@ -3,7 +3,7 @@
 # Builds libzephyr-java from pinned sources.
 #
 # This is the quick developer build: zephyr and the JNI library link against the host's shared
-# system libraries (boost, OpenSSL, unbound, sodium, hidapi, protobuf), so the result runs only
+# system libraries (boost, OpenSSL, unbound, sodium, hidapi), so the result runs only
 # on hosts like this one. Releases use bin/build_linux.sh, which builds the Linux natives through
 # zephyr's contrib/depends and needs only the C runtime of the host.
 #
@@ -17,9 +17,11 @@
 #    tree is not committed anywhere; it is excluded in the submodule's git directory
 #    (info/exclude, inside .git, not in the tree) so the submodule stays clean.
 # 3. Builds zephyr in external/zephyr-cpp/external/zephyr/build/release with the settings of
-#    zephyr's "make release-static" target plus ccache and ARCH=default (no -march), library
-#    targets only. cmake is skipped when the build directory has a CMakeCache.txt with
-#    ARCH=default; make always runs (a no-op when up to date).
+#    zephyr's "make release-static" target plus ccache, ARCH=default (no -march) and
+#    USE_DEVICE_TREZOR=OFF (no Trezor support, so no protobuf: the Java API cannot reach a
+#    hardware device), library targets only. cmake is skipped when the build directory has a
+#    CMakeCache.txt with ARCH=default and USE_DEVICE_TREZOR=OFF; make always runs (a no-op when up
+#    to date).
 # 4. Builds the JNI library in build/ (CMakeLists.txt of this repo).
 # 5. Copies it to target/natives/linux-x86_64/, which Maven packages into the JAR.
 #
@@ -104,12 +106,16 @@ grep -qxF 'external/zephyr' "$EXCLUDE" 2>/dev/null || echo 'external/zephyr' >> 
 # them cannot run (the CI java job aborted that way). ARCH=default passes no -march at all. The
 # release natives (contrib/depends) are CPU-independent already: they build byte-identical on
 # different machines. A cache configured with another ARCH (an existing checkout) is configured
-# again.
+# again. USE_DEVICE_TREZOR=OFF: zephyr then builds libdevice_trezor.a from its stub and needs
+# neither protobuf nor libusb (as in bin/build_linux.sh and bin/build_android.sh); a cache
+# configured with Trezor support is configured again as well.
 mkdir -p "$Z/build/release" && cd "$Z/build/release"
-if [ -f CMakeCache.txt ] && [ "$(grep '^ARCH:' CMakeCache.txt | cut -d= -f2)" = default ]; then
-  echo "zephyr: $Z/build/release/CMakeCache.txt exists (ARCH=default), skipping cmake"
+if [ -f CMakeCache.txt ] && [ "$(grep '^ARCH:' CMakeCache.txt | cut -d= -f2)" = default ] \
+    && [ "$(grep '^USE_DEVICE_TREZOR:' CMakeCache.txt | cut -d= -f2)" = OFF ]; then
+  echo "zephyr: $Z/build/release/CMakeCache.txt exists (ARCH=default, USE_DEVICE_TREZOR=OFF), skipping cmake"
 else
-  cmake -D STATIC=ON -D BUILD_64=ON -D CMAKE_BUILD_TYPE=Release -D USE_CCACHE=ON -D ARCH=default ../..
+  cmake -D STATIC=ON -D BUILD_64=ON -D CMAKE_BUILD_TYPE=Release -D USE_CCACHE=ON -D ARCH=default \
+    -D USE_DEVICE_TREZOR=OFF ../..
 fi
 # Only the wallet targets: the daemon, the tests and miniupnpc's sample are not needed,
 # and the sample does not compile with gcc 14 (strdup undeclared under -std=c11).
