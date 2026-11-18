@@ -245,6 +245,41 @@ public class TestWalletClosingChildren {
     run("fromcallback", true, "fromcallback").check();
   }
 
+  /** H1: the delays between startSyncing() and close(), in daemon RPC times, one per run. */
+  private static final String[] H1_DELAYS = { "0", "0.5", "1", "1.5", "2", "2.5" };
+
+  /**
+   * H1: close() shortly after startSyncing() on a wallet far behind the node, while the core's sync
+   * thread makes its daemon RPCs before the refresh begins, returns within
+   * {@value ClosingChild#H1_LIMIT_MS} ms instead of after a whole catch-up scan. Six runs, each
+   * closing a little later (0 to 2.5 times one daemon RPC after startSyncing() returned).
+   */
+  @RepeatedTest(6)
+  public void closeRightAfterStartSyncing(RepetitionInfo repetition) throws Exception {
+    assumeNodeAndWallet();
+    int i = repetition.getCurrentRepetition();
+    run("h1-start-" + i, true, "h1", "start", H1_DELAYS[i - 1]).check();
+  }
+
+  /** H1 with stopSyncing() between startSyncing() and close(). Six runs with the same delays. */
+  @RepeatedTest(6)
+  public void closeRightAfterStartAndStopSyncing(RepetitionInfo repetition) throws Exception {
+    assumeNodeAndWallet();
+    int i = repetition.getCurrentRepetition();
+    run("h1-stop-" + i, true, "h1", "stop", H1_DELAYS[i - 1]).check();
+  }
+
+  /**
+   * H2: close(true) while the core's sync thread is paused inside a refresh (a listener blocks in
+   * onNewBlock for 2 s): the wallet is saved after that thread has stopped, and it reopens with the
+   * scanned blocks. Three runs.
+   */
+  @RepeatedTest(3)
+  public void closeWithSaveWhileARefreshRuns(RepetitionInfo repetition) throws Exception {
+    assumeNodeAndWallet();
+    run("h2-" + repetition.getCurrentRepetition(), true, "h2").check();
+  }
+
   /**
    * T4: main returns while background syncing runs and the wallet is still open: exit status 0, no
    * crash report. Twenty runs. Known to fail: while the core's sync thread is inside a refresh, the

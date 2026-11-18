@@ -45,6 +45,10 @@ public class ClosingChild {
 
   private static final long T0 = System.currentTimeMillis();
   private static final long WAIT_MS = 240000;
+  /** H1: how long close() may wait right after startSyncing(); a whole catch-up scan of the test wallet takes longer. */
+  static final long H1_LIMIT_MS = 3000;
+  /** H2: how long before close(true) returns the wallet file may have been written. */
+  static final long H2_GAP_LIMIT_MS = 500;
 
   private static void log(String message) {
     System.out.println(String.format("[%8.3f s] [%s] %s", (System.currentTimeMillis() - T0) / 1000.0, Thread.currentThread().getName(), message));
@@ -65,11 +69,19 @@ public class ClosingChild {
       case "stopclose": stopClose(args[1]); break;
       case "fromcallback": fromCallback(args[1]); break;
       case "silent": silent(); break;
+      case "h1": h1(args[1], args[2], args[3]); break;
+      case "h2": h2(args[1]); break;
       case "exitopen": exitOpen(args[1]); break;
       default: fail("unknown scenario " + args[0]);
     }
     log("RESULT ok");
     log("MAIN-RETURNS");
+  }
+
+  private static String password() {
+    String password = System.getenv("ZEPHYR_CHILD_PASSWORD");
+    if (password == null) fail("ZEPHYR_CHILD_PASSWORD not set");
+    return password;
   }
 
   private static ZephyrWalletFull open(String path) {
@@ -331,6 +343,94 @@ public class ClosingChild {
     server.close();
     synchronized (held) { for (Socket socket : held) socket.close(); }
     threads("end");
+  }
+
+  /**
+   * H1: close() right after startSyncing() ("start"), or after startSyncing() and stopSyncing()
+   * ("stop"), on a wallet far behind the node. The core's new sync thread has not begun its refresh
+   * yet, and a stop that comes before the refresh starts is lost there (the refresh resets the
+   * core's run flag): close() must keep stopping it and return within about one batch of blocks,
+   * not after a whole catch-up scan. The third argument is the delay between startSyncing() and
+   * close(), in times one daemon RPC takes.
+   */
+  private static void h1(String path, String variant, String rpcs) throws Exception {
+    ZephyrWalletFull wallet = open(path);
+    long rpcStart = System.nanoTime();
+    long daemonHeight = wallet.getDaemonHeight(); // one daemon RPC: the unit of the delay below
+    long rpcNanos = System.nanoTime() - rpcStart;
+    log("blocks behind the node: " + (daemonHeight - Math.max(wallet.getHeight(), wallet.getRestoreHeight())) + "; one daemon RPC took " + TimeUnit.NANOSECONDS.toMicros(rpcNanos) + " us");
+    Counting listener = new Counting("none");
+    wallet.addListener(listener);
+    // the core's sync thread makes about three daemon RPCs before its refresh begins: waiting a
+    // part of that lets the stop land there rather than before the thread reaches its loop
+    long delayNanos = (long) (Double.parseDouble(rpcs) * rpcNanos);
+    wallet.startSyncing(1000L);
+    if (delayNanos > 0) Thread.sleep(TimeUnit.NANOSECONDS.toMillis(delayNanos), (int) (delayNanos % 1000000));
+    if (variant.equals("stop")) wallet.stopSyncing();
+    log((variant.equals("stop") ? "stopSyncing() and " : "") + "close() " + TimeUnit.NANOSECONDS.toMicros(delayNanos) + " us after startSyncing() returned (" + rpcs + " RPC times)");
+    long ms = timedClose(wallet);
+    log("after close: " + listener.counts());
+    if (ms > H1_LIMIT_MS) fail("close() right after startSyncing()" + (variant.equals("stop") ? " and stopSyncing()" : "") + " waited " + ms + " ms (limit " + H1_LIMIT_MS + " ms)");
+    if (!listener.threads.isEmpty()) assertCallbackThreadsEnded(listener.threads);
+  }
+
+  /**
+   * H2: close(true) while the core's sync thread is inside a refresh, held there by a listener that
+   * blocks in onNewBlock for 2 s. The save must come after that thread has stopped: the wallet file
+   * is written at the end of close(true), not while the refresh is paused, and the saved wallet
+   * opens with the scanned blocks.
+   */
+  private static void h2(String path) throws Exception {
+    ZephyrWalletFull wallet = open(path);
+    long restoreHeight = wallet.getRestoreHeight();
+    CountDownLatch blocked = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    AtomicBoolean armed = new AtomicBoolean();
+    Counting listener = new Counting("none") {
+      @Override public void onNewBlock(long height) {
+        super.onNewBlock(height);
+        if (armed.compareAndSet(true, false)) {
+          log("listener blocks in onNewBlock at height " + height);
+          blocked.countDown();
+          try {
+            release.await();
+          } catch (InterruptedException e) {
+            // released
+          }
+        }
+      }
+    };
+    wallet.addListener(listener);
+    wallet.startSyncing(1000L);
+    awaitFirstProgress(listener);
+    armed.set(true);
+    if (!blocked.await(WAIT_MS, TimeUnit.MILLISECONDS)) fail("the listener was not called within " + WAIT_MS + " ms");
+    Thread releaser = new Thread(() -> {
+      try {
+        Thread.sleep(2000);
+      } catch (InterruptedException e) {
+        // release now
+      }
+      log("releasing the listener");
+      release.countDown();
+    }, "releaser");
+    releaser.start();
+    File cache = new File(path);
+    long start = System.currentTimeMillis();
+    wallet.close(true);
+    long end = System.currentTimeMillis();
+    log("CLOSE-WAIT-MS " + (end - start));
+    if (!cache.isFile()) fail("no wallet file after close(true)");
+    long written = cache.lastModified();
+    long gap = end - written;
+    log("H2-GAP-MS " + gap + " (the wallet file was written " + (written - start) + " ms after close(true) started)");
+    if (gap > H2_GAP_LIMIT_MS) fail("close(true) wrote the wallet file " + gap + " ms before it returned: the save ran while the core's sync thread was still inside its refresh");
+    ZephyrWalletFull reopened = ZephyrWalletFull.openWallet(path, password(), ZephyrNetworkType.MAINNET); // offline
+    long height = reopened.getHeight();
+    reopened.close();
+    log("reopened offline: height " + height + ", restore height " + restoreHeight);
+    if (height <= restoreHeight) fail("the saved wallet holds no scanned block: height " + height);
+    assertCallbackThreadsEnded(listener.threads);
   }
 
   /**

@@ -35,9 +35,13 @@
  */
 
 #include <cerrno>
+#include <chrono>
+#include <condition_variable>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <mutex>
+#include <thread>
 #include "chacha.h" // TODO: explicitly include because wallet2.h #include "crypto/chacha.h" is ignored
 #include "zephyr_jni_bridge.h"
 #include "wallet/monero_wallet_full.h"
@@ -2425,21 +2429,81 @@ JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_saveJni(JNIEnv* env, 
   }
 }
 
-// Called by close() alone, while it holds the call lock's write side: no other call of this wallet
-// runs. A failed save throws and frees nothing, so close() can be retried.
+/**
+ * Keeps asking the core to stop its background sync, every 50 ms, from a thread of its own, for
+ * as long as this object lives: closeJni holds one while the core's close joins the sync thread.
+ * That thread can be in the part of its sync that comes before the refresh, which resets the
+ * core's stop flag when it starts (wallet2::refresh), so a single stop can be lost and the join
+ * would then wait for a whole catch-up scan. With the stop repeated, the refresh ends at its next
+ * batch of blocks. stop_syncing() only stores atomics, also while the core's close runs; the
+ * helper never calls into Java, and the destructor joins it before closeJni goes on, so it cannot
+ * outlive the wallet. Without a thread (it could not be created) the close goes on unrepeated.
+ */
+class sync_stopper {
+ public:
+  explicit sync_stopper(monero_wallet* wallet) : m_wallet(wallet), m_done(false) {
+    try {
+      m_thread = std::thread([this]() {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        while (!m_done) {
+          try { m_wallet->stop_syncing(); } catch (...) { }
+          m_cv.wait_for(lock, std::chrono::milliseconds(50));
+        }
+      });
+    } catch (...) {
+      MERROR("Could not start the thread that repeats the stop while the wallet closes");
+    }
+  }
+  ~sync_stopper() {
+    {
+      std::lock_guard<std::mutex> lock(m_mutex);
+      m_done = true;
+    }
+    m_cv.notify_all();
+    if (m_thread.joinable()) m_thread.join();
+  }
+ private:
+  monero_wallet* m_wallet;
+  bool m_done;
+  std::mutex m_mutex;
+  std::condition_variable m_cv;
+  std::thread m_thread;
+};
+
+/**
+ * Called by close() alone, while it holds the call lock's write side: no other Java call of this
+ * wallet runs, but the core's own background sync thread may, inside a refresh. Hence the order:
+ * 1. the core's close(false) stops syncing and joins that thread (while a sync_stopper repeats the
+ *    stop, so the join waits for one batch of blocks at most, not a lost stop's whole scan), then
+ *    stops and deinitializes wallet2 (which keeps its data, file names and cache key) and releases
+ *    the notification pool: from here no thread refreshes the wallet or calls the listener;
+ * 2. with save, the core's save (wallet2::store) writes the wallet: never during a refresh (the
+ *    core's own close(true) saves before it joins);
+ * 3. delete: the destructor's close(false) finds everything stopped and closed (no thread to join,
+ *    deinit does nothing the second time, the pool is gone) and cannot throw on this path; then
+ *    the listener is deleted and both handles are zeroed.
+ * An exception in 1 or 2 is thrown as ZephyrError and frees nothing (the steps can run again), so
+ * close() can be retried; the destructor's own exceptions could not be caught (it is noexcept),
+ * which is why the core's close runs before it.
+ */
 JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_closeJni(JNIEnv* env, jobject instance, jboolean save) {
   MTRACE("Java_zephyr_wallet_ZephyrWalletFull_CloseJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   if (wallet == nullptr) return;
   try {
+    {
+      sync_stopper stopper(wallet);
+      wallet->close(false);
+    }
     if (save) wallet->save();
-    delete wallet; // the core stops its sync and joins its sync thread: no callback runs after this
-    env->SetLongField(instance, get_handle_field(env, instance, JNI_WALLET_HANDLE), 0);
-    delete get_handle<wallet_jni_listener>(env, instance, JNI_LISTENER_HANDLE);
-    env->SetLongField(instance, get_handle_field(env, instance, JNI_LISTENER_HANDLE), 0);
   } catch (...) {
     rethrow_cpp_exception_as_java_exception(env);
+    return;
   }
+  delete wallet;
+  env->SetLongField(instance, get_handle_field(env, instance, JNI_WALLET_HANDLE), 0);
+  delete get_handle<wallet_jni_listener>(env, instance, JNI_LISTENER_HANDLE);
+  env->SetLongField(instance, get_handle_field(env, instance, JNI_LISTENER_HANDLE), 0);
 }
 
 JNIEXPORT jbyteArray JNICALL Java_zephyr_wallet_ZephyrWalletFull_getKeysFileBufferJni(JNIEnv* env, jobject instance, jstring jpassword, jboolean view_only) {

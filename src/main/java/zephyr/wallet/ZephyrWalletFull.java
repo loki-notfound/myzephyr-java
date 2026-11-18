@@ -2204,6 +2204,14 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     }
   }
   
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Not exclusive with background syncing: while {@code startSyncing()} runs (and after
+   * {@code stopSyncing()}, until the core's sync thread has finished its current sync) the core may
+   * be inside a refresh of the wallet that this save reads. To save a wallet that syncs in the
+   * background, use {@code close(true)}, which saves after that thread has ended.</p>
+   */
   @Override
   public void save() {
     beginCall();
@@ -2224,6 +2232,12 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
    * An interrupt does not end the wait; the thread's interrupt status is restored afterwards.
    * Closing a closed wallet has no effect; a second thread that closes the wallet meanwhile waits
    * for the first.
+   *
+   * <p>With save, the wallet is saved after the core's background sync thread (of
+   * {@code startSyncing()}) has ended and while no other call runs, so the save never meets a
+   * refresh. That thread is asked to stop again and again until it has ended: a stop that comes
+   * before its refresh begins is not lost, and close() waits for the refresh's current batch of
+   * blocks at most.</p>
    *
    * <p>Throws ZephyrError when called from inside one of the wallet's own calls or listener
    * callbacks, which close() would wait for (the wallet stays open), and when saving fails (the
