@@ -8,6 +8,220 @@ user guide in a release's section refer to the guide of that release.
 **Not affiliated with ZephyrProtocol.** An independent project. Report Zephyr vulnerabilities to the
 ZephyrProtocol team, not here.
 
+## v2.3.0-sec.2-java.5
+
+The fifth release on the same core as `v2.3.0-sec.2-java.1`: the closing and listener defects of
+`java.4` are fixed, every wallet call throws `ZephyrError`, the library's own logging keeps
+secrets out, and the artifacts move to Maven Central under `dev.lateo`. The wallet RPC client is
+removed, and the natives carry no Trezor code. **Breaking changes** below.
+
+### Built from
+
+The same zephyr-backports release set of 2026-11-07 as the previous releases, unchanged:
+
+| | Tag | Commit | Tag subject |
+|---|---|---|---|
+| zephyr | `v2.3.0-sec.2` | `8c6a120256b4bd887d6e7167d929d76e3507e0e5` | zephyr v2.3.0 + 30 security backports from Monero |
+| zephyr-cpp | `v2.3.0-sec.1` | `3a2ee602ee28e6b7941b617ad4706349ad992641` | zephyr-cpp master (4a99272f6d7a171cf6625016939094637459975a) + 4 security backports from monero-cpp |
+
+The root certificates are those of 2026-11-05, as in `java.4`; curl had published no newer file
+on 2026-11-19. New build setting: zephyr is configured with `USE_DEVICE_TREZOR=OFF`, and depends
+leaves out protobuf (below, Changed).
+
+### Breaking changes
+
+- **Coordinates and repository.** The groupId is `dev.lateo` (was `io.github.loki-notfound`); the
+  artifactIds `zephyr-java` and `zephyr-java-android` and the Java packages are unchanged. The
+  artifacts are on Maven Central, so a build needs no repository line. The Maven repository on
+  the project's GitHub Pages ends with this release, older versions included: it is no longer
+  served. Releases up to `java.4` remain as GitHub releases. The site moves to
+  `https://java-docs.lateo.dev`.
+- **The wallet RPC client is removed**, with the jeromq dependency that only its ZMQ listener
+  used (`org.zeromq:jeromq:0.5.2`, optional, and its `eu.neilalexander:jnacl:1.0.0`; the AAR's
+  compile-only jeromq). Removed public types: `zephyr.wallet.ZephyrWalletRpc` (its 5 constructors
+  and 170 public methods), `ZephyrWalletRpc.IncomingTransferComparator`,
+  `ZephyrWalletRpc.OutputComparator` and `zephyr.common.SslOptions` (its constructor, 5 getters
+  and 5 setters). Beyond the `ZephyrWallet` interface, `ZephyrWalletRpc` had `getProcess()`,
+  `stopProcess()`, `stopProcess(boolean)`, `getRpcConnection()`, `openWallet(String, String)`,
+  `openWallet(ZephyrWalletConfig)`, `createWallet(ZephyrWalletConfig)`,
+  `getMnemonicLanguages()`, `stop()`, `setDaemonConnection(ZephyrRpcConnection, Boolean,
+  SslOptions)`, `getAccounts(boolean, String, boolean)`, `getAccount(int, boolean, boolean)` and
+  `getSubaddresses(int, List, boolean)`. No public member of a kept class was removed.
+  `ZephyrDaemonRpc`, `ZephyrRpcConnection` and `ZephyrRpcError` stay.
+- **Exception types.** Every public method of `ZephyrWalletFull` and `ZephyrUtils` throws
+  `ZephyrError`, with the message it had. That includes the core's failures, which several calls let
+  through as `java.lang.Exception` or `IOException` (a wrong password among them). It also includes
+  the argument checks that threw `AssertionError`, the unknown hashes of `getTransfers` and
+  `getOutputs` and the "not implemented" calls, which threw `RuntimeException`, and a `null`
+  argument, which threw `NullPointerException` (now a `ZephyrError` with the runtime's text).
+  `toAtomicUnits(double)` throws `ZephyrError` "Amount is not a finite number: " for NaN and the
+  infinities. `OutOfMemoryError` stays as it was.
+- **Calls refused inside a listener callback.** They throw `ZephyrError` "Cannot call <call> from
+  inside a listener callback; call it after the callback has returned": every `sync`, `scanTxs`,
+  `rescanBlockchain`, `startSyncing`, `rescanSpent`, `makeMultisig`, `exchangeMultisigKeys`;
+  every call that relays (`createTx`, `createTxs`, `sweepUnlocked`, `sweepOutput` and `sweepDust`
+  with relay, `relayTx`, `relayTxs`, `submitTxs`, `submitMultisigTxHex`); `importKeyImages`,
+  `importMultisigHex`, `importOutputs`; and the calls that persist the wallet, `save`, `moveTo`,
+  `changePassword` and `getData`. A callback runs in the middle of a refresh: a sync from it
+  deadlocked, and a save from an output callback would write a transaction half processed.
+  `close()` from a callback, or from inside one of the wallet's own calls, throws "Cannot close
+  the wallet from inside one of its own calls or listener callbacks".
+- **Calls cut short by `close()` throw.** A `sync()`, `rescanBlockchain()`, `scanTxs()` or
+  `importMultisigHex()` that `close()` stops throws `ZephyrError` "Wallet is closed" instead of
+  returning a result that looks complete.
+- **`close()` waits.** It returns only when no other thread is inside a call of the wallet and the
+  core's background sync thread has ended, without a time limit (up to the core's timeout of
+  3 min 30 s for a node request under way). An interrupt does not end the wait.
+- **Callbacks of two threads can overlap.** The bridge no longer serialises callbacks: background
+  syncing and a relaying call on another thread can deliver at the same time. Listeners must be
+  thread-safe.
+- **Messages name the guide's sections** instead of "chapter 6": the TLS hint of "Wallet is not
+  connected to daemon" for an `https://` node names "TLS to a node", and the `java.time` message
+  of the RPC classes names "The RPC classes below API 26".
+
+### Security
+
+- `ZephyrWalletFull` at `FINE` no longer logs the transaction config of `createTxs` or the first
+  5,000 characters of the transactions of `createTxs` and `sweepUnlocked`, which held each
+  transaction's secret key. It logs the number of transactions and their hashes.
+- `ZephyrRpcConnection` from `setLogLevel(2)`, its responses at level 3 and its debug stack traces
+  print the values of secret names as `<redacted>`: `password`, `old_password`, `new_password`,
+  `seed`, `seed_offset`, `spendkey`, `viewkey`, `tx_key`, and in responses `key`, `tx_key_list`,
+  `tx_metadata`, `tx_metadata_list`, `signed_txset`, `multisig_txset`, `multisig_info` and `info`.
+  The user name and password written into a URI are redacted in what it prints, and in its
+  `toString()`.
+- `ZephyrRpcError.toString()` redacts the same names in the request parameters, which `java.4`
+  printed in full, passwords included. `getRpcParams()` still holds them.
+
+### Fixed
+
+- **`close()` during a `sync()` on another thread crashed the process** in `java.4`, with a
+  segmentation fault, in 4 of 4 runs with the released JAR (2026-11-17). `close()` now waits for
+  the calls in flight, every native call of the wallet runs inside a lock that `close()` waits
+  for, and the sync ends with "Wallet is closed".
+- **`close()` while background syncing scanned left a native thread attached**, and the JVM never
+  exited (3 of 3 runs with the released JAR, 2026-11-17), also with `stopSyncing()` right before
+  (2 of 2). The callbacks delivered meanwhile failed with "Wallet is closed" on stderr, hundreds of
+  times. Now `close()` stops the core's sync thread, again until it has ended, and joins it before
+  the wallet is freed. Callbacks return at once once the wallet is closed.
+- **An exception from a listener during background syncing left a native thread attached**, and
+  the JVM never exited (3 of 3 runs with the released JAR, 2026-11-17). Now every listener runs in
+  its own protection: its `Throwable` is logged at `WARNING` without the callback's data, and the
+  other listeners are still called. The bridge never leaves a callback thread attached: threads
+  are attached as daemon threads and detached after each callback.
+- **Adding and removing listeners while background syncing ran could crash the process.** The
+  change raced the core's sync thread in the core's unsynchronised listener set. A test that did
+  so in a loop crashed a development build with `java.4`'s pattern in 8 of 8 runs (2026-11-18);
+  `java.4` itself was not run. Now the native listener is added once, on the wallet's first
+  listener, and later changes only switch its delivery.
+- **`close(true)` saved while the core's sync thread could still be refreshing** the wallet, and
+  did not catch a failing save in native code (read in the code). Now it saves after that thread
+  has ended. When the save fails the wallet is closed and freed all the same, and `close(true)`
+  throws "Wallet was closed, but saving it failed: " with the core's reason.
+- **`close()` from a callback of background syncing aborted the process** ("trying joining
+  itself"), observed on 2026-11-18 with a development build whose closing code was `java.4`'s. Now
+  it is refused.
+- **Calls after `close()`**: `getReserveProofWallet` on a closed wallet crashed the process
+  (observed on 2026-11-18 with the same build), and `getData` and `changePassword` had no check.
+  Now every call of a closed wallet throws "Wallet is closed".
+- **The wrong amounts of `toAtomicUnits(double)`.** Values that `Double.toString` prints with 19
+  or more decimals, between 0.001 and 0.01, came out about 8 % too high (12 of 2,000,000 random
+  values). Values printed in scientific notation, below 0.001 and from 10^7, threw
+  `NumberFormatException`. Now every finite value converts, and decimals beyond the twelfth are
+  dropped as before.
+- **A `null` attribute key or value aborted the process** in `getAttribute` and `setAttribute`
+  (the bridge built a string from a null pointer). Now it is refused with "Must provide attribute
+  key" or "Must provide attribute value".
+- **A minified app could not be built against the AAR.** R8 stopped on classes that the Apache
+  HTTP client and its logging interface refer to (`org.brotli.dec.BrotliInputStream`,
+  `org.ietf.jgss.*`, `org.slf4j.impl.StaticLoggerBinder`) unless the app added its own rules;
+  `java.4` failed the same way (2026-11-19, AGP 9.5, R8 full mode). The AAR's consumer rules now
+  carry the three `-dontwarn` lines.
+- A wallet whose node connection failed right after it was opened or created was never freed;
+  it is now closed before the exception is thrown.
+- A listener given to `sync(listener)` that removed itself made the sync throw "Listener is not
+  registered with wallet" at its end; it no longer does.
+
+### Changed
+
+- **The natives carry no Trezor code and no protobuf.** zephyr is configured with
+  `USE_DEVICE_TREZOR=OFF` (its `device_trezor` library becomes the stub with an empty
+  registration), depends builds no protobuf, and the JNI library no longer links protobuf or
+  libusb directly. On Linux hidapi with libusb and eudev stays, for zephyr's Ledger code. Exports
+  and the needed libraries are unchanged. The natives are 17 to 20 % smaller: in a build of
+  2026-11-18, `linux-x86_64` 19,076,344 bytes (`java.4`: 23,206,736), `linux-arm64` 16,702,608
+  (20,053,160), `arm64-v8a` 16,025,256 (20,141,000), `armeabi-v7a` 14,559,540 (18,019,980) and
+  `x86_64` 19,013,608 (23,897,880).
+- The consumer R8 rules keep the two native handle fields of `ZephyrWalletFull` under their names,
+  which the bridge reads by name and Java no longer reads; and the three `-dontwarn` lines above.
+- The AAR's Android namespace is `dev.lateo.zephyrjava` (was `io.github.lokinotfound.zephyrjava`);
+  it names only the package of the AAR's manifest.
+- Both POMs carry what Maven Central requires (name, description with the not-affiliated
+  sentence, url, licences, developer, scm). They name the MIT licence of the library and the
+  Mozilla Public License 2.0 of the shipped root certificates (`cacert.pem`). The OSSRH
+  distribution settings and the old `release` profile are gone.
+- The release build writes the Maven Central bundle (`dist/<version>/central/`), which
+  `bin/sign_central_bundle.sh` signs. Every file Central serves is a release file under the signed
+  `SHA256SUMS`, except the AAR's Javadoc jar, a copy of the JAR's under the AAR's name, which
+  `manifest.json` lists. The JAR's POM and the AAR's Gradle module metadata are new release files.
+- The native listener is added to the core once, on the wallet's first listener, and stays until
+  `close()`. A wallet that never gets a listener costs what it cost in `java.4`. A wallet whose
+  listener was added and removed pays the core's per-block listener work, about 11 % per scan in
+  a measurement of 2026-11-18. Add the first listener before `startSyncing()`.
+- The JNI bridge throws `ZephyrError` for every core exception (`OutOfMemoryError` for a failed
+  allocation), deletes the local references of each callback, and checks each class lookup in
+  `JNI_OnLoad`.
+- The Javadoc of the wallet model's classes is complete; a missing comment in the classes kept
+  complete fails the Javadoc step. Four model classes got an explicit documented constructor.
+
+### Documentation
+
+- The user guide describes `java.5`: threads, callbacks and closing (the calls refused inside a
+  callback, what bounds `close()`, the rule to close every wallet before the process ends),
+  exceptions and logging, amounts, the RPC classes without the wallet RPC client, the
+  distribution, and the known limitations with a list of what `java.5` fixed. What remains for
+  readers of `java.4` stays, marked as such.
+- The README follows.
+
+### Tested
+
+On Linux `x86_64` (Debian 13, OpenJDK 21), from 2026-11-18 to 2026-11-19, with development builds
+of these sources, against a mainnet node, read-only; nothing was sent or relayed:
+
+- the offline tests, 71 on the final code, among them every public method of a closed wallet,
+  the refusals inside a callback, a failed save at close, `close()` racing calls on another
+  thread, the amounts table and the logging with planted secrets;
+- the closing tests in child processes (each fails on a crash, a hang or a thread left attached)
+  on the code before the save refusals: 45 passed, 20 opt-in runs skipped. Among them `close()`
+  during a foreground `sync()` in 10 of 10 runs, right after `startSyncing()` and
+  `stopSyncing()`, and listeners added and removed in a loop during background syncing.
+  `close()` returned within 203 ms against the node; against a socket that never answered it
+  waited 208 s, the core's timeout;
+- the read-only integration tests and the TLS tests;
+- all of these again under `-Xcheck:jni`, without a warning or fatal error from the JNI checks;
+- the offline and closing tests also on the Linux `x86_64` library built in the release container
+  (2026-11-18);
+- three release builds with identical `SHA256SUMS` and identical Maven Central bundles
+  (2026-11-19); a Gradle JVM program that resolved and ran the JAR from a local copy of the bundle;
+  a minified Android app built against the AAR, not run.
+
+Android: nothing of this release had run on Android or the emulator when these notes were
+written (2026-11-19).
+
+### The dependency
+
+Android: `dev.lateo:zephyr-java-android:2.3.0-sec.2-java.5`; the JVM:
+`dev.lateo:zephyr-java:2.3.0-sec.2-java.5`, both from Maven Central. The `packaging` line and the
+dependencies are those of the earlier releases; the guide's "Android" says where they go.
+
+### Verification
+
+```sh
+gpg --import KEYS.asc
+git verify-tag v2.3.0-sec.2-java.5
+gpg --verify SHA256SUMS.asc && sha256sum -c SHA256SUMS
+```
+
 ## v2.3.0-sec.2-java.4
 
 The fourth release on the same core as `v2.3.0-sec.2-java.1`: `https://` nodes work on Android,
