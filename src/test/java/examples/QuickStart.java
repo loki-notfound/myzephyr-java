@@ -40,7 +40,7 @@ public class QuickStart {
     try {
       System.out.println("Primary address: " + wallet.getPrimaryAddress());
 
-      // sync; the listener runs on a native thread, once per block fetched
+      // sync; the listener is called once per block fetched
       wallet.sync(new ZephyrWalletListener() {
         @Override
         public void onSyncProgress(long height, long startHeight, long endHeight, double percentDone, String message) {

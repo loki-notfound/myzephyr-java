@@ -13,14 +13,19 @@ with Zephyr's assets, conversions and reserve information added. The repository 
 
 ## Status
 
-The current release is `v2.3.0-sec.2-java.4`, built from the zephyr-backports release set of
-2026-11-07: zephyr `v2.3.0-sec.2` and zephyr-cpp `v2.3.0-sec.1`.
+This README describes release `v2.3.0-sec.2-java.5`, built from the zephyr-backports release set
+of 2026-11-07: zephyr `v2.3.0-sec.2` and zephyr-cpp `v2.3.0-sec.1`. It fixes the closing and
+listener defects of `java.4` and throws `ZephyrError` from every wallet call. It keeps secrets out
+of the library's logging, moves the artifacts to Maven Central under `dev.lateo` and removes the
+wallet RPC client. The [release notes](RELEASE-NOTES.md) list the breaking changes.
 
 - **The JAR** carries the native libraries for Linux `x86_64` and `arm64` and needs glibc 2.36 or
   newer. The `arm64` library is built and checked but has not been run.
 - **The AAR**, minSdk 24, carries the native library for `arm64-v8a`, `armeabi-v7a` and `x86_64`.
-  The `x86_64` library ran on the Android emulator, on API 24 and on API 35. The ARM libraries had
-  not run on hardware by release `2.3.0-sec.2-java.4` (2026-11-10).
+  The `x86_64` library of earlier releases ran on the Android emulator, on API 24 and on API 35.
+  For `java.5` nothing had run on Android when this README was written (2026-11-19). The ARM
+  libraries have not run on hardware.
+- The natives carry no Trezor code and no protobuf: the Java API cannot reach a hardware device.
 
 The guide's [What was tested](docs/guide/13-known-limitations.md#what-was-tested) has the details,
 and what was not tested.
@@ -35,8 +40,8 @@ shown balances per asset, sent transfers, converted ZPH to ZRS and swept account
 Outside its scope, or not ready:
 
 - native libraries for macOS and Windows, which are not packaged;
-- the RPC classes, `ZephyrWalletRpc` and `ZephyrDaemonRpc`, which are a first pass;
-  `ZephyrWalletRpc` serves the base coin only;
+- a wallet RPC client: `ZephyrWalletRpc` was removed in `java.5`. `ZephyrDaemonRpc` reads a node,
+  and beyond the node's information and block headers it is not tested;
 - testnet and stagenet, which never reach the rules of the current assets;
 - conversions other than ZPH → ZRS, which have not been run on mainnet;
 - the inherited areas listed in
@@ -50,7 +55,9 @@ the build manifest and the signed `SHA256SUMS`. Maven uses Maven Central by defa
 Android Studio project lists `mavenCentral()` in its `settings.gradle.kts`, so a project adds the
 dependency and no repository line. The project's site,
 `https://java-docs.lateo.dev`, carries the user guide and the Javadoc
-([Documentation](#documentation)).
+([Documentation](#documentation)). Releases up to `2.3.0-sec.2-java.4` were published under
+`io.github.loki-notfound` in a Maven repository on the project's GitHub Pages. That repository is
+no longer served; those releases remain as GitHub releases.
 
 Android (Gradle, Kotlin DSL). The AAR has its own artifactId, `zephyr-java-android`, and brings
 its POM's dependencies (Jackson and the Apache HTTP client) along. The dependency goes into the app
@@ -136,7 +143,7 @@ public class QuickStart {
     try {
       System.out.println("Primary address: " + wallet.getPrimaryAddress());
 
-      // sync; the listener runs on a native thread, once per block fetched
+      // sync; the listener is called once per block fetched
       wallet.sync(new ZephyrWalletListener() {
         @Override
         public void onSyncProgress(long height, long startHeight, long endHeight, double percentDone, String message) {
@@ -182,17 +189,20 @@ the fees.
 ## Known limitations
 
 The guide's [Known limitations](docs/guide/13-known-limitations.md) lists every limit of
-`2.3.0-sec.2-java.4` with its status. Three matter most for an app:
+`2.3.0-sec.2-java.5` with its status, and what `java.5` fixed. Three matter most for an app:
 
-- **Closing during a sync, and exceptions in callbacks.** A `close()` from another thread during
-  a `sync()` crashed the process, and a callback's exception during background syncing kept the
-  JVM from exiting (runs of 2026-11-17). Let a sync finish before you close, and catch every
-  exception inside a callback
+- **Closing and callbacks.** `close()` waits for the calls in flight and the core's sync thread,
+  without a time limit, so call it off an app's main thread. Close every wallet before the
+  process ends: a process can hang in its exit while background syncing refreshes. A listener
+  callback cannot sync, relay, import, save or close the wallet. Callbacks of two threads can
+  overlap
   ([Closing a wallet that syncs](docs/guide/04-threads-and-listeners.md#closing-a-wallet-that-syncs),
-  [An exception thrown in a callback](docs/guide/04-threads-and-listeners.md#an-exception-thrown-in-a-callback)).
-- **What the logs hold.** At some settings the library logs passwords, mnemonics and transaction
-  keys. The core's log, once switched on, records the primary address, amounts and transaction
-  hashes ([Logging safely](docs/guide/09-errors.md#logging-safely),
+  [What a callback may call](docs/guide/04-threads-and-listeners.md#what-a-callback-may-call)).
+  Up to `java.4` a `close()` during a sync could crash the process.
+- **What the logs hold.** The core's log, once switched on, records the primary address, amounts
+  and transaction hashes. The library's own logging keeps secrets out from `java.5` on; `java.4`
+  logged passwords, mnemonics and transaction keys at some settings
+  ([Logging safely](docs/guide/09-errors.md#logging-safely),
   [The native log](docs/guide/09-errors.md#the-native-log)).
 - **Amounts and assets the core does not report.** `checkTxKey` returns amount 0 for every
   current transaction and reports `good` whenever it does not throw, so it cannot confirm a
@@ -241,7 +251,8 @@ git submodule update --init external/zephyr-cpp
   `debian:12` image, with podman or docker.
 - `bin/build_android.sh`: the Android natives per ABI with zephyr's `contrib/depends` and NDK r18b.
 - `bin/build_release.sh`: everything, into `dist/<version>/`: the JAR, the AAR, sources, Javadoc,
-  debug symbols, `manifest.json` and `SHA256SUMS`.
+  debug symbols, `manifest.json` and `SHA256SUMS`. It also writes the Maven Central bundle, which
+  the maintainer signs with `bin/sign_central_bundle.sh`.
 
 The guide's [Building and verifying](docs/guide/14-building-and-verifying.md) has the patches,
 the manifest and the steps to reproduce a release.
@@ -266,8 +277,10 @@ sha256sum -c SHA256SUMS
 
 Run `git verify-tag` in a clone of this repository, and the last two commands in the directory of
 the release files. `SHA256SUMS` covers every release file, `manifest.json` and the site archive
-included. The guide's [Signatures](docs/guide/14-building-and-verifying.md#signatures) also names
-the key that signs the core's tags.
+included. The same key signs every file on Maven Central (its `.asc`). Each of those files is also
+a release file under `SHA256SUMS`, or listed in `manifest.json`. The guide's
+[Signatures](docs/guide/14-building-and-verifying.md#signatures) also names the key that signs the
+core's tags.
 
 ## Versioning
 
