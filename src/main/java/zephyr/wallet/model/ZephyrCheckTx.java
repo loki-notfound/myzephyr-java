@@ -68,7 +68,9 @@ public class ZephyrCheckTx extends ZephyrCheck {
    * 
    * <p>Zephyr: in the full wallet ({@code ZephyrWalletFull}) this is 0 for every current
    * transaction. The core reads the amount of the asset {@code ZEPH} only, and since hard fork 11
-   * (height 536,000) no output is {@code ZEPH}; {@link #isGood()} and the confirmations are right.
+   * (height 536,000) no output is {@code ZEPH}. Nor does {@link #isGood()} show a payment: from
+   * {@code checkTxKey} it is true whenever the call does not throw, also when the transaction pays
+   * nothing to the address; from {@code checkTxProof} it is the result of the signature check.
    * Read the amount from the wallet's {@code getTxs(hash)}: the receiver's incoming transfers or the
    * sender's outgoing destinations, each with its asset. See the user guide,
    * {@code docs/guide/06-history.md}, section "checkTxKey returns amount 0".</p>

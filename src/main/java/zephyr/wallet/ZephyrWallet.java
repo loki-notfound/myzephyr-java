@@ -1186,10 +1186,13 @@ public interface ZephyrWallet {
    * 
    * <p>Zephyr: in the full wallet ({@link ZephyrWalletFull}) the received amount of the result is 0
    * for every current transaction. The core reads the amount of the asset {@code ZEPH} only, and
-   * since hard fork 11 (height 536,000) no output is {@code ZEPH}. {@link ZephyrCheckTx#isGood()} and
-   * the confirmations are right. Read the amount from {@link #getTxs(String...)} instead: the
-   * receiver's incoming transfers, or the sender's outgoing destinations, each with its asset. See
-   * the user guide, {@code docs/guide/06-history.md}, section "checkTxKey returns amount 0".</p>
+   * since hard fork 11 (height 536,000) no output is {@code ZEPH}. {@link ZephyrCheckTx#isGood()} is
+   * true whenever the call does not throw, also when the transaction pays nothing to the address
+   * (read in the core's code, not run), so the result does not show that a payment was made: do not
+   * accept a payment on it. The confirmations are right. Read the amount from
+   * {@link #getTxs(String...)} instead: the receiver's incoming transfers, or the sender's outgoing
+   * destinations, each with its asset. See the user guide, {@code docs/guide/06-history.md}, section
+   * "checkTxKey returns amount 0".</p>
    * 
    * @param txHash specifies the transaction to check
    * @param txKey is the transaction's secret key
@@ -1223,8 +1226,9 @@ public interface ZephyrWallet {
    * <p>Zephyr: in the full wallet ({@link ZephyrWalletFull}) the received amount of the result is 0
    * for every current transaction, from the same core code as {@link #checkTxKey}: the core reads
    * the amount of the asset {@code ZEPH} only, which no output has carried since hard fork 11.
-   * {@link ZephyrCheckTx#isGood()} and the confirmations are right. Read the amount from
-   * {@link #getTxs(String...)} instead. See the user guide, {@code docs/guide/06-history.md}, section "checkTxKey returns amount 0".</p>
+   * {@link ZephyrCheckTx#isGood()} is the result of the signature check (read in the core's code,
+   * not run). Read the amount from {@link #getTxs(String...)} instead. See the user guide,
+   * {@code docs/guide/06-history.md}, section "checkTxKey returns amount 0".</p>
    * 
    * @param txHash specifies the transaction to prove
    * @param address is the destination public address of the transaction
