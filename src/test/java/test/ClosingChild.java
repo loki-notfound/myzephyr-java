@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.management.ManagementFactory;
+import java.lang.reflect.Field;
 import java.lang.management.ThreadMXBean;
 import java.math.BigInteger;
 import java.net.InetAddress;
@@ -68,7 +69,6 @@ public class ClosingChild {
     log("FAIL " + reason);
     System.exit(2);
   }
-
   /** For a thread that is stuck: its stack and every other thread's, then the process ends at once. */
   private static void failStuck(String reason) {
     log("FAIL " + reason);
@@ -99,6 +99,7 @@ public class ClosingChild {
       case "scanclose": scanClose(args[1]); break;
       case "fgtoggle": foregroundToggle(args[1]); break;
       case "h1held": h1Held(args[1], args[2]); break;
+      case "freedclose": freedClose(); break;
       default: fail("unknown scenario " + args[0]);
     }
     log("RESULT ok");
@@ -824,6 +825,45 @@ public class ClosingChild {
     log("after close: " + listener.counts());
     if (ms > H1_LIMIT_MS) fail("close() with the core's sync thread held before its refresh" + (variant.equals("stop") ? " (after stopSyncing())" : "") + " waited " + ms + " ms (limit " + H1_LIMIT_MS + " ms): the stop was lost");
     if (!listener.threads.isEmpty()) assertCallbackThreadsEnded(listener.threads);
+  }
+
+  private static Field walletField(String name) throws Exception {
+    Field field = ZephyrWalletFull.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return field;
+  }
+
+  /**
+   * C1 of the review of S1c: close() again after the native close freed the wallet but threw an
+   * Error before Java recorded it (a save at close that fails with the core's std::bad_alloc, which
+   * reaches Java as OutOfMemoryError: closeJni has freed the wallet and zeroed its handle, and
+   * close() caught only Exception). No run here can make the core run out of memory in its save, so
+   * the state is made by reflection: a normal close(), then the wallet's "freed" flag cleared again.
+   * close() and close(true) must then return at once without a native call on the freed wallet
+   * (which would end this JVM), and record the wallet as freed. No node needed.
+   */
+  private static void freedClose() throws Exception {
+    ZephyrWalletFull wallet = ZephyrWalletFull.createWallet(new ZephyrWalletConfig().setPassword("freed").setNetworkType(ZephyrNetworkType.MAINNET));
+    wallet.addListener(new ZephyrWalletListener());
+    wallet.close();
+    Field handle = walletField("jniWalletHandle"), freed = walletField("isFreed"), walletPassword = walletField("password");
+    if ((Long) handle.get(wallet) != 0L) fail("the native wallet was not freed by close()");
+    freed.set(wallet, false);          // as close() left it when closeJni freed the wallet and threw an Error
+    walletPassword.set(wallet, "freed"); // and the password with it
+    log("the wallet is freed, its handle zero, and marked as not freed");
+    long start = System.nanoTime();
+    wallet.close();      // reached stopSyncingJni() on the freed wallet
+    wallet.close(true);
+    log("CLOSE-WAIT-MS " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start));
+    if (!(Boolean) freed.get(wallet)) fail("close() did not record the freed wallet as freed");
+    if (walletPassword.get(wallet) != null) fail("close() kept the password of the freed wallet");
+    if (!wallet.isClosed()) fail("isClosed() false");
+    try {
+      wallet.getHeight();
+      fail("getHeight() on the freed wallet returned");
+    } catch (ZephyrError e) {
+      log("getHeight() threw ZephyrError: " + e.getMessage());
+    }
   }
 
   /**

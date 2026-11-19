@@ -65,7 +65,7 @@ public class TestWalletClosingChildren {
   }
 
   /** The outcome of one child. */
-  private static class Child {
+  static class Child {
     String name;
     int exit = -1;
     boolean timedOut;
@@ -100,8 +100,11 @@ public class TestWalletClosingChildren {
     }
   }
 
-  /** Runs one child in its own directory under target/closing-children and waits for it within the limits. */
-  private static Child run(String name, boolean needsWallet, String... args) throws Exception {
+  /**
+   * Runs one child in its own directory under target/closing-children and waits for it within the
+   * limits. Also used by {@link TestWalletClosing} for a child that needs no node.
+   */
+  static Child run(String name, boolean needsWallet, String... args) throws Exception {
     Child child = new Child();
     child.name = name;
     Path dir = RUNS.resolve(name);

@@ -50,7 +50,8 @@ import zephyr.wallet.model.ZephyrWalletListener;
  * files only. The native callbacks are driven by calling the wallet's private callback receiver
  * by reflection, so these tests cover the Java half of the listener rules; the native half
  * (threads attached by the core, close() during a running sync) is covered by
- * {@link TestWalletClosingChildren} in the integration profile.
+ * {@link TestWalletClosingChildren} in the integration profile. One test whose defect is a crash
+ * runs its wallet in a JVM of its own, with the same runner, without a node.
  */
 public class TestWalletClosing {
 
@@ -732,6 +733,18 @@ public class TestWalletClosing {
     }
     Collections.sort(names);
     return names;
+  }
+
+  /**
+   * C1 of the review of S1c: close() of a wallet whose native close freed it but threw an Error
+   * before Java recorded it (a save at close that fails with OutOfMemoryError) returns at once and
+   * records the wallet as freed, instead of reaching a native call on the freed wallet, which ends
+   * the process. Run in a JVM of its own ({@link ClosingChild}, scenario "freedclose", the state made
+   * by reflection), since the defect is a crash; no node needed.
+   */
+  @Test
+  public void closeAfterTheWalletWasFreedReachesNoNativeCall() throws Exception {
+    TestWalletClosingChildren.run("freedclose", false, "freedclose").check();
   }
 
   /**

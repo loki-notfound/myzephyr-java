@@ -2374,7 +2374,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
    * <p>Throws ZephyrError when called from inside one of the wallet's own calls or listener
    * callbacks, which close() would wait for (the wallet stays open). Should the core's own close
    * step fail, close() throws with the wallet closed for calls but not freed, and can be
-   * repeated.</p>
+   * repeated. Once the native wallet is freed, whatever close() threw, a later close() returns at
+   * once.</p>
    *
    * @param save specifies if the wallet should be saved before being closed
    */
@@ -2384,7 +2385,12 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       throw new ZephyrError("Cannot close the wallet from inside one of its own calls or listener callbacks");
     }
     synchronized (closeLock) {
-      if (isFreed) return; // closed already
+      // closed already; a zero handle is a wallet the native close freed (it zeroes the handle on
+      // this lock's thread), also when that close threw before isFreed was set
+      if (isFreed || jniWalletHandle == 0) {
+        markFreed();
+        return;
+      }
       isClosed = true;     // new calls fail, callbacks return at once
       boolean interrupted = false;
       try {
@@ -2406,14 +2412,22 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
         } finally {
           callLock.writeLock().unlock();
         }
-        isFreed = true;
-        password = null;
-        listeners.clear();
         if (saveFailure != null) throw saveFailure;
       } finally {
+        // whatever closeJni threw (an OutOfMemoryError from a failed save included): once it has
+        // freed the wallet, the wallet is recorded as freed, so no later close() reaches a native call
+        if (jniWalletHandle == 0) markFreed();
         if (interrupted) Thread.currentThread().interrupt();
       }
     }
+  }
+
+  /** Records that the native wallet is freed; called holding closeLock. */
+  private void markFreed() {
+    isClosed = true;
+    isFreed = true;
+    password = null;
+    listeners.clear();
   }
   
   /**
