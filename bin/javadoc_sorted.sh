@@ -28,8 +28,9 @@
 # (-Xdoclint:all,-missing; javadoc's default is all), so the files inherited unchanged from
 # monero-java report no "no comment" warnings. A second javadoc run with -Xdoclint:missing over the
 # files of bin/javadoc-complete.txt alone (the other sources on the source path) reports a missing
-# comment in those files; it writes to a scratch directory that is deleted, so target/apidocs is
-# the generation's alone.
+# comment in those files and fails the script when there is one, so a public member added to them
+# without a comment stops the release build and the CI job; it writes to a scratch directory that is
+# deleted, so target/apidocs is the generation's alone.
 #
 # Environment: JAVA_HOME (optional; else javadoc from PATH)
 # Usage: bin/javadoc_sorted.sh
@@ -75,4 +76,6 @@ rm -rf target/javadoc-complete-check
   || { cat target/javadoc-complete.log >&2; exit 1; }
 rm -rf target/javadoc-complete-check
 cat target/javadoc-complete.log >&2
-echo "missing Javadoc in the $(wc -l < target/javadoc-complete-sources.txt) files of bin/javadoc-complete.txt: $(grep -c ': warning:' target/javadoc-complete.log || true) warnings"
+missing=$(grep -c ': warning:' target/javadoc-complete.log || true)
+echo "missing Javadoc in the $(wc -l < target/javadoc-complete-sources.txt) files of bin/javadoc-complete.txt: $missing warnings"
+[ "$missing" = 0 ] || { echo "document every public member of the files in bin/javadoc-complete.txt" >&2; exit 1; }
