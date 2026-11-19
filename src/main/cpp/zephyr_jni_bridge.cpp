@@ -2520,7 +2520,8 @@ class sync_stopper {
  *    wallet or calls the listener;
  * 2. with save, the core's save (wallet2::store) writes the wallet's cache file, never its keys
  *    file (store_to with the same file and no forced rewrite): never during a refresh (the core's
- *    own close(true) saves before it joins);
+ *    own close(true) saves before it joins); with the multisig message store active it writes that
+ *    store's file after the cache, so a save can fail after the cache was written;
  * 3. delete: the destructor's close(false) finds everything stopped and closed (no thread to join,
  *    deinit does nothing the second time, the pool is gone) and cannot throw on this path; then
  *    the listener is deleted and both handles are zeroed.

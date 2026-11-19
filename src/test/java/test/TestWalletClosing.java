@@ -682,7 +682,7 @@ public class TestWalletClosing {
   /**
    * close(true) whose save fails (the wallet's directory made read-only, so the core cannot write
    * its cache file) still closes and frees the native wallet, and throws ZephyrError saying that the
-   * wallet was closed without saving, with the core's reason. The keys file is not written by a
+   * wallet was closed and saving it failed, with the core's reason. The keys file is not written by a
    * save, so only what changed since the last save is lost: a reopened wallet has the last save, and
    * the old object can no longer overwrite what the reopened one saves later.
    */
@@ -710,7 +710,7 @@ public class TestWalletClosing {
         wallet.close(true);
         problems.add("close(true) returned although the save could not write");
       } catch (ZephyrError e) {
-        if (!String.valueOf(e.getMessage()).startsWith("Wallet was closed without saving: ")) problems.add("close(true) threw \"" + e.getMessage() + "\"");
+        if (!String.valueOf(e.getMessage()).startsWith("Wallet was closed, but saving it failed: ")) problems.add("close(true) threw \"" + e.getMessage() + "\"");
       }
       if (!wallet.isClosed()) problems.add("isClosed() false after close(true)");
       if ((Long) field(wallet, "jniWalletHandle") != 0L) problems.add("the native wallet was not freed");

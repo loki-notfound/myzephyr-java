@@ -2369,8 +2369,11 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
    * says so. While close(true) saves, the wallet's keys file is no longer locked: do not open the
    * same wallet elsewhere before close(true) has returned. When the save fails (a full disk, a
    * directory that cannot be written), the wallet is closed and freed all the same, and close()
-   * throws ZephyrError("Wallet was closed without saving: " and the core's reason): a save never
-   * writes the keys file, so what changed since the last save is lost and nothing else.</p>
+   * throws ZephyrError("Wallet was closed, but saving it failed: " and the core's reason). A save
+   * never writes the keys file: when the cache file could not be written, what changed since the
+   * last save is lost and nothing else. The core writes the multisig message store's file (only
+   * where that messaging is in use) after the cache file, so a failure there leaves the cache
+   * saved.</p>
    *
    * <p>Throws ZephyrError when called from inside one of the wallet's own calls or listener
    * callbacks, which close() would wait for (the wallet stays open). Should the core's own close
@@ -2409,7 +2412,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
           closeJni(save);
         } catch (Exception e) {
           if (jniWalletHandle != 0) throw toZephyrError(e); // the core's close failed: nothing freed, close() can be repeated
-          saveFailure = new ZephyrError("Wallet was closed without saving: " + messageOf(e)); // freed all the same
+          saveFailure = new ZephyrError("Wallet was closed, but saving it failed: " + messageOf(e)); // freed all the same; the cache may be saved (a later step failed)
         } finally {
           callLock.writeLock().unlock();
         }
