@@ -119,7 +119,7 @@ password) and `<path>` (the cache: the synced transactions and outputs). Open th
 if (ZephyrWalletFull.walletExists(path)) {
   try {
     wallet = ZephyrWalletFull.openWallet(path, password, ZephyrNetworkType.MAINNET, nodeUri);
-  } catch (Exception e) {  // "invalid password" arrives as java.lang.Exception
+  } catch (ZephyrError e) {  // "invalid password"; up to java.4 a java.lang.Exception
     messages.show("The wallet could not be opened: " + e.getMessage());
   }
 }
@@ -128,9 +128,10 @@ if (ZephyrWalletFull.walletExists(path)) {
 The network type must match the one the wallet was created with. A path without a wallet throws
 a `ZephyrError` "Wallet does not exist at path: " with the path.
 
-**A wrong password is not a `ZephyrError`.** Observed on 2026-11-17, also with the released JAR:
-`openWallet` with a wrong password threw `java.lang.Exception` with the message "invalid password". A `catch (ZephyrError
-e)` does not catch it; catch `Exception` around `openWallet`
+A wrong password throws a `ZephyrError` "invalid password" in `2.3.0-sec.2-java.5` (one of the
+library's offline tests checks it). **Releases up to `2.3.0-sec.2-java.4` threw `java.lang.Exception` instead**,
+observed on 2026-11-17 with the released JAR. On those releases a `catch (ZephyrError e)` does not
+catch it; catch `Exception` around `openWallet` there
 ([Errors and exceptions](09-errors.md)).
 
 ## Wallet bytes
@@ -171,6 +172,9 @@ write nothing and report no error (read in the core's code). Call `getData()` ag
 result whenever you would otherwise save, and before `close()`.
 `changePassword` does not work for such a wallet; [The password](#the-password) has the details.
 
+`getData()` is refused inside a listener callback, like `save()`: its cache array is what a save
+would write ([What a callback may call](04-threads-and-listeners.md#what-a-callback-may-call)).
+
 `moveTo(path)` gives a wallet held in memory its files:
 
 ```java examples/GuideWallets.java
@@ -181,7 +185,9 @@ wallet.save();  // writes to the new files from now on
 Observed on 2026-11-17 with a wallet opened from bytes: `moveTo` wrote `<path>` (the cache) and
 `<path>.keys`, and no `.address.txt`. Then `getPath()` returned the new path, `save()` worked, and
 the wallet opened again from that path at the same height. Moving onto an existing file, into a
-missing directory or onto another file system was not tried.
+missing directory or onto another file system was not tried. `moveTo` writes the files as
+`save()` does, so the same rules apply: not inside a listener callback, and not while background
+syncing runs ([When to save](#when-to-save)).
 
 ## The password
 
@@ -194,7 +200,7 @@ confirmed on mainnet. Apps that store bytes can keep the password stable, or res
 wallet from its mnemonic under the new password (which costs a re-sync).
 
 A wrong old password is refused before the core is asked, with a `ZephyrError` "Invalid original
-password.".
+password.". `changePassword` saves the wallet, so it follows the rules of `save()` below.
 
 ## When to save
 
@@ -209,30 +215,56 @@ arrays again:
 - before your process can be stopped, on Android when the app goes to the background
   ([Lifecycle and threads](10-android.md#lifecycle-and-threads)).
 
+Two rules from `2.3.0-sec.2-java.5` on (read in the core's code):
+
+- **Never from inside a listener callback.** `save()`, `moveTo()`, `changePassword()` and
+  `getData()` throw a `ZephyrError` there. A callback runs in the middle of a refresh, and a save
+  from an output callback would write a transaction half processed. Save after `sync()` has
+  returned, or hand the event to a thread of your own.
+- **Not while background syncing runs.** A save is not exclusive with the core's sync thread, and
+  after `stopSyncing()` that thread may still finish its current sync. `close(true)` saves after
+  that thread has ended. A wallet that stays open and must be saved regularly can sync with
+  `sync()` on its own thread instead, and save between two syncs
+  ([What a callback may call](04-threads-and-listeners.md#what-a-callback-may-call)).
+
 ## Closing
 
 `close()` closes without saving; `close(true)` saves first. After `close` the object must not be
-used again: `isClosed()` returns `true`, and most other calls throw a `ZephyrError` "Wallet is
-closed". A few have no such check; `changePassword` after `close()` fails with an unrelated error.
-Closing a closed wallet has no effect.
+used again: `isClosed()` returns `true`, and every other call throws a `ZephyrError` "Wallet is
+closed". One of the library's offline tests calls every public method of a closed wallet and
+checks this. Closing a closed wallet has no effect.
 
-`close(true)` saves in native code that does not catch a failure of the save (read in the bridge's
-code; not run). Call `save()` first, which reports a failure as an exception, then `close()`.
+`close()` returns only when the wallet is closed. It stops a sync that runs, waits for the calls
+of other threads and for the core's background sync thread, and has no time limit. So call it off
+the main thread of an app. `close()` from inside a listener callback is refused
+([Closing a wallet that syncs](04-threads-and-listeners.md#closing-a-wallet-that-syncs)).
+
+`close(true)` saves after the core's background sync thread has ended, so the save never meets a
+refresh:
+
+- **A failed save still closes the wallet.** When the save fails (a full disk, a directory that
+  cannot be written), the wallet is closed and freed all the same. `close(true)` then throws a
+  `ZephyrError` "Wallet was closed, but saving it failed: " with the core's reason. A save never
+  writes the keys file, so only what changed since the last save is lost.
+- **The keys file is not locked during that save.** Do not open the same wallet elsewhere before
+  `close(true)` has returned.
+- **A wallet without a file** is not written, and nothing says so ([Wallet bytes](#wallet-bytes)).
 
 ```java examples/GuideWallets.java
 try {
   wallet.sync();
   System.out.println(wallet.getBalance());
-  wallet.save();     // reports a failure; close(true) would not
 } finally {
-  wallet.close();
+  wallet.close(true);  // saves and closes; a failed save throws, the wallet is closed anyway
 }
 ```
 
-Never call `close()` while another thread may be inside `sync()`. Observed on 2026-11-17 with the
-released JAR, such a `close()` crashed the process in 4 of 4 runs. With background syncing,
-`stopSyncing()` alone is not enough: let its scan stop before you close
-([Closing a wallet that syncs](04-threads-and-listeners.md#closing-a-wallet-that-syncs)).
+A `close()` from another thread during a `sync()` is safe from `2.3.0-sec.2-java.5` on: the sync
+throws a `ZephyrError` "Wallet is closed". In releases up to `2.3.0-sec.2-java.4` such a `close()`
+crashed the process (4 of 4 runs with the released JAR, 2026-11-17). On those releases, never call
+`close()` while another thread may be inside `sync()`. In `java.4`, `close(true)` also did not
+catch a failure of the save in native code (read in the bridge's code); call `save()` first there,
+then `close()`.
 
 ## Addresses and keys
 

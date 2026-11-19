@@ -1,5 +1,6 @@
 package examples;
 
+import zephyr.common.ZephyrError;
 import zephyr.common.ZephyrRpcConnection;
 import zephyr.common.ZephyrUtils;
 import zephyr.daemon.model.ZephyrNetworkType;
@@ -60,13 +61,13 @@ public class GuideWallets {
     return viewOnly;  // isViewOnly() is true
   }
 
-  // the wallet files at the path, opened; a wrong password is not a ZephyrError
+  // the wallet files at the path, opened; a wrong password is a ZephyrError from 2.3.0-sec.2-java.5 on
   static ZephyrWalletFull open(String path, String password, String nodeUri, Messages messages) {
     ZephyrWalletFull wallet = null;
     if (ZephyrWalletFull.walletExists(path)) {
       try {
         wallet = ZephyrWalletFull.openWallet(path, password, ZephyrNetworkType.MAINNET, nodeUri);
-      } catch (Exception e) {  // "invalid password" arrives as java.lang.Exception
+      } catch (ZephyrError e) {  // "invalid password"; up to java.4 a java.lang.Exception
         messages.show("The wallet could not be opened: " + e.getMessage());
       }
     }
@@ -109,9 +110,8 @@ public class GuideWallets {
     try {
       wallet.sync();
       System.out.println(wallet.getBalance());
-      wallet.save();     // reports a failure; close(true) would not
     } finally {
-      wallet.close();
+      wallet.close(true);  // saves and closes; a failed save throws, the wallet is closed anyway
     }
   }
 
