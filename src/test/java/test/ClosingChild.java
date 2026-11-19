@@ -166,16 +166,28 @@ public class ClosingChild {
    * callback and detaches it at the callback's end, which ends the callback's java.lang.Thread; a
    * thread left attached stays alive (as a daemon thread it no longer keeps the JVM from exiting,
    * so the JVM's exit does not show it).
+   *
+   * <p>A callback can also be delivered on a Java thread, inline in one of that thread's own wallet
+   * calls; such a thread stays alive by design. The threads a scenario names as {@code foreground}
+   * are those it lets make wallet calls while it records callbacks: they are left out of the check.
+   * Any other thread the core did not attach (the main thread, when it is not named) fails it.</p>
    */
-  private static void assertCallbackThreadsEnded(Set<Thread> threads) {
+  private static void assertCallbackThreadsEnded(Set<Thread> threads, Thread... foreground) {
+    List<Thread> skipped = Arrays.asList(foreground);
     List<String> alive = new ArrayList<String>();
+    int checked = 0;
     for (Thread thread : threads) {
+      if (skipped.contains(thread)) {
+        log("a callback was delivered on the scenario's own thread '" + thread.getName() + "' (inline in one of its calls); not checked");
+        continue;
+      }
       if (thread == Thread.currentThread()) fail("a background callback ran on the main thread");
+      checked++;
       if (thread.isAlive()) alive.add(thread.getName() + (thread.isDaemon() ? "(d)" : "") + " " + thread.getState());
     }
-    if (threads.isEmpty()) fail("no callback thread was recorded");
-    if (!alive.isEmpty()) fail(alive.size() + " of " + threads.size() + " callback thread(s) still alive after close(): " + alive);
-    log("all " + threads.size() + " callback thread(s) ended");
+    if (checked == 0) fail("no callback thread of the core was recorded");
+    if (!alive.isEmpty()) fail(alive.size() + " of " + checked + " callback thread(s) still alive after close(): " + alive);
+    log("all " + checked + " callback thread(s) ended");
   }
 
   private static void threads(String when) {
@@ -561,7 +573,8 @@ public class ClosingChild {
     timedClose(wallet);
     if (removed.progress.get() + removed.blocks.get() + removed.balances.get() > 0) fail("the removed listener got callbacks: " + removed.counts());
     if (started > W1_THREAD_LIMIT) fail(started + " threads started during a scan of " + scanned + " blocks with no listener: the native listener stayed registered with the core");
-    assertCallbackThreadsEnded(added.threads);
+    // main added and removed listeners during the scan: a callback delivered on it inline is not a background callback
+    assertCallbackThreadsEnded(added.threads, Thread.currentThread());
   }
 
   /**
