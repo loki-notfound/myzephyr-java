@@ -29,7 +29,9 @@ import org.junit.jupiter.api.Test;
  * runner's JVM could not report.
  *
  * <p>A child passes when it prints "RESULT ok" and its JVM ends by itself with status 0, leaves no
- * {@code hs_err} file and prints no "Wallet is closed" on stderr. The core's threads are attached
+ * {@code hs_err} file and prints no "Wallet is closed" on stderr. A child that finds the node or the
+ * wallet unfit for its scenario (one that could not fail there) prints "SKIP" with the reason and
+ * ends with status {@value ClosingChild#SKIP_STATUS}; the test is then skipped, not passed. The core's threads are attached
  * as daemon threads, so a JVM that exits no longer shows that every callback thread was detached;
  * the background scenarios check the callback threads themselves ({@link ClosingChild}). Every child has a time limit
  * ({@value #CHILD_LIMIT_S} s, and {@value #EXIT_LIMIT_S} s from the moment its main returns); one
@@ -84,8 +86,18 @@ public class TestWalletClosingChildren {
       return "-";
     }
 
-    /** The child's verdict: all conditions, each failure named, with the end of its output. */
+    /**
+     * The child's verdict: all conditions, each failure named, with the end of its output. A child
+     * that found its precondition missing (a "SKIP" line and status {@value ClosingChild#SKIP_STATUS},
+     * nothing else wrong) skips the test with its reason.
+     */
     void check() {
+      if (!timedOut && exit == ClosingChild.SKIP_STATUS && hsErr.isEmpty()) {
+        for (String line : stdout) {
+          int at = line.indexOf("] SKIP ");
+          if (at >= 0) Assumptions.assumeTrue(false, name + ": " + line.substring(at + 7));
+        }
+      }
       List<String> problems = new ArrayList<String>();
       if (timedOut) problems.add(timeoutReason);
       else if (exit != 0) problems.add("exit status " + exit);
@@ -277,7 +289,9 @@ public class TestWalletClosingChildren {
    * request for the node's height, before its refresh begins, while close() comes; the request goes
    * on 500 ms later. close() must return within {@value ClosingChild#H1_LIMIT_MS} ms (the stop is
    * repeated), not after the whole catch-up scan. Two runs; each waits about 32 s first, until the
-   * core's cached node height has expired.
+   * core's cached node height has expired. Skipped when the node is not synced with its peers or
+   * the wallet is fewer than {@value ClosingChild#H1_MIN_BEHIND} blocks behind it: the test could
+   * not fail then.
    */
   @RepeatedTest(2)
   public void closeWhileTheSyncThreadIsHeldBeforeItsRefresh(RepetitionInfo repetition) throws Exception {

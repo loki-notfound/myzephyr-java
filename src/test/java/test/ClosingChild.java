@@ -69,6 +69,15 @@ public class ClosingChild {
     log("FAIL " + reason);
     System.exit(2);
   }
+
+  /** Exit status of a child whose precondition does not hold (it could not fail): the parent skips the test. */
+  static final int SKIP_STATUS = 3;
+
+  /** For a scenario whose precondition does not hold: a line starting with "SKIP", then status 3. */
+  private static void skip(String reason) {
+    log("SKIP " + reason);
+    System.exit(SKIP_STATUS);
+  }
   /** For a thread that is stuck: its stack and every other thread's, then the process ends at once. */
   private static void failStuck(String reason) {
     log("FAIL " + reason);
@@ -786,6 +795,8 @@ public class ClosingChild {
 
   /** H1, held window: seconds the core caches the node's height (30) and a margin for its 1 s clock. */
   static final long H1_CACHE_S = 32;
+  /** H1, held window: blocks the wallet must be behind the node, so that a lost stop costs a long scan. */
+  static final long H1_MIN_BEHIND = 2000;
 
   /**
    * H1 with the window reached on purpose. The wallet talks to the node through a local
@@ -795,6 +806,11 @@ public class ClosingChild {
    * request; close() (after stopSyncing() in the "stop" variant) comes while it is held, and the
    * request goes on 500 ms after close() began. A stop that is not repeated is lost then, and close()
    * waits for the whole catch-up scan; with the stop repeated, close() returns within the limit.
+   *
+   * <p>That holds only when the released sync thread would scan for long: the core refreshes only
+   * when the node is synced with its peers, and the scan is long only when the wallet is far behind.
+   * The child checks both before it arms the forwarder (from the node heights the core has cached
+   * since its connection check) and skips, with the reason, when either does not hold.</p>
    */
   private static void h1Held(String path, String variant) throws Exception {
     String uri = System.getProperty("zephyr.daemon.uri");
@@ -802,8 +818,12 @@ public class ClosingChild {
     URI node = new URI(uri);
     Forwarder forwarder = new Forwarder(node.getHost(), node.getPort());
     ZephyrWalletFull wallet = ZephyrWalletFull.openWallet(path, password(), ZephyrNetworkType.MAINNET, "http://127.0.0.1:" + forwarder.port());
-    long connected = System.nanoTime();
-    log("opened through the local forwarder; blocks behind the node: " + (wallet.getDaemonHeight() - Math.max(wallet.getHeight(), wallet.getRestoreHeight())));
+    long behind = wallet.getDaemonHeight() - Math.max(wallet.getHeight(), wallet.getRestoreHeight());
+    boolean nodeSynced = wallet.isDaemonSynced();
+    long connected = System.nanoTime(); // the core's cached node heights expire 30 s after its last request, at the latest this one
+    log("opened through the local forwarder; blocks behind the node: " + behind + "; node synced with its peers: " + nodeSynced);
+    if (!nodeSynced) skip("the node is not synced with its peers: the core's sync thread would not refresh, so a lost stop would cost nothing and the test could not fail");
+    if (behind < H1_MIN_BEHIND) skip("the wallet is " + behind + " blocks behind the node, fewer than " + H1_MIN_BEHIND + ": a lost stop would cost a short scan only, and the test could not fail");
     Counting listener = new Counting("none");
     wallet.addListener(listener);
     long waitMs = TimeUnit.NANOSECONDS.toMillis(TimeUnit.SECONDS.toNanos(H1_CACHE_S) - (System.nanoTime() - connected));
