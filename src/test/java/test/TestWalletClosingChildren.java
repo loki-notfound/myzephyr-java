@@ -305,6 +305,23 @@ public class TestWalletClosingChildren {
   }
 
   /**
+   * F1: a listener added and removed in a tight loop, and removing itself from its callback, during
+   * a background scan of {@value ClosingChild#CHURN_BLOCKS} blocks: no crash. Three runs.
+   */
+  @RepeatedTest(3)
+  public void listenerChurnDuringBackgroundScan(RepetitionInfo repetition) throws Exception {
+    assumeNodeAndWallet();
+    run("churn-" + repetition.getCurrentRepetition(), true, "churn").check();
+  }
+
+  /** A listener removed and another added from main during a foreground sync(): at once, no callback after the removal. */
+  @Test
+  public void listenersChangedDuringForegroundSync() throws Exception {
+    assumeNodeAndWallet();
+    run("fgtoggle", true, "fgtoggle").check();
+  }
+
+  /**
    * T4: main returns while background syncing runs and the wallet is still open: exit status 0, no
    * crash report. Twenty runs. Known to fail: while the core's sync thread is inside a refresh, the
    * JVM does not finish exiting (it exits once that thread waits between two syncs), so the test

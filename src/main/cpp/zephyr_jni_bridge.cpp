@@ -34,6 +34,7 @@
  * limitations under the License.
  */
 
+#include <atomic>
 #include <cerrno>
 #include <chrono>
 #include <condition_variable>
@@ -250,9 +251,14 @@ jmethodID callback_method(JNIEnv* env, const char* name, const char* signature) 
 }
 
 /**
- * Listens for wallet notifications and notifies the listener in Java. Created once per wallet,
- * when its first Java listener is added, and deleted by closeJni after the core, which can then
- * no longer call it.
+ * Listens for wallet notifications and notifies the listener in Java. Created once per wallet and
+ * added to the core's listeners when the wallet's first Java listener is added (setListenerJni),
+ * and deleted by closeJni after the core, which can then no longer call it. It stays in the core's
+ * listeners all that time: the core keeps them in an unsynchronized set that its sync thread copies
+ * several times per block, so that set is changed once per wallet, not on every change between no
+ * Java listener and one. Whether a callback reaches Java is switched by delivering: while it is
+ * false (no Java listener), every callback returns at once, before it attaches its thread or calls
+ * anything.
  *
  * No lock is held across the call into Java. jlistener is set by the constructor and cleared by
  * the destructor only, and the destructor runs only when no callback can run: closeJni deletes
@@ -265,9 +271,16 @@ jmethodID callback_method(JNIEnv* env, const char* name, const char* signature) 
 struct wallet_jni_listener : public monero_wallet_listener {
 
   jobject jlistener;
+  std::atomic<bool> delivering; // whether callbacks reach Java; written by setListenerJni and closeJni
+  bool in_core;                 // whether it is in the core's listeners; used by setListenerJni only (under Java's listening lock)
 
-  wallet_jni_listener(JNIEnv* env, jobject listener) {
+  wallet_jni_listener(JNIEnv* env, jobject listener) : delivering(false), in_core(false) {
     jlistener = env->NewGlobalRef(listener);
+  }
+
+  // the first check of every callback, before anything else
+  bool off() const {
+    return !delivering.load(std::memory_order_acquire) || jlistener == nullptr;
   }
 
   ~wallet_jni_listener() {
@@ -280,7 +293,7 @@ struct wallet_jni_listener : public monero_wallet_listener {
   };
 
   void on_sync_progress(uint64_t height, uint64_t start_height, uint64_t end_height, double percent_done, const string& message) override {
-    if (jlistener == nullptr) return;
+    if (off()) return;
     JNIEnv *env;
     int envStat = attachJVM(&env);
     if (envStat == JNI_ERR) return;
@@ -294,7 +307,7 @@ struct wallet_jni_listener : public monero_wallet_listener {
   }
 
   void on_new_block(uint64_t height) override {
-    if (jlistener == nullptr) return;
+    if (off()) return;
     JNIEnv *env;
     int envStat = attachJVM(&env);
     if (envStat == JNI_ERR) return;
@@ -306,7 +319,7 @@ struct wallet_jni_listener : public monero_wallet_listener {
   }
 
   void on_balances_changed(uint64_t new_balance, uint64_t new_unlocked_balance, const std::string& asset_type) override {
-    if (jlistener == nullptr) return;
+    if (off()) return;
     JNIEnv *env;
     int envStat = attachJVM(&env);
     if (envStat == JNI_ERR) return;
@@ -322,7 +335,7 @@ struct wallet_jni_listener : public monero_wallet_listener {
   }
 
   void on_output_received(const monero_output_wallet& output) override {
-    if (jlistener == nullptr) return;
+    if (off()) return;
     JNIEnv *env;
     int envStat = attachJVM(&env);
     if (envStat == JNI_ERR) return;
@@ -343,7 +356,7 @@ struct wallet_jni_listener : public monero_wallet_listener {
   }
 
   void on_output_spent(const monero_output_wallet& output) override {
-    if (jlistener == nullptr) return;
+    if (off()) return;
     JNIEnv *env;
     int envStat = attachJVM(&env);
     if (envStat == JNI_ERR) return;
@@ -785,32 +798,37 @@ JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getAddressIndexJni
 }
 
 /**
- * Adds the wallet's one JNI listener to the core's listeners, or removes it from them. The listener
- * is created on the first registration and its handle stored at once; it is never deleted here,
- * only by closeJni after the core, also while it is not registered: a Java listener removed from
- * inside a callback cannot delete the native listener that is delivering that callback. A failed
- * registration is undone in the core and leaves the listener unregistered (and freed at close).
+ * The wallet's one JNI listener and whether its callbacks reach Java (delivering: whether there is
+ * a Java listener). The first call with delivering on creates the listener, stores its handle at
+ * once and adds it to the core's listeners, where it stays until closeJni deletes it after the
+ * core: the core's listener set is not synchronized and its sync thread copies it, so it is changed
+ * once per wallet, and a Java listener removed from inside a callback cannot delete the native
+ * listener that is delivering that callback. Delivery is switched on only after the addition, so
+ * nothing the core delivers from inside add_listener reaches Java on the caller's thread. Every
+ * other call only sets delivering, without calling the core. A failed addition is undone in the
+ * core and leaves the listener out of the core's listeners (and freed at close); the next call
+ * with delivering on tries the addition again. Called by Java under its listening lock.
  */
-JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_setListenerJni(JNIEnv *env, jobject instance, jobject jlistener, jboolean registered) {
+JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_setListenerJni(JNIEnv *env, jobject instance, jobject jlistener, jboolean delivering) {
   MTRACE("Java_zephyr_wallet_ZephyrWalletFull_setListenerJni");
-  monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   wallet_jni_listener* listener = get_handle<wallet_jni_listener>(env, instance, JNI_LISTENER_HANDLE);
   try {
     if (listener == nullptr) {
-      if (!registered || jlistener == nullptr) return;
+      if (delivering != JNI_TRUE || jlistener == nullptr) return;
       listener = new wallet_jni_listener(env, jlistener);
       env->SetLongField(instance, get_handle_field(env, instance, JNI_LISTENER_HANDLE), reinterpret_cast<jlong>(listener));
     }
-    if (!registered) {
-      wallet->remove_listener(*listener);
-      return;
+    if (delivering == JNI_TRUE && !listener->in_core) {
+      monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
+      try {
+        wallet->add_listener(*listener);
+      } catch (...) {
+        try { wallet->remove_listener(*listener); } catch (...) { } // not left in the core's listeners
+        throw;
+      }
+      listener->in_core = true;
     }
-    try {
-      wallet->add_listener(*listener);
-    } catch (...) {
-      try { wallet->remove_listener(*listener); } catch (...) { } // not left in the core's listeners
-      throw;
-    }
+    listener->delivering.store(delivering == JNI_TRUE, std::memory_order_release);
   } catch (...) {
     rethrow_cpp_exception_as_java_exception(env);
   }

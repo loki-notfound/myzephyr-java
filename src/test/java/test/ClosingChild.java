@@ -17,6 +17,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import zephyr.common.ZephyrError;
 import zephyr.daemon.model.ZephyrNetworkType;
@@ -89,6 +90,8 @@ public class ClosingChild {
       case "h3": h3(args[1], args[2]); break;
       case "w1": w1(args[1]); break;
       case "exitopen": exitOpen(args[1]); break;
+      case "churn": churn(args[1]); break;
+      case "fgtoggle": foregroundToggle(args[1]); break;
       default: fail("unknown scenario " + args[0]);
     }
     log("RESULT ok");
@@ -588,5 +591,108 @@ public class ClosingChild {
     wallet.startSyncing(1000L);
     awaitFirstProgress(listener);
     log("main returns with the wallet open and syncing: " + listener.counts());
+  }
+
+  /** F1: blocks the churn scenario scans while the listener is toggled. */
+  static final long CHURN_BLOCKS = 6000;
+
+  /**
+   * F1 of the review of S1b: a listener added and removed in a tight loop on one thread while the
+   * core's sync thread scans in the background, and removing itself from its own onNewBlock: the
+   * set of listeners the core copies several times per block must not change under that copy. The
+   * JVM must not crash; the toggled listener receives callbacks while it is registered. The
+   * wallet's first listener is added (and removed) before startSyncing(), as the Javadoc of
+   * addListener() asks: that first addition is the one change of the core's set that remains.
+   */
+  private static void churn(String path) throws Exception {
+    ZephyrWalletFull wallet = open(path);
+    long from = Math.max(wallet.getHeight(), wallet.getRestoreHeight());
+    long target = Math.min(from + CHURN_BLOCKS, wallet.getDaemonHeight() - 1);
+    AtomicBoolean stop = new AtomicBoolean();
+    AtomicLong toggles = new AtomicLong(), selfRemovals = new AtomicLong();
+    AtomicReference<Throwable> unexpected = new AtomicReference<Throwable>();
+    Counting toggled = new Counting("none") {
+      @Override public void onNewBlock(long height) {
+        super.onNewBlock(height);
+        try {
+          wallet.removeListener(this);
+          selfRemovals.incrementAndGet();
+        } catch (ZephyrError e) {
+          // removed by the churner meanwhile
+        }
+      }
+    };
+    wallet.addListener(toggled);
+    wallet.removeListener(toggled);
+    wallet.startSyncing(1000L);
+    Thread churner = new Thread(() -> {
+      while (!stop.get()) {
+        try {
+          wallet.addListener(toggled);
+          try {
+            wallet.removeListener(toggled);
+          } catch (ZephyrError e) {
+            if (!String.valueOf(e.getMessage()).contains("not registered")) throw e; // removed itself from its callback
+          }
+          toggles.incrementAndGet();
+        } catch (Throwable t) {
+          unexpected.compareAndSet(null, t);
+          return;
+        }
+      }
+    }, "churner");
+    churner.start();
+    long end = System.currentTimeMillis() + WAIT_MS;
+    while (wallet.getHeight() < target && churner.isAlive()) {
+      if (System.currentTimeMillis() > end) fail("the scan did not reach height " + target + " within " + WAIT_MS + " ms");
+      Thread.sleep(50);
+    }
+    stop.set(true);
+    churner.join(WAIT_MS);
+    if (unexpected.get() != null) fail("the churner ended with " + unexpected.get());
+    log("CHURN " + toggles.get() + " add/remove pairs and " + selfRemovals.get() + " removals from the callback while " + (wallet.getHeight() - from) + " blocks were scanned; " + toggled.counts());
+    wallet.stopSyncing();
+    timedClose(wallet);
+    if (toggled.blocks.get() == 0) fail("the toggled listener never received a callback");
+    assertCallbackThreadsEnded(toggled.threads, churner);
+  }
+
+  /**
+   * Listeners changed from main while a foreground sync() delivers callbacks: a listener added then
+   * receives callbacks at once, and once the last listener is removed none of them receives a
+   * callback after those in flight have ended; neither change waits for the sync to end.
+   */
+  private static void foregroundToggle(String path) throws Exception {
+    ZephyrWalletFull wallet = open(path);
+    Counting first = new Counting("none");
+    wallet.addListener(first);
+    AtomicReference<String> outcome = new AtomicReference<String>();
+    Thread syncer = new Thread(() -> outcome.set(attempt("sync()", () -> "returned blocks fetched " + wallet.sync().getNumBlocksFetched())), "syncer");
+    syncer.start();
+    awaitFirstProgress(first);
+    Counting second = new Counting("none");
+    long start = System.nanoTime();
+    wallet.addListener(second);
+    log("addListener() during the sync returned after " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start) + " ms");
+    awaitFirstProgress(second);
+    log("the listener added during the sync got callbacks: " + second.counts());
+    start = System.nanoTime();
+    wallet.removeListener(first);
+    wallet.removeListener(second);
+    log("removing both listeners during the sync returned after " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start) + " ms");
+    Thread.sleep(100); // a callback in flight may still reach them
+    String settled = first.counts() + " / " + second.counts();
+    long observed = System.nanoTime();
+    while (syncer.isAlive() && System.nanoTime() - observed < TimeUnit.MILLISECONDS.toNanos(500)) Thread.sleep(10);
+    long observedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - observed);
+    String later = first.counts() + " / " + second.counts();
+    if (!later.equals(settled)) fail("a removed listener still receives callbacks: " + settled + " then " + later);
+    if (observedMs < 200) fail("the sync ended " + observedMs + " ms after the removal: too soon to see whether the removed listeners got callbacks");
+    log("no callback for the removed listeners during " + observedMs + " ms of the running sync");
+    timedClose(wallet);
+    syncer.join(WAIT_MS);
+    if (syncer.isAlive()) fail("the syncer did not end");
+    log(outcome.get());
+    if (!outcome.get().equals("sync(): ZephyrError: Wallet is closed") && !outcome.get().startsWith("sync(): returned")) fail("sync() ended with " + outcome.get());
   }
 }

@@ -541,31 +541,94 @@ public class TestWalletClosing {
   }
 
   /**
-   * The native listener is created once and kept until close(): removing the last Java listener
-   * takes it out of the core's listeners without freeing it (also from inside a callback), adding a
-   * listener registers the same native listener again, and close() frees it.
+   * The native listener is created and added to the core's listeners by the wallet's first
+   * addListener(), and kept until close(): later additions and removals of Java listeners, also
+   * from inside a callback, only switch its delivery; the native listener stays the same; close()
+   * frees it. A wallet that never gets a listener has none.
    */
   @Test
-  public void nativeListenerIsKeptWhileUnregistered() throws Exception {
+  public void nativeListenerIsAddedOnceAndOnlySwitched() throws Exception {
     ZephyrWalletFull wallet = inMemoryWallet();
+    assertEquals(0L, field(wallet, "jniListenerHandle"), "a native listener before the first addListener()");
     Recorder first = new Recorder();
     wallet.addListener(first);
     long handle = (Long) field(wallet, "jniListenerHandle");
-    assertNotEquals(0L, handle, "no native listener after addListener");
-    assertEquals(Boolean.TRUE, field(wallet, "nativeListenerRegistered"));
+    assertNotEquals(0L, handle, "no native listener after the first addListener()");
+    assertEquals(Boolean.TRUE, field(wallet, "listenerDelivery"));
     wallet.removeListener(first);
-    assertEquals(Boolean.FALSE, field(wallet, "nativeListenerRegistered"), "registered with no Java listener");
+    assertEquals(Boolean.FALSE, field(wallet, "listenerDelivery"), "delivering with no Java listener");
     assertEquals(handle, field(wallet, "jniListenerHandle"), "the native listener changed");
     wallet.addListener(new ZephyrWalletListener() {
       @Override public void onNewBlock(long height) { wallet.removeListener(this); }
     });
-    assertEquals(Boolean.TRUE, field(wallet, "nativeListenerRegistered"));
+    assertEquals(Boolean.TRUE, field(wallet, "listenerDelivery"));
     assertEquals(null, deliverNewBlock(wallet), "the callback threw");
-    assertEquals(Boolean.FALSE, field(wallet, "nativeListenerRegistered"), "registered after the last listener removed itself");
+    assertEquals(Boolean.FALSE, field(wallet, "listenerDelivery"), "delivering after the last listener removed itself");
     wallet.addListener(first);
-    assertEquals(Boolean.TRUE, field(wallet, "nativeListenerRegistered"));
+    assertEquals(Boolean.TRUE, field(wallet, "listenerDelivery"));
     assertEquals(handle, field(wallet, "jniListenerHandle"), "the native listener changed");
     wallet.close();
     assertEquals(0L, field(wallet, "jniListenerHandle"), "the native listener was not freed by close()");
+  }
+
+  /**
+   * The delivery switch follows the Java listener set when several threads add and remove
+   * listeners at once, some of them from inside callbacks: after every interleaving it is on
+   * exactly while the set is not empty.
+   */
+  @Test
+  public void deliverySwitchFollowsTheListenerSet() throws Exception {
+    ZephyrWalletFull wallet = inMemoryWallet();
+    int rounds = 2000;
+    CountDownLatch start = new CountDownLatch(1);
+    List<String> failures = new CopyOnWriteArrayList<String>();
+    List<Thread> threads = new ArrayList<Thread>();
+    List<ZephyrWalletListener> kept = new CopyOnWriteArrayList<ZephyrWalletListener>();
+    for (int i = 0; i < 4; i++) {
+      boolean fromCallback = i % 2 == 1;
+      boolean keepLast = !fromCallback; // the listeners of the callback threads are never kept: a stale callback may still add and remove them
+      Thread thread = new Thread(() -> {
+        ZephyrWalletListener own = new ZephyrWalletListener();
+        try {
+          start.await();
+          for (int n = 0; n < rounds; n++) {
+            if (fromCallback) {
+              // add and remove from inside a callback delivered on this thread
+              ZephyrWalletListener trigger = new ZephyrWalletListener() {
+                @Override public void onNewBlock(long height) {
+                  wallet.addListener(own);
+                  wallet.removeListener(own);
+                }
+              };
+              wallet.addListener(trigger);
+              Throwable t = deliverNewBlock(wallet);
+              if (t != null) failures.add("escaped: " + t);
+              wallet.removeListener(trigger);
+            } else {
+              wallet.addListener(own);
+              wallet.removeListener(own);
+            }
+          }
+          if (keepLast) {
+            wallet.addListener(own);
+            kept.add(own);
+          }
+        } catch (Throwable t) {
+          failures.add(t.toString());
+        }
+      }, "switcher-" + i);
+      threads.add(thread);
+    }
+    for (Thread thread : threads) thread.start();
+    start.countDown();
+    for (Thread thread : threads) {
+      thread.join(TimeUnit.SECONDS.toMillis(120));
+      assertFalse(thread.isAlive(), thread.getName() + " still running after 120 s");
+    }
+    assertTrue(failures.isEmpty(), "failures: " + failures);
+    assertEquals(2, wallet.getListeners().size(), "listeners left");
+    assertEquals(Boolean.TRUE, field(wallet, "listenerDelivery"), "not delivering with listeners registered");
+    for (ZephyrWalletListener listener : kept) wallet.removeListener(listener);
+    assertEquals(Boolean.FALSE, field(wallet, "listenerDelivery"), "delivering with no listener registered");
   }
 }

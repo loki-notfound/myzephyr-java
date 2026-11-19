@@ -37,7 +37,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 import java.util.logging.Level;
@@ -104,11 +103,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   private boolean isFreed;                      // whether the native wallet is freed; guarded by closeLock
   private final ReentrantReadWriteLock callLock = new ReentrantReadWriteLock(); // native calls hold the read side, close() the write side
   private final Object closeLock = new Object(); // one close() at a time
-  private final ReentrantLock listening = new ReentrantLock(); // guards the three fields below; a callback's thread only tries it
-  private boolean nativeListenerRegistered;      // whether the native listener is in the core's listeners
-  private boolean updatingListening;             // set while the holder of the listening lock changes the registration
-  private int refreshes;                         // calls running a refresh of the core now (sync, scanTxs, rescanBlockchain)
-  private volatile boolean listeningChanged;     // a registration change that the holder of the listening lock applies
+  private final Object listening = new Object(); // a change of the listener set and the native listener's delivery switch, together
+  private boolean listenerDelivery;              // whether the native listener passes callbacks to Java; guarded by listening
   
   /**
    * Private constructor with a handle to the memory address of the wallet in c++.
@@ -621,6 +617,16 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   /**
    * {@inheritDoc}
    *
+   * <p>The wallet's first listener adds the wallet's native listener to the core's listeners, once:
+   * it stays there until {@code close()}, and every later addition or removal of a Java listener
+   * only switches whether its callbacks reach Java, without calling into the core. The core's
+   * listener set is not synchronized and the core's sync thread copies it several times per block,
+   * so add the wallet's first listener before {@code startSyncing()} (and not from another thread
+   * during a {@code sync()}): added while a sync runs, it changes that set under the copy once.
+   * Once the native listener is in place, the core does its per-block listener work (a balance
+   * check) also while no Java listener is registered; the callbacks then return in the native
+   * layer, before they attach a thread or call into Java.</p>
+   *
    * <p>Callbacks run on the thread of the sync that delivers them (the caller of {@code sync()},
    * the core's own thread for {@code startSyncing()}) or of a call that relays; callbacks of
    * different threads can overlap. From inside a callback the wallet can be read, and listeners
@@ -635,12 +641,14 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   public void addListener(ZephyrWalletListenerI listener) {
     beginCall();
     try {
-      super.addListener(listener);
-      try {
-        updateListening();
-      } catch (RuntimeException e) {
-        listeners.remove(listener); // not registered: the wallet does not keep it
-        throw e;
+      synchronized (listening) {
+        super.addListener(listener);
+        try {
+          updateDelivery();
+        } catch (RuntimeException e) {
+          listeners.remove(listener); // not registered: the wallet does not keep it
+          throw e;
+        }
       }
     } catch (RuntimeException | AssertionError e) {
       throw toZephyrError(e);
@@ -653,8 +661,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   public void removeListener(ZephyrWalletListenerI listener) {
     beginCall();
     try {
-      super.removeListener(listener);
-      updateListening(); // the last one: the native listener leaves the core's listeners, and stays until close()
+      synchronized (listening) {
+        super.removeListener(listener);
+        updateDelivery(); // the last one: the native listener stops delivering, and stays in the core's listeners until close()
+      }
     } catch (RuntimeException | AssertionError e) {
       throw toZephyrError(e);
     } finally {
@@ -966,7 +976,6 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     
       // sync wallet and handle exception; close() from another thread ends the sync at the core's
       // next batch of blocks, and the sync then ends in this one "Wallet is closed"
-      beginRefresh();
       try {
         Object[] results = syncJni(startHeight);
         if (isClosed) throw new ZephyrError("Wallet is closed"); // cut short: not a complete result
@@ -975,8 +984,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
         if (isClosed) throw new ZephyrError("Wallet is closed");
         throw daemonError(e);
       } finally {
-        if (listener != null) listeners.remove(listener); // unregister listener; throws nothing, also when closed meanwhile or removed by itself
-        endRefresh();
+        if (listener != null) removeListenerQuietly(listener); // throws nothing, also when closed meanwhile or removed by itself
       }
     } catch (RuntimeException | AssertionError e) {
       throw toZephyrError(e);
@@ -991,12 +999,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     beginCall();
     try {
       try {
-        listening.lock(); // a registration change cannot clear the core's callback while its sync thread starts
-        try {
-          startSyncingJni(syncPeriodInMs == null ? DEFAULT_SYNC_PERIOD_IN_MS : syncPeriodInMs);
-        } finally {
-          listening.unlock();
-        }
+        startSyncingJni(syncPeriodInMs == null ? DEFAULT_SYNC_PERIOD_IN_MS : syncPeriodInMs);
       } catch (Exception e) {
         throw daemonError(e);
       }
@@ -1029,13 +1032,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     beginCall();
     try {
       String[] txMetadatasArr = txHashes.toArray(new String[txHashes.size()]); // convert to array for jni
-      beginRefresh();
       try {
         scanTxsJni(txMetadatasArr);
       } catch (Exception e) {
         throw daemonError(e);
-      } finally {
-        endRefresh();
       }
     } catch (RuntimeException | AssertionError e) {
       throw toZephyrError(e);
@@ -1066,13 +1066,10 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     refuseInCallback("rescanBlockchain()");
     beginCall();
     try {
-      beginRefresh();
       try {
         rescanBlockchainJni();
       } catch (Exception e) {
         throw daemonError(e);
-      } finally {
-        endRefresh();
       }
     } catch (RuntimeException | AssertionError e) {
       throw toZephyrError(e);
@@ -2427,7 +2424,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   
   private native String decodeIntegratedAddressJni(String integratedAddress);
   
-  private native void setListenerJni(WalletJniListener listener, boolean registered);
+  private native void setListenerJni(WalletJniListener listener, boolean delivering);
   
   private native Object[] syncJni(long startHeight);
   
@@ -2897,76 +2894,32 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   // ---------------------------- PRIVATE HELPERS -----------------------------
   
   /**
-   * Brings the native listener's registration with the core in line with the Java listener set:
-   * in the core's listeners while there is a Java listener, out of them while there is none, so
-   * that the core does no per-block listener work (balance checks, an upcall per block) for an
-   * empty set. The native listener itself is created once and freed by close() after the core,
-   * whether registered or not: a listener removed from inside a callback cannot free the native
-   * listener that delivers it. Called inside the call lock.
-   *
-   * <p>A thread that delivers a callback never waits for the listening lock: its holder can be
-   * inside the core waiting for the core's listener lock, which that callback's thread may hold
-   * (the core delivers some notifications from inside its listener update). It leaves the change to
-   * the holder, which checks again once it has unlocked. A callback from inside this thread's own
-   * change returns at once; the change's loop sees what it did.</p>
-   *
-   * <p>A removal waits while a call of this library runs a refresh (the last one to end does it):
-   * removing the last listener makes the core clear wallet2's callback at once unless its own sync
-   * thread runs, and that must not happen under a running refresh (the core defers it itself for
-   * its sync thread). Adding is done at once, as the core's own sync(listener) does; the core's
-   * listener set is not synchronized, so adding while the core's sync thread runs is a race of the
-   * core that this cannot remove (it is limited to the moment the set stops being empty).</p>
+   * Switches the native listener's delivery to match the Java listener set: callbacks reach Java
+   * while there is a Java listener; without one the native listener returns from every callback at
+   * once, before it attaches the core's thread or calls into Java, so an empty set costs no upcall.
+   * The first switch on creates the native listener and adds it to the core's listeners; it stays
+   * there until close(), so the core's listener set, which its sync thread copies without a lock,
+   * changes once per wallet at most (not on every change from no listener to one, and never by a
+   * removal). Called holding the listening lock, inside the call lock. A callback's thread that
+   * waits for the lock waits only for a switch: callbacks reach Java only once the native listener
+   * was added and switched on, so the one call into the core (that first addition) is over by then.
    */
-  private void updateListening() {
-    listeningChanged = true;
-    while (listeningChanged && !isClosed) {
-      if (!listening.tryLock()) {
-        if (jniListener.inCallback()) return; // the holder applies it after its own change
-        listening.lock();
-      }
+  private void updateDelivery() {
+    boolean wanted = !listeners.isEmpty();
+    if (wanted == listenerDelivery) return;
+    setListenerJni(jniListener, wanted);
+    listenerDelivery = wanted;
+  }
+
+  /** Removes a listener that sync(listener) added, inside the call lock; throws nothing. */
+  private void removeListenerQuietly(ZephyrWalletListenerI listener) {
+    synchronized (listening) {
+      listeners.remove(listener);
       try {
-        if (updatingListening) return; // a callback from inside the change below, on this thread: its loop sees this
-        listeningChanged = false;
-        updatingListening = true;
-        try {
-          while (!isClosed) {
-            boolean wanted = !listeners.isEmpty();
-            if (wanted == nativeListenerRegistered) break;
-            if (!wanted && refreshes > 0) break; // removed when the last running refresh ends
-            setListenerJni(jniListener, wanted);
-            nativeListenerRegistered = wanted;
-          }
-        } finally {
-          updatingListening = false;
-        }
-      } finally {
-        listening.unlock();
+        updateDelivery();
+      } catch (RuntimeException e) {
+        LOGGER.fine("Switching the native listener's delivery failed: " + e.getMessage());
       }
-    }
-  }
-
-  /** Starts a call that runs a refresh of the core (it delivers callbacks): removals of the native listener wait. */
-  private void beginRefresh() {
-    listening.lock();
-    try {
-      refreshes++;
-    } finally {
-      listening.unlock();
-    }
-  }
-
-  /** Ends a call that ran a refresh, and does a removal that waited for it; throws nothing. */
-  private void endRefresh() {
-    listening.lock();
-    try {
-      refreshes--;
-    } finally {
-      listening.unlock();
-    }
-    try {
-      updateListening();
-    } catch (RuntimeException e) {
-      LOGGER.fine("Updating the native listener's registration failed: " + e.getMessage());
     }
   }
 
