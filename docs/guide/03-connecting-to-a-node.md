@@ -22,6 +22,11 @@ Replace `node.example.invalid` with your node's host name. The user name and pas
 nodes that require RPC login. `17767` is the default RPC port of a mainnet node.
 `getDaemonConnection()` returns the connection in use.
 
+Change the node while no sync runs. `setDaemonConnection` resets fields of the core that a refresh
+on another thread reads and writes without a lock (read in the core's code). The request under
+way is waited for, not replaced
+([Calls from several threads](04-threads-and-listeners.md#calls-from-several-threads)).
+
 A wallet without a connection still opens: it shows the state of its last sync, but cannot sync or
 send. `setProxyUri` routes the core's connection through a proxy (inherited from monero-java,
 meant for Tor); it has not been tested with Zephyr.
@@ -251,10 +256,10 @@ not connected to daemon" of an `https://` URI, whatever the cause. The cause can
 certificate, but also a node that is down or a wrong port:
 
 ```text
-Wallet is not connected to daemon: the node is an https node; its certificate may not be trusted (see ZephyrTls and the user guide, chapter 6)
+Wallet is not connected to daemon: the node is an https node; its certificate may not be trusted (see ZephyrTls and the user guide, "TLS to a node")
 ```
 
-Releases up to `2.3.0-sec.2-java.4` print "chapter 6" in that message. The section it means is
-[TLS to a node](#tls-to-a-node) in this chapter, and later releases name that section instead.
+The section it names is [TLS to a node](#tls-to-a-node) in this chapter. Releases up to
+`2.3.0-sec.2-java.4` print "chapter 6" in its place; they mean the same section.
 When the certificate is the cause, the native log says "SSL certificate is not in the allowed list,
 connection dropped" ([The native log](09-errors.md#the-native-log)).
