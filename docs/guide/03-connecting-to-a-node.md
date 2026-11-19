@@ -257,9 +257,11 @@ core makes that check when the connection is set and on each `isConnectedToDaemo
 away after that check gives other messages, such as "Failed to connect to daemon" from
 `getDaemonHeight()`. Call `isConnectedToDaemon()` to refresh the state.
 
-**For an `https://` node** the message gets a hint at TLS. The library adds it to every "Wallet is
-not connected to daemon" of an `https://` URI, whatever the cause. The cause can be an untrusted
-certificate, but also a node that is down or a wrong port:
+**For an `https://` node** the message gets a hint at TLS. The calls about the node and the
+syncing calls add it to "Wallet is not connected to daemon" for an `https://` URI, whatever the
+cause: `getDaemonHeight`, `getDaemonMaxPeerHeight`, `isDaemonSynced`, `sync`, `startSyncing`,
+`scanTxs`, `rescanSpent` and `rescanBlockchain`. Other calls pass the core's message unchanged.
+The cause can be an untrusted certificate, but also a node that is down or a wrong port:
 
 ```text
 Wallet is not connected to daemon: the node is an https node; its certificate may not be trusted (see ZephyrTls and the user guide, "TLS to a node")
