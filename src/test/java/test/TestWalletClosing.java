@@ -490,11 +490,13 @@ public class TestWalletClosing {
    * the listeners inline; submitMultisigTxHex() relays without notifying and marks the spent
    * outputs), and the calls that change the wallet's outputs under the refresh that delivers the
    * callback (rescanSpent(), importOutputs(), importKeyImages(), importMultisigHex(), whose core
-   * function also refreshes). Reads, signMultisigTxHex() and the same calls without relay keep
-   * working. Offline, on an in-memory wallet without funds: nothing could be built or sent.
+   * function also refreshes), and every call that persists the wallet (save(), moveTo(),
+   * changePassword(), getData()), whose saved state could hold a block half processed. Reads,
+   * signMultisigTxHex() and the same calls without relay keep working. Offline, on an in-memory
+   * wallet without funds: nothing could be built or sent.
    */
   @Test
-  public void callsThatCannotRunInACallbackAreRefused() throws Exception {
+  public void callsThatCannotRunInACallbackAreRefused(@TempDir Path dir) throws Exception {
     ZephyrWalletFull wallet = inMemoryWallet();
     String address = wallet.getPrimaryAddress();
     String hash = String.join("", Collections.nCopies(64, "0"));
@@ -522,6 +524,10 @@ public class TestWalletClosing {
     refused.put("importMultisigHex", () -> wallet.importMultisigHex(Arrays.asList("not multisig info")));
     refused.put("importKeyImages", () -> wallet.importKeyImages(new ArrayList<ZephyrKeyImage>()));
     refused.put("importOutputs", () -> wallet.importOutputs("00"));
+    refused.put("save", () -> { wallet.save(); return null; });
+    refused.put("moveTo", () -> { wallet.moveTo(dir.resolve("moved").toString()); return null; });
+    refused.put("changePassword", () -> { wallet.changePassword("wrong password", "new password"); return null; });
+    refused.put("getData", wallet::getData);
     Map<String, Call> allowed = new LinkedHashMap<String, Call>();
     allowed.put("getHeight", wallet::getHeight);
     allowed.put("getBalance", wallet::getBalance);
@@ -530,7 +536,6 @@ public class TestWalletClosing {
     allowed.put("createTxs(no relay)", () -> wallet.createTxs(new ZephyrTxConfig().setAccountIndex(0).setAddress(address).setAmount(BigInteger.ONE).setRelay(false)));
     allowed.put("sweepDust(false)", () -> wallet.sweepDust(false));
     allowed.put("signMultisigTxHex", () -> wallet.signMultisigTxHex("00"));
-    allowed.put("changePassword", () -> { wallet.changePassword("wrong password", "new password"); return null; });
     allowed.put("setDaemonConnection(null)", () -> { wallet.setDaemonConnection((String) null); return null; });
     Map<String, String> inCallback = new LinkedHashMap<String, String>();
     wallet.addListener(new ZephyrWalletListener() {
@@ -547,12 +552,13 @@ public class TestWalletClosing {
     }
     assertTrue(notRefused.isEmpty(), "not refused inside a callback: " + notRefused);
     for (String name : Arrays.asList("getHeight", "getBalance", "getAccounts", "stopSyncing")) assertEquals("returned", inCallback.get(name), name + " inside a callback");
-    for (String name : Arrays.asList("createTxs(no relay)", "sweepDust(false)", "signMultisigTxHex", "changePassword", "setDaemonConnection(null)")) {
+    for (String name : Arrays.asList("createTxs(no relay)", "sweepDust(false)", "signMultisigTxHex", "setDaemonConnection(null)")) {
       assertFalse(inCallback.get(name).contains("from inside a listener callback"), name + " was refused: " + inCallback.get(name));
     }
     // outside a callback the same calls reach the core (offline, so they fail there)
     String outside = outcome(wallet::sync);
     assertFalse(outside.contains("from inside a listener callback"), "sync() outside a callback: " + outside);
+    assertEquals("returned", outcome(wallet::getData), "getData() outside a callback");
   }
 
   /**

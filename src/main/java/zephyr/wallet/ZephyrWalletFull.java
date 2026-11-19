@@ -598,11 +598,18 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   }
 
   /**
-   * Move the wallet from its current path to the given path.
+   * Move the wallet from its current path to the given path. The core writes the wallet's files at
+   * the new path as {@code save()} does.
+   *
+   * <p>Not exclusive with background syncing: while {@code startSyncing()} runs (and after
+   * {@code stopSyncing()}, until the core's sync thread has finished its current sync) the core may
+   * be inside a refresh of the wallet that this call writes. Throws ZephyrError when called from
+   * inside a listener callback (see {@link #addListener(ZephyrWalletListenerI)}).</p>
    * 
    * @param path is the new wallet's path
    */
   public void moveTo(String path) {
+    refuseInCallback("moveTo()");
     beginCall();
     try {
       moveToJni(path, password);
@@ -648,17 +655,21 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
    * {@code importMultisigHex}: they change the wallet's outputs while the refresh that delivers
    * the callback stands between two of its steps ({@code importMultisigHex} also runs a refresh of
    * its own);</li>
+   * <li>{@code save}, {@code moveTo}, {@code changePassword} and {@code getData}: every call that
+   * persists the wallet. A callback runs in the middle of the refresh that delivers it: the core
+   * notifies a received output before it has applied the rest of that transaction (its spends, its
+   * outgoing and payment records) and before the block joins the wallet's chain, so a save from an
+   * output callback would write a transaction half processed. Save after {@code sync()} has
+   * returned, or from a thread of your own after a callback has handed the event over;</li>
    * <li>{@code startSyncing}: it would start the core's sync thread from inside a sync;</li>
    * <li>{@code close}: it would wait for the callback that calls it.</li>
    * </ul>
    *
    * <p>Not refused, as read in the core: {@code signMultisigTxHex} ({@code sign_multisig_tx} takes
    * no lock, notifies nothing and changes only the signed outputs' multisig nonces and the stored
-   * transaction keys, which a refresh does not use); {@code changePassword}
-   * ({@code change_password} saves the wallet as {@code save()} does and rewrites its keys file;
-   * the core keeps the keys unencrypted in memory, so nothing is re-encrypted under the refresh);
-   * {@code setDaemonConnection} ({@code set_daemon_connection} waits for a node request under way,
-   * then points the core at the new node, from which the paused refresh goes on).</p>
+   * transaction keys, which a refresh does not use); {@code setDaemonConnection}
+   * ({@code set_daemon_connection} waits for a node request under way, then points the core at the
+   * new node, from which the paused refresh goes on).</p>
    *
    * <p>A read is never refused, but it is not always free of callbacks: a read that can include
    * pool transactions ({@code getTxs}, {@code getTransfers} and the like) first refreshes the
@@ -2303,10 +2314,16 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
 
   /**
    * Get the wallet's keys and cache data.
+   *
+   * <p>The cache data is what a save would write, so this call is refused like {@code save()}:
+   * it throws ZephyrError when called from inside a listener callback (see
+   * {@link #addListener(ZephyrWalletListenerI)}), and it is not exclusive with background syncing
+   * (see {@link #save()}).</p>
    * 
    * @return the keys and cache data, respectively
    */
   public synchronized byte[][] getData() {
+    refuseInCallback("getData()");
     beginCall();
     try {
       return new byte[][] { getKeysFileBufferJni(password, isViewOnly()), getCacheFileBufferJni() };
@@ -2317,8 +2334,18 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     }
   }
   
+  /**
+   * {@inheritDoc}
+   *
+   * <p>The core saves the wallet with the new password, the cache as {@code save()} writes it and
+   * the keys file. Not exclusive with background syncing: while {@code startSyncing()} runs (and
+   * after {@code stopSyncing()}, until the core's sync thread has finished its current sync) the
+   * core may be inside a refresh of the wallet that this call writes. Throws ZephyrError when called
+   * from inside a listener callback (see {@link #addListener(ZephyrWalletListenerI)}).</p>
+   */
   @Override
   public void changePassword(String oldPassword, String newPassword) {
+    refuseInCallback("changePassword()");
     beginCall();
     try {
       try {
@@ -2342,9 +2369,14 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
    * {@code stopSyncing()}, until the core's sync thread has finished its current sync) the core may
    * be inside a refresh of the wallet that this save reads. To save a wallet that syncs in the
    * background, use {@code close(true)}, which saves after that thread has ended.</p>
+   *
+   * <p>Throws ZephyrError when called from inside a listener callback (see
+   * {@link #addListener(ZephyrWalletListenerI)}): save after {@code sync()} has returned, or from a
+   * thread of your own after a callback has handed the event over.</p>
    */
   @Override
   public void save() {
+    refuseInCallback("save()");
     beginCall();
     try {
       saveJni();
@@ -3038,13 +3070,17 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
    * through on_spend_txs, import_key_images through wallet2's on_money_spent); when it relays
    * (submit_multisig_tx_hex through wallet2's commit_tx, which also marks outputs spent); or when
    * it changes the wallet's outputs between two steps of the refresh that delivers the callback
-   * (rescan_spent, import_outputs, import_key_images, import_multisig_hex, which also refreshes).
-   * startSyncing() and close() are refused for their own reasons (a sync thread started from inside
-   * a sync; a close() that would wait for its own callback). Not refused: sign_multisig_tx_hex,
-   * change_password and set_daemon_connection (none locks the sync mutex, notifies or changes the
-   * outputs), and reads, although a read that refreshes the pool (get_txs and get_transfers with
-   * pool transactions, through update_pool_state and process_pool_state) can notify inline. The
-   * list is in the Javadoc of addListener().
+   * (rescan_spent, import_outputs, import_key_images, import_multisig_hex, which also refreshes);
+   * or when it persists the wallet (save, move_to, change_password, and getData(), whose cache bytes
+   * are a save): wallet2's process_new_transaction calls on_money_received before it has applied
+   * the transaction's spends and its outgoing and payment records, and a block joins m_blockchain
+   * only after all its transactions, so a save from an output callback writes a transaction half
+   * processed. startSyncing() and close() are refused for their own reasons (a sync thread started
+   * from inside a sync; a close() that would wait for its own callback). Not refused:
+   * sign_multisig_tx_hex and set_daemon_connection (neither locks the sync mutex, notifies, changes
+   * the outputs or persists the wallet), and reads, although a read that refreshes the pool
+   * (get_txs and get_transfers with pool transactions, through update_pool_state and
+   * process_pool_state) can notify inline. The list is in the Javadoc of addListener().
    */
   private void refuseInCallback(String call) {
     if (jniListener.inCallback()) throw new ZephyrError("Cannot call " + call + " from inside a listener callback; call it after the callback has returned");
