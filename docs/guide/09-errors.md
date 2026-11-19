@@ -6,88 +6,91 @@ them safely. It ends with the core's own log.
 
 ## ZephyrError
 
-`zephyr.common.ZephyrError` is the exception the library's own checks and most wallet calls throw.
-It is not the only one: [Calls that let the core's exception through](#calls-that-let-the-cores-exception-through)
-names the others. It extends `RuntimeException`, so
-the compiler does not ask you to catch it. It carries a message and an optional `Integer` code:
+`zephyr.common.ZephyrError` is the exception of the library. In `2.3.0-sec.2-java.5` every public
+method of `ZephyrWalletFull` and of `ZephyrUtils` throws it and nothing else, apart from the cases
+in [What is not a ZephyrError](#what-is-not-a-zephyrerror). It extends `RuntimeException`, so the
+compiler does not ask you to catch it. It carries a message and an optional `Integer` code:
 
 - `getMessage()` is the text;
 - `getCode()` is the code, or `null`;
 - `toString()` is the message, or "code: message" when there is a code.
 
-Many wallet calls catch the native failure and throw a `ZephyrError` with the core's message and
-no code. Two calls set the code -1: `getReserveProofAccount` and `checkReserveProof`. Checks in
-the Java code, such as a missing network type or a closed wallet, throw a `ZephyrError` as well.
+The core's failures arrive with the core's message and no code. Two calls set the code -1:
+`getReserveProofAccount` and `checkReserveProof`. Checks in the Java code, such as a missing
+network type or a closed wallet, throw a `ZephyrError` as well.
 
 ## Where messages come from
 
 | Source | What arrives | Example |
 |---|---|---|
 | a check in the Java code | `ZephyrError` with the library's text | "Wallet is closed" |
-| the core, through a wallet call that wraps it | `ZephyrError` with the core's text, code `null` | "not enough money" |
-| the core, through a call that does not wrap it | `java.lang.Exception` with the core's text | "invalid password" |
+| the core, through any wallet call | `ZephyrError` with the core's text, code `null` | "not enough money", "invalid password" |
+| a call refused inside a listener callback | `ZephyrError` | "Cannot call save() from inside a listener callback; call it after the callback has returned" |
+| an argument check | `ZephyrError` | "Log level must be an integer >= 0" |
+| a `null` argument the Java code does not check itself | `ZephyrError` with the Java runtime's text for the `NullPointerException` | — |
+| an unknown hash in a transaction, transfer or output query | `ZephyrError` | "Wallet missing requested tx hashes: " and the hashes |
+| an inherited method that zephyr-java does not implement | `ZephyrError` | "ZephyrWalletFull.tagAccounts() not implemented" |
 | the core, out of memory | `OutOfMemoryError`, not wrapped | — |
-| an argument check | `AssertionError` | "Log level must be an integer >= 0" |
-| an unknown hash in a transfer or output query | `RuntimeException` | "Wallet missing requested tx hashes: " and the hashes |
-| an inherited method that zephyr-java does not implement | `RuntimeException` | "ZephyrWalletFull.tagAccounts() not implemented" |
 | the RPC classes, an RPC or HTTP error | `ZephyrRpcError`, a `ZephyrError` with the RPC code or HTTP status | [ZephyrRpcError](11-the-rpc-classes.md#zephyrrpcerror) |
 | the RPC classes, no connection | a plain `ZephyrError` whose message is the cause's text | — |
 
-The JNI bridge turns a C++ exception into a `java.lang.Exception` (an `IOException` for an I/O
-failure, an `OutOfMemoryError` when memory runs out). A wallet call that wraps it catches the
-`Exception` and rethrows it as a `ZephyrError`; an `OutOfMemoryError` passes through unchanged.
+The JNI bridge turns every C++ exception of the core into a `ZephyrError`, except a failure to
+allocate memory, which becomes an `OutOfMemoryError`. The Java side turns any other
+`RuntimeException` or `AssertionError` of a wallet call into a `ZephyrError` with the same
+message. It leaves out the cause, which can carry the data that failed to parse.
 
-### Calls that let the core's exception through
+## What is not a ZephyrError
 
-Not every call of `ZephyrWalletFull` wraps the core's failure. In `2.3.0-sec.2-java.4` these pass it
-on as `java.lang.Exception` (or `IOException`), as read in the source:
+- **`OutOfMemoryError`**, when the core runs out of memory.
+- **The Java runtime's own errors when the native library cannot be loaded** (read in the code).
+  The first use of `ZephyrWalletFull` then fails with an `ExceptionInInitializerError` around the
+  `ZephyrError`, and later uses with a `NoClassDefFoundError`. A native call of `ZephyrUtils` fails
+  with an `UnsatisfiedLinkError`. Call `ZephyrUtils.loadNativeLibrary()` first to get the
+  `ZephyrError` with both reasons ([The native library](01-getting-started.md#the-native-library)).
+- **The other classes.** The rule covers `ZephyrWalletFull` and `ZephyrUtils` only. A model class
+  used directly can throw other exceptions: `ZephyrTxConfig.setAmount(String)` throws a
+  `NumberFormatException` for text that is not a number. `ZephyrTls`, the RPC classes and the
+  connection manager were not checked for the rule.
 
-- `openWallet` from a path, `openWalletData`, and `createWallet` for a random wallet or one from a
-  mnemonic;
-- `save`, `moveTo` and `getData`;
-- the six balance calls (`getBalance`, `getUnlockedBalance`), `getReserveInfo` and
-  `getCirculatingSupply`: they catch only `ZephyrError`, which the bridge never throws;
-- `getOutputs`, `getHeight`, `getRestoreHeight` and `setRestoreHeight`;
-- the account and subaddress calls (`getAccounts`, `getAccount`, `createAccount`, `getSubaddresses`,
-  `createSubaddress`, `setSubaddressLabel`, `getAddress`);
-- `getTxNotes`, `setTxNotes`, the export and import of outputs and key images, `signMessage`, the
-  address book and the attributes;
-- the getters of the keys, the mnemonic, the path and the network type.
+**Some native calls still do not catch the core's failure.** Among them are the account and
+subaddress calls and `getAddress` (read in the bridge's code). An exception that leaves native code
+uncaught can end the process. An invalid account or subaddress index is the likely trigger, so pass
+only indexes the wallet reported. This was not run.
 
-Observed on 2026-11-17, also with the released JAR: `openWallet` with a wrong password threw
-`java.lang.Exception` with the message "invalid password", not a `ZephyrError`. In the core's code,
-`getCirculatingSupply` without a node throws "failed to get circulating supply. Make sure you are
-connected to a daemon." the same way. The rule that follows: **catch `Exception` around wallet
-calls, not only `ZephyrError`** ([Opening wallet files](02-wallets.md#opening-wallet-files)).
+**Releases up to `2.3.0-sec.2-java.4`** let the core's failure through as `java.lang.Exception` in
+many calls: opening and creating wallets, `save`, `moveTo`, `getData`, the balance calls, the
+account calls and others. Observed on 2026-11-17 with the released JAR: a wrong password threw
+`java.lang.Exception` "invalid password". In their source, an unknown hash in a transfer or output
+query threw a plain `RuntimeException`, and argument checks an `AssertionError`. A `null`
+attribute key or value, in `getAttribute(null)`, `setAttribute(null, v)` or
+`setAttribute(k, null)`, aborted the process. That was read in the bridge's code and observed on
+2026-11-18 with a development build whose bridge is the same in that place. On those releases,
+catch `Exception` around wallet calls, not only `ZephyrError`. `2.3.0-sec.2-java.5` refuses a
+`null` attribute key or value with "Must provide attribute key" or "Must provide attribute value".
 
-Some of these calls do not catch the core's failure in the native code either. Among them are the
-account and subaddress calls and `getAddress` (read in the bridge's code). An exception that
-leaves native code uncaught can end the process. An invalid account or subaddress index is the
-likely trigger, so pass only indexes the wallet reported. This was not run.
-
-A few calls have no check for a closed wallet, among them `changePassword`. After `close()` it fails
-with an unrelated error instead of "Wallet is closed" (read in the source).
-
-`ZephyrUtils.validateAddress` turns its `AssertionError` into a `ZephyrError`; `isValidAddress`
+`ZephyrUtils.validateAddress` throws a `ZephyrError` that names the problem; `isValidAddress`
 returns `false` instead of throwing.
 
 ## The messages a wallet meets
 
-The messages below appear in this guide, in the library's source or in the runs of 2026-11-17. The
-core's messages are its own text and can change with the core.
+The messages below appear in this guide, in the library's source or in the runs of 2026-11-17 to
+2026-11-19. The core's messages are its own text and can change with the core.
 
 | Message | Thrown by | What the app can do |
 |---|---|---|
 | "Wallet does not exist at path: " and the path | `openWallet` | offer to create or restore a wallet |
-| "invalid password" (`java.lang.Exception`) | `openWallet` | ask for the password again |
+| "invalid password" | `openWallet` | ask for the password again |
 | "Wallet already exists: " and the path | `createWallet` | choose another path |
 | "Cannot specify restore height when creating random wallet" | `createWallet` | leave the restore height out |
 | "Wallet may be initialized with a mnemonic or keys but not both" | `createWallet` | give one of the two |
 | "Must specify a network type: 'mainnet', 'testnet' or 'stagenet'" | `createWallet`, `openWallet` with a config | set `MAINNET` |
-| "Wallet is closed" | most calls after `close()` | open the wallet again |
+| "Wallet is closed" | every call after `close()`, and a `sync()`, `rescanBlockchain()`, `scanTxs()` or `importMultisigHex()` that `close()` cut short | open the wallet again |
+| "Cannot call " and the call, then " from inside a listener callback; call it after the callback has returned" | the calls refused inside a callback ([What a callback may call](04-threads-and-listeners.md#what-a-callback-may-call)) | hand the work to a thread of your own |
+| "Cannot close the wallet from inside one of its own calls or listener callbacks" | `close()` | close from a thread of your own |
+| "Wallet was closed, but saving it failed: " and the core's reason | `close(true)` | the wallet is closed; what changed since the last save is lost ([Closing](02-wallets.md#closing)) |
 | "Wallet is not connected to daemon" | `sync()`, `getDaemonHeight()` and other calls that need the node, when the last connection check failed | check the node; for `https://` the message adds a hint at TLS ([When the node cannot be reached](03-connecting-to-a-node.md#when-the-node-cannot-be-reached)) |
 | "Failed to connect to daemon" | `getDaemonHeight()` and the like, when the node went away after the last connection check | check the node |
-| "failed to get circulating supply. Make sure you are connected to a daemon." (`java.lang.Exception`) | `getCirculatingSupply` | connect the wallet to a node |
+| "failed to get circulating supply. Make sure you are connected to a daemon." | `getCirculatingSupply` | connect the wallet to a node |
 | "failed to connect to daemon: " and the URI | `getHeightByDate` | check the node |
 | `failed to read file ".keys"` | `changePassword` on a wallet from bytes | [The password](02-wallets.md#the-password) |
 | "Invalid original password." | `changePassword` | ask for the old password again |
@@ -98,15 +101,15 @@ core's messages are its own text and can change with the core.
 | "Mint/redeem TX amounts permit at most 4 decimal places" | `createTxs` for a conversion | round down to four decimals |
 | "Cannot set amount because ZephyrTxConfig already has multiple destinations" | `ZephyrTxConfig.setAmount` | set the amount on each destination |
 | "Must provide account index" | `getBalance(asset, null)` | pass an account index |
-| "Wallet missing requested tx hashes: " and the hashes | `getTxs(hash)` | sync, or use `getTxs(hashes, missing)` |
+| "Wallet missing requested tx hashes: " and the hashes | `getTxs(hash)`, and `getTransfers` or `getOutputs` with hashes in the query | sync, or use `getTxs(hashes, missing)` |
+| "Must provide attribute key", "Must provide attribute value" | `getAttribute`, `setAttribute` | pass a key and a value |
+| "Amount is not a finite number: " and the value | `ZephyrUtils.toAtomicUnits(double)` | check the input ([Amounts](05-assets-and-balances.md#amounts)) |
 | "Address has invalid ..." or "Address network type mismatch" | `validateAddress` | ask the user to check the address |
 | "The RPC classes need java.time: ..." | the RPC classes on API 24 and 25 | [The RPC classes below API 26](10-android.md#the-rpc-classes-below-api-26) |
-| "Not supported by ZephyrWalletRpc until the RPC port: reserve info" | `ZephyrWalletRpc` | use `ZephyrWalletFull` |
 
-**What an app can tell apart.** The type separates only the broad cases. A library check or a
-wrapped core failure is a `ZephyrError`, a core failure that was not wrapped a `java.lang.Exception`,
-and an RPC error a `ZephyrRpcError`. Every refusal of `createTxs` by the core is the same `ZephyrError`
-with a `null` code; only the text differs. So the message table above is the only handle, and its
+**What an app can tell apart.** The type separates only the broad cases. A library check and a
+core failure are a `ZephyrError`, and an RPC error a `ZephyrRpcError`. Every refusal of `createTxs`
+by the core is the same `ZephyrError` with a `null` code; only the text differs. So the message table above is the only handle, and its
 texts are not guaranteed to stay the same across releases of the core. As advice:
 
 - check what you can before you build: round a conversion to four decimals, compare the amount
@@ -127,30 +130,49 @@ wait for pending funds to unlock." Keep the core's message for the log.
 
 ## Logging safely
 
+Never log the mnemonic, the private keys or the wallet password. `toString()` reaches a log
+without an explicit call: through `printStackTrace()`, through `"" + e`, and through the
+throwable output of most loggers. For a `ZephyrError` without a code, `getMessage()` and
+`toString()` are the same text.
+
+**`ZephyrRpcError.toString()` appends the RPC method and its parameters** as JSON. From
+`2.3.0-sec.2-java.5` on it prints the values of secret parameters as `<redacted>`, while
+`getRpcParams()` still holds them. Log `getMessage()` and `getCode()`, and never log
+`getRpcParams()`.
+
 > [!WARNING]
-> **Never log `ZephyrRpcError.toString()`.** It appends the RPC method and its parameters as JSON.
-> The calls of `ZephyrWalletRpc` that open or create a wallet put the wallet's password into those
-> parameters, and its `setDaemonConnection` the node's login password. Log `getMessage()` and
-> `getCode()` instead.
+> **Up to `2.3.0-sec.2-java.4` the library logged secrets at some settings.** At `FINE` the
+> transaction config and the transactions with their secret keys; from `setLogLevel(2)` request
+> bodies with passwords and mnemonics; and `ZephyrRpcError.toString()` the parameters unredacted,
+> apart from the passwords. Keep `FINE` logging of the library and `setLogLevel` off on those
+> releases.
 
-Releases after `2.3.0-sec.2-java.4` print the values of `password`, `old_password`, `new_password`,
-`seed`, `seed_offset`, `spendkey`, `viewkey` and `tx_key` as `<redacted>` in `toString()`, while
-`getRpcParams()` still holds them.
-
-`toString()` also reaches a log without an explicit call: through `printStackTrace()`, through
-`"" + e`, and through the throwable output of most loggers. Never log the mnemonic, the private keys
-or the wallet password. For a `ZephyrError` without a code, `getMessage()` and `toString()` are the
-same text.
-
-The library logs secrets itself at some settings (read in the source):
+What the library logs in `2.3.0-sec.2-java.5` (read in the source):
 
 | Setting | What is logged, and where |
 |---|---|
-| `java.util.logging` level `FINE` for `zephyr.wallet.ZephyrWalletFull` | the whole transaction config of `createTxs`, and the first 5,000 characters of the transactions `createTxs` and `sweepUnlocked` return, which can hold a transaction's secret key |
-| `ZephyrUtils.setLogLevel(2)` | every request body of the RPC classes, on `System.out`: for `ZephyrWalletRpc` that includes wallet passwords and mnemonics |
-| `ZephyrUtils.setLogLevel(3)` | every response as well, which can hold keys and mnemonics |
-| `setPrintStackTrace(true)` on a `ZephyrRpcConnection` | every request body, with a stack trace, on stderr |
+| `java.util.logging` level `FINE` for `zephyr.wallet.ZephyrWalletFull` | for `createTxs` and `sweepUnlocked`, the number of transactions built and their hashes; never the config, the transactions or their keys. Also a failed stop at close, and a failed switch of the native listener |
+| `WARNING` for `zephyr.wallet.ZephyrWalletFull` | a listener that threw: its class, the callback's name and its `Throwable`; callback data that could not be read: the exception's class only ([An exception thrown in a callback](04-threads-and-listeners.md#an-exception-thrown-in-a-callback)) |
+| `ZephyrUtils.setLogLevel(2)` | every request body and URI of the RPC classes, on `System.out`, with the values of secret names and the URI's user name and password as `<redacted>` |
+| `ZephyrUtils.setLogLevel(3)` | every response as well, up to 10,000 characters, redacted by the same names |
+| `setPrintStackTrace(true)` on a `ZephyrRpcConnection` | the redacted request body, with a stack trace, on stderr |
 | any `ZephyrUtils.setLogLevel` call, `configureNativeLogging` | the core's log, which holds the primary address, amounts and transaction hashes ([The native log](#the-native-log)) |
+
+The redacted names, matched without regard to case at any depth:
+
+- in requests: `password`, `old_password`, `new_password`, `seed`, `seed_offset`, `spendkey`,
+  `viewkey` and `tx_key`;
+- in responses of a wallet RPC server: `key`, `seed`, `tx_key`, `tx_key_list`, `tx_metadata`,
+  `tx_metadata_list`, `signed_txset`, `multisig_txset`, `multisig_info` and `info`.
+
+`key` and `info` are generic names: a node's answer with an output's public key under `key` is
+redacted too. Some fields are private but not secret, and are printed: key images, transaction
+hashes, a transaction's hex, an unsigned transaction set, exported outputs, signed key images and
+addresses. A log at levels 2 and 3 is still private data.
+
+Two more places print, without secrets: a failed check of `ZephyrConnectionManager` and a failed
+poll of `ZephyrDaemonRpc` print their stack trace, which can name the node's host and port.
+`ZephyrDaemonRpc` logs unexpected fields of a node's answer at `WARNING`.
 
 On Android, `System.out` and `System.err` go to logcat. In a released app, keep `FINE` logging of
 the library off and do not call `setLogLevel` or `configureNativeLogging`. Without them the core
@@ -184,9 +206,13 @@ it in the app's private storage, out of backups and crash reports, and switch it
 
 **The log can grow fast.** With a listener registered, a level-0 file log grew by one error line
 per scanned block: about 1.1 MB for 7,700 blocks. The line was "wait should have been called
-before waiter dtor - waiting now". Without a listener there were 4 such lines.
+before waiter dtor - waiting now". Without a listener there were 4 such lines. In
+`2.3.0-sec.2-java.5` the native listener stays in the core's listeners once a listener was added.
+Whether the log then keeps growing after the last listener is removed was not run.
 
 These runs used a developer build of the `2.3.0-sec.2-java.4` sources on Linux. A level-0 log of the
 released JAR held the same lines on 2026-11-17: the primary address, the wallet path, and the
-amounts and hashes of the outputs. Levels above 1 were not tried. On Android, `configureNativeLogging` has not been tried; nothing the core logs appears
-in logcat ([Logs](10-android.md#logs)).
+amounts and hashes of the outputs. They were not repeated with `2.3.0-sec.2-java.5`, which does
+not change the core or the bridge's logging calls. Levels above 1 were not tried. On Android,
+`configureNativeLogging` has not been tried; nothing the core logs appears in logcat
+([Logs](10-android.md#logs)).

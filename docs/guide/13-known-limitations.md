@@ -44,8 +44,8 @@ Status words:
 | an exception from a callback during `sync()` is printed and swallowed, and skips the rest of that block's notifications | observed on 2026-11-17 | [An exception thrown in a callback](04-threads-and-listeners.md#an-exception-thrown-in-a-callback) |
 | calls from several threads on one wallet are not known to be safe | not established | [Calls from several threads](04-threads-and-listeners.md#calls-from-several-threads) |
 | a wrong password in `openWallet` throws `java.lang.Exception`, not `ZephyrError` | observed on 2026-11-17, also with the released JAR; open | [Where messages come from](09-errors.md#where-messages-come-from) |
-| many wallet calls, among them the balance calls, `save` and the account calls, let the core's `java.lang.Exception` through | read in the source; open | [Calls that let the core's exception through](09-errors.md#calls-that-let-the-cores-exception-through) |
-| an invalid account or subaddress index may end the process: some native calls do not catch the core's failure | read in the code; not run | [Calls that let the core's exception through](09-errors.md#calls-that-let-the-cores-exception-through) |
+| many wallet calls, among them the balance calls, `save` and the account calls, let the core's `java.lang.Exception` through | read in the source; open | [What is not a ZephyrError](09-errors.md#what-is-not-a-zephyrerror) |
+| an invalid account or subaddress index may end the process: some native calls do not catch the core's failure | read in the code; not run | [What is not a ZephyrError](09-errors.md#what-is-not-a-zephyrerror) |
 | `close(true)` does not catch a failing save in native code | read in the code; not run | [Closing](02-wallets.md#closing) |
 | at `FINE` and from `setLogLevel(2)` the library logs transaction keys, passwords and mnemonics | read in the source | [Logging safely](09-errors.md#logging-safely) |
 | `ZephyrUtils.toAtomicUnits(double)` throws below 0.001 and from 10^7, and truncates silently | specified Java behaviour; run on 2026-11-17 | [Amounts](05-assets-and-balances.md#amounts) |
