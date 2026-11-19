@@ -95,7 +95,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   private static final long DEFAULT_SYNC_PERIOD_IN_MS = 10000; // default period betweeen syncs in ms
   
   // instance variables
-  private long jniWalletHandle;                 // memory address of the wallet in c++; read and written by name in c++ (kept by the R8 consumer rules)
+  private long jniWalletHandle;                 // memory address of the wallet in c++; read and written by name in c++ (kept by the R8 consumer rules), zeroed by c++ once freed
   private long jniListenerHandle;               // memory address of the wallet listener in c++; set by name in c++ only (kept by the R8 consumer rules)
   private WalletJniListener jniListener;        // receives notifications from jni c++
   private volatile String password;             // written by changePassword(), read by other calls on other threads
@@ -2321,20 +2321,34 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
    * Optionally save, then close the wallet. Returns only when the wallet is closed: new calls fail
    * with "Wallet is closed" from the start, the listeners receive no more callbacks, the core is
    * asked to stop syncing, and close() waits, without a time limit, until no other thread is
-   * inside a call of this wallet; a call that waits on the node ends when the core gives up on it.
-   * An interrupt does not end the wait; the thread's interrupt status is restored afterwards.
-   * Closing a closed wallet has no effect; a second thread that closes the wallet meanwhile waits
-   * for the first.
+   * inside a call of this wallet and the core's background sync thread (of {@code startSyncing()})
+   * has ended. An interrupt does not end the wait; the thread's interrupt status is restored
+   * afterwards. Closing a closed wallet has no effect; a second thread that closes the wallet
+   * meanwhile waits for the first.
    *
-   * <p>With save, the wallet is saved after the core's background sync thread (of
-   * {@code startSyncing()}) has ended and while no other call runs, so the save never meets a
-   * refresh. That thread is asked to stop again and again until it has ended: a stop that comes
-   * before its refresh begins is not lost, and close() waits for the refresh's current batch of
-   * blocks at most.</p>
+   * <p>How long close() waits: a sync, scan or rescan that runs is stopped, and the core's sync
+   * thread is asked to stop again and again until it has ended (a stop that comes before its
+   * refresh begins is not lost); a refresh normally ends within its current batch of blocks. It
+   * can take longer: a request to the node that is under way is waited for, up to the core's
+   * timeout (3 min 30 s against a node that does not answer), and so is the one with which the
+   * core saves the ring members after its refresh; a listener callback that blocks is waited for;
+   * and, read in the core's code and not seen in a run, when the core's sync thread is just about
+   * to wait for its next sync period as close() begins, close() can wait for the rest of that
+   * period.</p>
+   *
+   * <p>With save, the wallet's cache file is written after the core's background sync thread has
+   * ended and while no other call runs, so the save never meets a refresh. A wallet without a file
+   * (created without a path, or opened with {@code openWalletData()}) is not written, and nothing
+   * says so. While close(true) saves, the wallet's keys file is no longer locked: do not open the
+   * same wallet elsewhere before close(true) has returned. When the save fails (a full disk, a
+   * directory that cannot be written), the wallet is closed and freed all the same, and close()
+   * throws ZephyrError("Wallet was closed without saving: " and the core's reason): a save never
+   * writes the keys file, so what changed since the last save is lost and nothing else.</p>
    *
    * <p>Throws ZephyrError when called from inside one of the wallet's own calls or listener
-   * callbacks, which close() would wait for (the wallet stays open), and when saving fails (the
-   * wallet stays closed for calls; close() can be repeated).</p>
+   * callbacks, which close() would wait for (the wallet stays open). Should the core's own close
+   * step fail, close() throws with the wallet closed for calls but not freed, and can be
+   * repeated.</p>
    *
    * @param save specifies if the wallet should be saved before being closed
    */
@@ -2357,16 +2371,19 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
           }
           stopSyncingQuietly(); // again: a stop that comes before a refresh starts is lost
         }
+        ZephyrError saveFailure = null;
         try {
           closeJni(save);
         } catch (Exception e) {
-          throw toZephyrError(e);
+          if (jniWalletHandle != 0) throw toZephyrError(e); // the core's close failed: nothing freed, close() can be repeated
+          saveFailure = new ZephyrError("Wallet was closed without saving: " + messageOf(e)); // freed all the same
         } finally {
           callLock.writeLock().unlock();
         }
         isFreed = true;
         password = null;
         listeners.clear();
+        if (saveFailure != null) throw saveFailure;
       } finally {
         if (interrupted) Thread.currentThread().interrupt();
       }

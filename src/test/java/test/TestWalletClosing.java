@@ -11,7 +11,9 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.math.BigInteger;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -30,6 +32,7 @@ import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -636,6 +639,94 @@ public class TestWalletClosing {
     assertEquals(Boolean.TRUE, field(wallet, "listenerDelivery"), "not delivering with listeners registered");
     for (ZephyrWalletListener listener : kept) wallet.removeListener(listener);
     assertEquals(Boolean.FALSE, field(wallet, "listenerDelivery"), "delivering with no listener registered");
+  }
+
+  /**
+   * close(true) whose save fails (the wallet's directory made read-only, so the core cannot write
+   * its cache file) still closes and frees the native wallet, and throws ZephyrError saying that the
+   * wallet was closed without saving, with the core's reason. The keys file is not written by a
+   * save, so only what changed since the last save is lost: a reopened wallet has the last save, and
+   * the old object can no longer overwrite what the reopened one saves later.
+   */
+  @Test
+  public void failedSaveAtCloseStillClosesTheWallet(@TempDir Path dir) throws Exception {
+    Path walletDir = Files.createDirectory(dir.resolve("wallet"));
+    String path = walletDir.resolve("w").toString();
+    ZephyrWalletFull wallet = ZephyrWalletFull.createWallet(new ZephyrWalletConfig().setPath(path).setPassword("closing-test").setNetworkType(ZephyrNetworkType.MAINNET));
+    opened.add(wallet);
+    wallet.setAttribute("state", "saved");
+    wallet.save();
+    wallet.setAttribute("state", "not saved");
+    Files.setPosixFilePermissions(walletDir, PosixFilePermissions.fromString("r-x------"));
+    List<String> problems = new ArrayList<String>();
+    try {
+      boolean writable;
+      try {
+        Files.delete(Files.createFile(walletDir.resolve("probe")));
+        writable = true;
+      } catch (java.io.IOException e) {
+        writable = false;
+      }
+      Assumptions.assumeFalse(writable, "a read-only directory is writable for this user (root): the save cannot be made to fail this way");
+      try {
+        wallet.close(true);
+        problems.add("close(true) returned although the save could not write");
+      } catch (ZephyrError e) {
+        if (!String.valueOf(e.getMessage()).startsWith("Wallet was closed without saving: ")) problems.add("close(true) threw \"" + e.getMessage() + "\"");
+      }
+      if (!wallet.isClosed()) problems.add("isClosed() false after close(true)");
+      if ((Long) field(wallet, "jniWalletHandle") != 0L) problems.add("the native wallet was not freed");
+    } finally {
+      Files.setPosixFilePermissions(walletDir, PosixFilePermissions.fromString("rwx------"));
+    }
+    ZephyrWalletFull reopened = ZephyrWalletFull.openWallet(path, "closing-test", ZephyrNetworkType.MAINNET);
+    opened.add(reopened);
+    if (!"saved".equals(reopened.getAttribute("state"))) problems.add("the reopened wallet has state " + reopened.getAttribute("state"));
+    reopened.setAttribute("state", "saved by the reopened wallet");
+    reopened.close(true);
+    try {
+      wallet.close(true); // the old object, retried
+    } catch (ZephyrError e) {
+      problems.add("the retried close(true) threw \"" + e.getMessage() + "\"");
+    }
+    ZephyrWalletFull again = ZephyrWalletFull.openWallet(path, "closing-test", ZephyrNetworkType.MAINNET);
+    opened.add(again);
+    if (!"saved by the reopened wallet".equals(again.getAttribute("state"))) problems.add("the old object overwrote the newer save: state " + again.getAttribute("state"));
+    assertTrue(problems.isEmpty(), "problems: " + problems);
+  }
+
+  /**
+   * close(true) of a wallet opened from data (keys and cache bytes, no path) saves nothing and
+   * throws nothing: the core's save returns at once for a wallet without a file.
+   */
+  @Test
+  public void closeWithSaveOfAWalletOpenedFromDataWritesNothing(@TempDir Path dir) throws Exception {
+    String path = dir.resolve("w").toString();
+    ZephyrWalletFull source = ZephyrWalletFull.createWallet(new ZephyrWalletConfig().setPath(path).setPassword("closing-test").setNetworkType(ZephyrNetworkType.MAINNET));
+    byte[][] data = source.getData();
+    source.close(true);
+    List<String> before = listing(dir);
+    ZephyrWalletFull fromData = ZephyrWalletFull.openWalletData("closing-test", ZephyrNetworkType.MAINNET, data[0], data[1], null);
+    opened.add(fromData);
+    fromData.setAttribute("state", "in memory only");
+    fromData.close(true);
+    assertTrue(fromData.isClosed());
+    assertEquals(before, listing(dir), "close(true) of a wallet opened from data wrote files");
+  }
+
+  private static List<String> listing(Path dir) throws Exception {
+    List<String> names = new ArrayList<String>();
+    try (java.util.stream.Stream<Path> files = Files.list(dir)) {
+      files.forEach(f -> {
+        try {
+          names.add(f.getFileName() + " " + Files.size(f) + " " + Files.getLastModifiedTime(f).toMillis());
+        } catch (java.io.IOException e) {
+          names.add(f.getFileName() + " ?");
+        }
+      });
+    }
+    Collections.sort(names);
+    return names;
   }
 
   /**

@@ -2509,37 +2509,57 @@ class sync_stopper {
 /**
  * Called by close() alone, while it holds the call lock's write side: no other Java call of this
  * wallet runs, but the core's own background sync thread may, inside a refresh. Hence the order:
+ * 0. the native listener stops delivering: no callback reaches Java or attaches a thread any more;
  * 1. the core's close(false) stops syncing and joins that thread (while a sync_stopper repeats the
- *    stop, so the join waits for one batch of blocks at most, not a lost stop's whole scan), then
- *    stops and deinitializes wallet2 (which keeps its data, file names and cache key) and releases
- *    the notification pool: from here no thread refreshes the wallet or calls the listener;
- * 2. with save, the core's save (wallet2::store) writes the wallet: never during a refresh (the
- *    core's own close(true) saves before it joins);
+ *    stop, so a stop that comes before the thread's refresh begins is not lost), then stops and
+ *    deinitializes wallet2 (which keeps its data, file names and cache key; its keys file is no
+ *    longer locked from here) and releases the notification pool: from here no thread refreshes the
+ *    wallet or calls the listener;
+ * 2. with save, the core's save (wallet2::store) writes the wallet's cache file, never its keys
+ *    file (store_to with the same file and no forced rewrite): never during a refresh (the core's
+ *    own close(true) saves before it joins);
  * 3. delete: the destructor's close(false) finds everything stopped and closed (no thread to join,
  *    deinit does nothing the second time, the pool is gone) and cannot throw on this path; then
  *    the listener is deleted and both handles are zeroed.
- * An exception in 1 or 2 is thrown as ZephyrError and frees nothing (the steps can run again), so
- * close() can be retried; the destructor's own exceptions could not be caught (it is noexcept),
- * which is why the core's close runs before it.
+ * An exception in 1 is thrown as ZephyrError and frees nothing (the step can run again), so close()
+ * can be retried; the destructor's own exceptions could not be caught (it is noexcept), which is
+ * why the core's close runs before it. A failed save (2) still frees the wallet, and its exception
+ * is thrown after: the keys file is unlocked by then, and a wallet kept for a retry could later
+ * write its cache over a newer one saved by the same wallet opened again. Java tells the two cases
+ * apart by the wallet handle (zeroed only once the wallet is freed).
  */
 JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_closeJni(JNIEnv* env, jobject instance, jboolean save) {
   MTRACE("Java_zephyr_wallet_ZephyrWalletFull_CloseJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
   if (wallet == nullptr) return;
+  wallet_jni_listener* listener = get_handle<wallet_jni_listener>(env, instance, JNI_LISTENER_HANDLE);
+  if (listener != nullptr) listener->delivering.store(false, std::memory_order_release);
   try {
-    {
-      sync_stopper stopper(wallet);
-      wallet->close(false);
-    }
-    if (save) wallet->save();
+    sync_stopper stopper(wallet);
+    wallet->close(false);
   } catch (...) {
     rethrow_cpp_exception_as_java_exception(env);
     return;
   }
+  std::exception_ptr save_failure;
+  if (save) {
+    try {
+      wallet->save();
+    } catch (...) {
+      save_failure = std::current_exception();
+    }
+  }
   delete wallet;
   env->SetLongField(instance, get_handle_field(env, instance, JNI_WALLET_HANDLE), 0);
-  delete get_handle<wallet_jni_listener>(env, instance, JNI_LISTENER_HANDLE);
+  delete listener;
   env->SetLongField(instance, get_handle_field(env, instance, JNI_LISTENER_HANDLE), 0);
+  if (save_failure) {
+    try {
+      std::rethrow_exception(save_failure);
+    } catch (...) {
+      rethrow_cpp_exception_as_java_exception(env);
+    }
+  }
 }
 
 JNIEXPORT jbyteArray JNICALL Java_zephyr_wallet_ZephyrWalletFull_getKeysFileBufferJni(JNIEnv* env, jobject instance, jstring jpassword, jboolean view_only) {
