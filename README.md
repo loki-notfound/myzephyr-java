@@ -45,28 +45,20 @@ Outside its scope, or not ready:
 
 ## Coordinates
 
-Releases are published as GitHub releases and in a static Maven repository on this project's
-GitHub Pages, `https://loki-notfound.github.io/myzephyr-java/maven`, which keeps every release.
-Maven Central may follow once the API is stable. The same site carries the user guide and the
-Javadoc ([Documentation](#documentation)).
+Releases are published on Maven Central under the groupId `dev.lateo`, and as GitHub releases with
+the build manifest and the signed `SHA256SUMS`. Maven uses Maven Central by default, and an
+Android Studio project lists `mavenCentral()` in its `settings.gradle.kts`, so a project adds the
+dependency and no repository line. The project's site,
+`https://java-docs.lateo.dev`, carries the user guide and the Javadoc
+([Documentation](#documentation)).
 
 Android (Gradle, Kotlin DSL). The AAR has its own artifactId, `zephyr-java-android`, and brings
-its POM's dependencies (Jackson and the Apache HTTP client) along. The repository goes into
-`settings.gradle.kts`, the dependency into the app module's `build.gradle.kts`:
-
-```kotlin
-dependencyResolutionManagement {
-    repositories {
-        google()
-        mavenCentral()
-        maven { url = uri("https://loki-notfound.github.io/myzephyr-java/maven") }
-    }
-}
-```
+its POM's dependencies (Jackson and the Apache HTTP client) along. The dependency goes into the app
+module's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.4")
+    implementation("dev.lateo:zephyr-java-android:2.3.0-sec.2-java.4")
 }
 ```
 
@@ -84,15 +76,8 @@ RPC classes need on API 24 and 25, ABIs and sizes, backup, logs and a first test
 Desktop and server (Maven), the JAR with the Linux natives:
 
 ```xml
-<repositories>
-  <repository>
-    <id>zephyr-java</id>
-    <url>https://loki-notfound.github.io/myzephyr-java/maven</url>
-  </repository>
-</repositories>
-
 <dependency>
-  <groupId>io.github.loki-notfound</groupId>
+  <groupId>dev.lateo</groupId>
   <artifactId>zephyr-java</artifactId>
   <version>2.3.0-sec.2-java.4</version>
 </dependency>
@@ -218,9 +203,9 @@ The guide's [Known limitations](docs/guide/13-known-limitations.md) lists every 
 
 ## Documentation
 
-- [The user guide on the project's site](https://loki-notfound.github.io/myzephyr-java/guide/).
+- [The user guide on the project's site](https://java-docs.lateo.dev/guide/).
 - [The user guide as Markdown](docs/guide/README.md) in this repository, the same text.
-- [The Javadoc of the current release](https://loki-notfound.github.io/myzephyr-java/javadoc/).
+- [The Javadoc of the current release](https://java-docs.lateo.dev/javadoc/).
   Every release also ships it as a `-javadoc.jar`; `mvn javadoc:javadoc` builds it from a checkout.
 - [The releases on GitHub](https://github.com/loki-notfound/myzephyr-java/releases), and the
   [release notes](RELEASE-NOTES.md) in this repository.

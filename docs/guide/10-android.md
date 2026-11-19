@@ -8,20 +8,9 @@ default trust, is in [TLS to a node](03-connecting-to-a-node.md#tls-to-a-node).
 
 ## The dependency
 
-The repository goes where the project declares its repositories, which in a project created by
-Android Studio is `settings.gradle.kts`:
-
-```kotlin
-dependencyResolutionManagement {
-    repositories {
-        google()
-        mavenCentral()
-        maven { url = uri("https://loki-notfound.github.io/myzephyr-java/maven") }
-    }
-}
-```
-
-The dependency and the packaging line go into the app module's `build.gradle.kts`:
+The AAR is on Maven Central. A project created by Android Studio already lists `mavenCentral()`
+where it declares its repositories (`settings.gradle.kts`), so no repository line is added. The
+dependency and the packaging line go into the app module's `build.gradle.kts`:
 
 ```kotlin
 android {
@@ -29,7 +18,7 @@ android {
 }
 
 dependencies {
-    implementation("io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.4")
+    implementation("dev.lateo:zephyr-java-android:2.3.0-sec.2-java.4")
 }
 ```
 
@@ -39,26 +28,12 @@ dependencies {
 > `mergeDebugJavaResource` with "3 files found with path 'META-INF/DEPENDENCIES'". The file is
 > Maven metadata; nothing reads it at run time.
 
-Android Studio's project template also sets `repositoriesMode` to `FAIL_ON_PROJECT_REPOS` in that
-block. A `repositories { }` block in the module's build file then stops the build:
+A project whose repositories do not include `mavenCentral()` adds it where the others are
+declared: with `repositoriesMode` set to `FAIL_ON_PROJECT_REPOS`, as in Android Studio's template,
+that is the settings file, since a `repositories { }` block in a module's build file then stops
+the build.
 
-```text
-Build was configured to prefer settings repositories over project repositories but repository '…' was added by build file '…'
-```
-
-So put the repository line in the settings file.
-
-The same in the Groovy DSL (`settings.gradle` and `app/build.gradle`):
-
-```groovy
-dependencyResolutionManagement {
-    repositories {
-        google()
-        mavenCentral()
-        maven { url = 'https://loki-notfound.github.io/myzephyr-java/maven' }
-    }
-}
-```
+The same in the Groovy DSL (`app/build.gradle`):
 
 ```groovy
 android {
@@ -66,7 +41,7 @@ android {
 }
 
 dependencies {
-    implementation 'io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.4'
+    implementation 'dev.lateo:zephyr-java-android:2.3.0-sec.2-java.4'
 }
 ```
 
@@ -78,7 +53,7 @@ With a version catalog, `gradle/libs.versions.toml` gets the entry and the modul
 zephyrJava = "2.3.0-sec.2-java.4"
 
 [libraries]
-zephyr-java-android = { module = "io.github.loki-notfound:zephyr-java-android", version.ref = "zephyrJava" }
+zephyr-java-android = { module = "dev.lateo:zephyr-java-android", version.ref = "zephyrJava" }
 ```
 
 The AAR is published as `zephyr-java-android` (the JAR for the JVM is `zephyr-java`). It brings

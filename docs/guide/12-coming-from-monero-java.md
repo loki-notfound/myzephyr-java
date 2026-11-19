@@ -22,7 +22,7 @@ The rename was done once, mechanically, over the whole source tree:
 | `MoneroUtils.xmrToAtomicUnits(double)` | `ZephyrUtils.toAtomicUnits(double)` |
 | `MoneroUtils.atomicUnitsToXmr(BigInteger)` | `ZephyrUtils.fromAtomicUnits(BigInteger)` |
 | native library `monero-java` | native library `zephyr-java` |
-| Maven `io.github.monero-ecosystem:monero-java` (now `io.github.woodser:monero-java`) | Maven `io.github.loki-notfound:zephyr-java` |
+| Maven `io.github.monero-ecosystem:monero-java` (now `io.github.woodser:monero-java`) | Maven `dev.lateo:zephyr-java` |
 
 Everything else keeps its name: method names, parameters, the model's fields and the query
 classes. So a monero-ts example ports by renaming its types.

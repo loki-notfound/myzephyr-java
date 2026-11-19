@@ -61,28 +61,28 @@ The `arm64` library for Linux is built and checked but has not been run
 
 There are two artifacts with the same Java classes:
 
-- **The JAR**, `io.github.loki-notfound:zephyr-java`, for desktop and server JVMs on Linux. It
+- **The JAR**, `dev.lateo:zephyr-java`, for desktop and server JVMs on Linux. It
   carries the native library for Linux `x86_64` and `arm64` as resources, so nothing else has to be
   installed.
-- **The AAR**, `io.github.loki-notfound:zephyr-java-android`, for Android apps. It carries the
+- **The AAR**, `dev.lateo:zephyr-java-android`, for Android apps. It carries the
   native library for `arm64-v8a`, `armeabi-v7a` and `x86_64` under `jni/<abi>/`, and the R8 rules
   every app needs. [Android](10-android.md) has its Gradle lines.
 
-Both come from a Maven repository on the project's GitHub Pages. For a JVM project with Gradle
-(Kotlin DSL):
+Both are on Maven Central, so the build needs `mavenCentral()` among its repositories and no
+other repository line. For a JVM project with Gradle (Kotlin DSL):
 
 ```kotlin
 repositories {
     mavenCentral()
-    maven { url = uri("https://loki-notfound.github.io/myzephyr-java/maven") }
 }
 
 dependencies {
-    implementation("io.github.loki-notfound:zephyr-java:2.3.0-sec.2-java.4")
+    implementation("dev.lateo:zephyr-java:2.3.0-sec.2-java.4")
 }
 ```
 
-The Maven form and the repository are in the [README's coordinates](../../README.md#coordinates).
+The Maven form is in the [README's coordinates](../../README.md#coordinates); Maven uses Maven
+Central by default.
 
 ## The native library
 

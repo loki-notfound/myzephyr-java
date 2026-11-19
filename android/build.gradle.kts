@@ -1,5 +1,7 @@
 // The zephyr-java AAR: the Java sources of the Maven build plus libzephyr-java.so per ABI.
-// Build: ./gradlew assembleRelease publishReleasePublicationToLocalRepository
+// Build: ./gradlew assembleRelease publishReleasePublicationToLocalRepository (into build/repo:
+// the AAR, its sources jar, POM and Gradle module metadata, which bin/package_release.sh copies to
+// dist/<version>/ for the release and bin/make_central_bundle.sh for Maven Central)
 plugins {
     id("com.android.library") version "9.5.0"
     `maven-publish`
@@ -33,7 +35,7 @@ val zephyrJavaProperties = tasks.register<ZephyrJavaProperties>("zephyrJavaPrope
 }
 
 android {
-    namespace = "io.github.lokinotfound.zephyrjava"
+    namespace = "dev.lateo.zephyrjava"
     compileSdk = 36
     buildToolsVersion = "36.0.0"
 
@@ -88,14 +90,38 @@ publishing {
             afterEvaluate {
                 from(components["release"])
             }
+            // the fields Maven Central requires, the same values as pom.xml's (bin/make_central_bundle.sh
+            // checks both POMs)
+            pom {
+                name.set("Zephyr Java Library for Android")
+                description.set("Java bindings for the Zephyr wallet core (zephyr-cpp), the AAR for Android with the natives for arm64-v8a, armeabi-v7a and x86_64. An independent project, not affiliated with ZephyrProtocol.")
+                url.set("https://github.com/loki-notfound/myzephyr-java")
+                licenses {
+                    license {
+                        name.set("MIT License")
+                        url.set("https://opensource.org/license/mit")
+                        distribution.set("repo")
+                    }
+                }
+                developers {
+                    developer {
+                        name.set("loki-notfound")
+                        email.set("loki@lateo.dev")
+                        url.set("https://github.com/loki-notfound")
+                    }
+                }
+                scm {
+                    connection.set("scm:git:https://github.com/loki-notfound/myzephyr-java.git")
+                    developerConnection.set("scm:git:ssh://git@github.com/loki-notfound/myzephyr-java.git")
+                    url.set("https://github.com/loki-notfound/myzephyr-java")
+                }
+            }
         }
     }
     repositories {
         maven {
             name = "local"
-            // build/repo; bin/make_maven_repo.sh publishes into dist/<version>/maven with -PrepoDir=
-            val repoDir = providers.gradleProperty("repoDir")
-            url = if (repoDir.isPresent) uri(repoDir.get()) else uri(layout.buildDirectory.dir("repo"))
+            url = uri(layout.buildDirectory.dir("repo"))
         }
     }
 }
