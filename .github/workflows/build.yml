@@ -183,9 +183,11 @@ jobs:
     # umask 022 and the same three Android SDK packages, step for step what
     # bin/package_release_container.sh does locally, so the CI release files
     # and a local build can match byte for byte: the JAR (Linux natives, tests on the
-    # depends-built x86_64 library), sources and Javadoc jars, the AAR (Android natives) with its
-    # sources jar and POM, the debug symbols, the Maven repository, the site, the manifest and
-    # SHA256SUMS in dist/<version>/
+    # depends-built x86_64 library), sources and Javadoc jars and its POM, the AAR (Android
+    # natives) with its sources jar, POM and module metadata, the debug symbols, the site, the
+    # manifest and SHA256SUMS in dist/<version>/, and the Maven Central bundle before signing in
+    # dist/<version>/central/ (uploaded with the rest; the maintainer signs the bundle of the
+    # verified build, as with SHA256SUMS)
     needs: natives
     runs-on: ubuntu-24.04
     timeout-minutes: 60

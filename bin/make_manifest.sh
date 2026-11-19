@@ -37,19 +37,14 @@
 #                from (DEBIAN_SNAPSHOT in bin/container-build-deps.sh)
 #   depends      every package of zephyr's contrib/depends/packages/*.mk: version, file name
 #                and sha256 as declared there
-#   previous_release
-#                the release whose Maven repository bin/merge_previous_release.sh merged into the
-#                site: version and site_archive_sha256 from bin/previous-release.env (null
-#                without that file, a first release)
 #   central_bundle
 #                the Maven Central bundle before signing, dist/<version>/central/
 #                (bin/make_central_bundle.sh): path, size and sha256 of every file but the checksum
 #                files, so the signed SHA256SUMS covers what the maintainer signs for Central
 #   artifacts    every file in dist/<version>/ except manifest.json and SHA256SUMS: name, size,
 #                sha256; for the site archive site-<version>.tar.gz also its entry count
-#                The site directory (dist/<version>/site/, with the Maven repository in
-#                site/maven/) is not listed: the archive holds it (bin/package_release.sh builds
-#                both before the manifest).
+#                The site directory (dist/<version>/site/) is not listed: the archive holds it
+#                (bin/package_release.sh builds both before the manifest).
 # SHA256SUMS is sha256sum over the top-level files of dist/<version>/, the release assets: the
 # manifest and the site archive included, nothing below site/ (so sha256sum -c works on the
 # downloaded assets), one line per file.
@@ -294,11 +289,6 @@ def main():
     if not os.path.isdir(dist):
         sys.exit(f"no {dist}: run bin/build_release.sh first")
     pins = shell_vars("bin/pins.env")
-    previous_release = None
-    if os.path.isfile(os.path.join(ROOT, "bin/previous-release.env")):
-        prev = shell_vars("bin/previous-release.env")
-        previous_release = {"version": prev["PREV_VERSION"],
-                            "site_archive_sha256": prev["PREV_SITE_SHA256"]}
     patches_dir = os.path.join(ROOT, "patches/depends")
     ca = shell_vars("bin/ca-bundle.env")
     ca_file = "src/main/resources-raw/zephyr/common/cacert.pem"
@@ -347,7 +337,6 @@ def main():
                     for n in sorted(os.listdir(patches_dir)) if n.endswith(".patch")],
         "root_certificates": root_certificates,
         "toolchain": toolchain(),
-        "previous_release": previous_release,
         "depends": depends_packages(),
         "artifacts": artifacts,
         "central_bundle": central_bundle,

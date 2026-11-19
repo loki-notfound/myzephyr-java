@@ -103,7 +103,9 @@ There are four entry points:
   **`bin/build_android_container.sh <abi|--all>`** runs it in the same pinned image.
 - **`bin/build_release.sh`**, everything: the natives, stripping with separate debug files, the
   JAR with sources and Javadoc jars, the AAR through Gradle in `android/`, and `dist/<version>/`
-  with `manifest.json` and `SHA256SUMS`. The pure tests run on the depends-built library.
+  with `manifest.json` and `SHA256SUMS`. The pure tests run on the depends-built library. It also
+  writes `dist/<version>/central/`, the Maven Central bundle before signing
+  ([Maven Central](#maven-central)).
 
 The packaging of `bin/build_release.sh` runs in the same pinned image
 (`bin/package_release_container.sh`, with the image's own JDK and Maven). It needs podman or docker
@@ -148,17 +150,35 @@ Two builds from the same commit give the same files:
 | `toolchain` | gcc, binutils, CMake, glibc, JDK and Maven of the packaging environment (`packaging_env`, `packaging_container`), NDK (version and sha256) and its clang, Android Gradle plugin, Gradle (distribution and sha256), compile and min SDK, build-tools, the Android SDK package revisions; per Linux native its compiler, glibc and container; per Android native its NDK, clang, API level, build path and container |
 | `zephyr_java` | the commit, its `SOURCE_DATE_EPOCH`, the version |
 | `artifacts` | every release file with its size and sha256 |
+| `central_bundle` | every file of the Maven Central bundle (checksum files aside) by its repository path, with its size and sha256 |
 
-`SHA256SUMS` lists every file of the release, the manifest included. The Maven repository and the
-site are the archive `site-<version>.tar.gz`, whose hash is in `SHA256SUMS`; Pages serves its
-contents.
+`SHA256SUMS` lists every file of the release, the manifest included. The site is the archive
+`site-<version>.tar.gz`, whose hash is in `SHA256SUMS`; Pages serves its contents.
+
+## Maven Central
+
+The releases are published on Maven Central under `dev.lateo`. The release build writes the
+bundle for it, `dist/<version>/central/` (`bin/make_central_bundle.sh`): both artifacts in Maven
+repository layout (`dev/lateo/zephyr-java/<version>/`, `dev/lateo/zephyr-java-android/<version>/`),
+each with its sources jar, Javadoc jar and POM, the AAR also with its Gradle module metadata, and
+an `.md5`, `.sha1`, `.sha256` and `.sha512` next to every file. Every file is a release file byte
+for byte, except the AAR's Javadoc jar, which is the JAR's under the AAR's name: both compile the
+same sources. The script refuses a `-SNAPSHOT` version and a POM without the fields Central
+requires (name, description, url, licence, developer, scm).
+
+The bundle is not a release asset; `manifest.json` lists its files. The maintainer signs it with
+`bin/sign_central_bundle.sh`, which checks the checksums, refuses when the maintainer key's secret
+key is absent, writes an `.asc` next to every file but the checksums, verifies them and writes the
+zip that is uploaded to the Central Portal. `--dry-run` runs the checks and lists the files without
+signing.
 
 ## Signatures
 
 Two keys are involved:
 
 - **The maintainer key** `31DA 39AB 43E0 CA67 F1F3  A661 BA2A FF22 DF8A 4A13` signs the zephyr-java
-  release tags and `SHA256SUMS`. It is [`KEYS.asc`](../../KEYS.asc) in this repository.
+  release tags, `SHA256SUMS` and every file on Maven Central (its `.asc`). It is
+  [`KEYS.asc`](../../KEYS.asc) in this repository.
 - **The zephyr-backports release key** `FB39 94F0 997C A6F0 43D7  2491 9EFF 03F5 27D2 40A1` signs the
   core's tags. It is `keys/zephyr-backports.asc` in the zephyr-backports repository. The build
   scripts verify the tags with `git verify-tag` when the tag is present. Without gpg or without the
@@ -174,7 +194,10 @@ sha256sum -c SHA256SUMS
 ```
 
 Run `git verify-tag` in a clone of this repository, and the last two commands in the directory of
-the release files. Then compare `core` in `manifest.json` with `bin/pins.env` at the tag.
+the release files. Then compare `core` in `manifest.json` with `bin/pins.env` at the tag. A file
+from Maven Central is checked against its `.asc` the same way, for example
+`gpg --verify zephyr-java-<version>.jar.asc zephyr-java-<version>.jar`; its sha256 is in
+`SHA256SUMS` (the jars, the AAR and the POMs) or in `manifest.json` (`central_bundle`).
 
 ## Reproducing a release
 
@@ -228,7 +251,7 @@ rebuilding.
 ## The guide and its site
 
 This guide is the Markdown in `docs/guide/`, readable on GitHub as it is. It is also a static site
-on the project's GitHub Pages, `https://loki-notfound.github.io/myzephyr-java/guide/`. Two scripts
+on the project's GitHub Pages, `https://java-docs.lateo.dev/guide/`. Two scripts
 build and check it, with Python 3 and its standard library only:
 
 ```sh
@@ -236,11 +259,10 @@ bin/build_site.sh
 bin/check_site.sh
 ```
 
-`bin/build_site.sh` writes the landing page, one page per guide file and the assets to
-`build/site/` (`site/build_site.py`). Its Markdown converter (`site/markdown.py`) knows exactly the
-Markdown this guide uses and fails on anything else, so a page never differs from what GitHub
-shows. With `--maven <site>/maven` the landing page lists the older releases found in a published
-Maven repository, the same section a release's site has.
+`bin/build_site.sh` writes the landing page, one page per guide file, the assets and the `CNAME`
+file with the site's domain to `build/site/` (`site/build_site.py`). Its Markdown converter
+(`site/markdown.py`) knows exactly the Markdown this guide uses and fails on anything else, so a
+page never differs from what GitHub shows.
 
 `bin/check_site.sh` checks the result (`site/check_site.py`):
 
@@ -248,7 +270,8 @@ Maven repository, the same section a release's site has.
 - the page policy `default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'` in every page;
 - no script, no style attribute, no external resource or absolute path;
 - well-formed pages;
-- every relative link and anchor resolves.
+- every relative link and anchor resolves;
+- `CNAME` holds `java-docs.lateo.dev`, and there is no `maven/`.
 
 The pages carry no JavaScript. The footer names the version and the commit with its date, so the
 same commit gives the same site.
@@ -268,8 +291,8 @@ The version a release names in the guide and in the README is checked as well.
 `bin/check_versions.sh` fails when a coordinate, the Maven snippet, the version catalog entry, a
 `git verify-tag` line or the index's version line names another version than `pom.xml`.
 
-`bin/make_site.sh` builds the same pages into a release's site, next to the Javadoc and the Maven
-repository. The site archive of a release therefore carries the guide of its commit. Every CI run
+`bin/make_site.sh` builds the same pages into a release's site, next to the Javadoc. The site
+archive of a release therefore carries the guide of its commit. Every CI run
 builds and checks the site too (job `java`).
 
 The look comes from the lateo house style, `@lateo/style` 0.1.0. `site/assets/` holds unchanged

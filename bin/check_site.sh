@@ -5,9 +5,9 @@
 # link; no family bar, script, style element or attribute, event handler, external resource or
 # absolute path; http:// nowhere outside code and https:// only as a link target; callouts in the
 # house markup, at most two per guide page; every relative link and anchor resolves (into javadoc/
-# and maven/ when the site has them); the stylesheets load nothing from elsewhere. Works on the
-# guide-only build of bin/build_site.sh and on a release's site of bin/make_site.sh. Needs python3
-# (standard library only).
+# when the site has it); the stylesheets load nothing from elsewhere; CNAME holds the Pages domain
+# and there is no maven/. Works on the guide-only build of bin/build_site.sh and on a release's
+# site of bin/make_site.sh. Needs python3 (standard library only).
 #
 # Usage: bin/check_site.sh [<site directory>]   (default build/site)
 

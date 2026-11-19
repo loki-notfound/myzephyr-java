@@ -27,14 +27,15 @@
 #                                    bin/package_release.sh is everything after the natives:
 #                                    the JAR (with the Linux natives, the pure tests on the
 #                                    depends-built x86_64 library), sources and Javadoc jars; the
-#                                    AAR (artifactId zephyr-java-android) with its sources jar and
-#                                    POM; dist/<version>/ with the debug symbols as a reproducible
-#                                    tar.gz; the static Maven repository (bin/make_maven_repo.sh),
-#                                    the Pages site with the user guide (bin/make_site.sh) and its
-#                                    archive site-<version>.tar.gz (with the previous releases'
-#                                    Maven repository merged in, bin/merge_previous_release.sh),
-#                                    manifest.json and SHA256SUMS over the release assets
-#                                    (bin/make_manifest.sh)
+#                                    AAR (artifactId zephyr-java-android) with its sources jar,
+#                                    POM and module metadata, the JAR's POM; dist/<version>/ with
+#                                    the debug symbols as a reproducible tar.gz; the Maven Central
+#                                    bundle before signing, dist/<version>/central/
+#                                    (bin/make_central_bundle.sh; the maintainer signs it with
+#                                    bin/sign_central_bundle.sh); the Pages site with the user
+#                                    guide and the Javadoc (bin/make_site.sh) and its archive
+#                                    site-<version>.tar.gz; manifest.json and SHA256SUMS over the
+#                                    release assets (bin/make_manifest.sh)
 # bin/check_versions.sh runs first: the pom version, VERSION_NAME and RELEASE_TAG (when set)
 # must agree.
 #
@@ -49,8 +50,6 @@
 #   BUILD_ANDROID_ABIS  Android ABIs to build (default "arm64-v8a armeabi-v7a x86_64"; empty: none,
 #                       and then no AAR)
 #   SOURCE_DATE_EPOCH   optional, see above
-#   PREV_SITE_ARCHIVE   optional, a local copy of the previous release's site archive for
-#                       bin/merge_previous_release.sh (else it is downloaded and checked)
 #   LINUX_BUILD         container (default; podman or docker) or host
 #   ANDROID_BUILD       container (default; podman or docker) or host
 #   PACKAGE_BUILD       container (default; podman or docker) or host

@@ -1,6 +1,7 @@
 """Checks a built site (site/build_site.py, bin/make_site.sh): every guide file has its page and
-every page under guide/ its guide file; every page of the site (every .html file outside javadoc/
-and maven/) is well-formed (no unclosed or mismatched tag), starts with the doctype and
+every page under guide/ its guide file; CNAME holds the site's domain, java-docs.lateo.dev, alone
+(no newline); there is no maven/ (the releases are on Maven Central); every page of the site (every
+.html file outside javadoc/) is well-formed (no unclosed or mismatched tag), starts with the doctype and
 <html lang="en">, has the strict policy in its head, one level-1 heading, headings without skipped
 levels, unique ids, a skip link to #main, no lateo family bar, no script, no style element or
 attribute, no event handler attribute, no element the site does not use, no javascript: URL, no
@@ -9,8 +10,8 @@ target of a link (<a href>); every callout is a div of class "lt-callout" plus e
 "lt-callout-info", "lt-callout-warning" or "lt-callout-danger", with role="note", whose first
 element is its title, a p of class "lt-callout-title", and a guide page has at most two; every
 relative link and every anchor resolves; the stylesheets load nothing from elsewhere. A link into
-javadoc/ or maven/ is checked when that directory exists in the site and accepted when it does
-not (the guide-only build).
+javadoc/ is checked when that directory exists in the site and accepted when it does not (the
+guide-only build).
 
 Usage: python3 -I site/check_site.py --site <dir>
 Python 3 standard library only; exit status 0 when every check passes, 1 otherwise.
@@ -32,7 +33,9 @@ UNUSED = {"iframe", "object", "embed", "img", "video", "audio", "source", "form"
 URL_ATTRS = {"href", "src", "srcset", "action", "poster", "data", "formaction", "xlink:href", "cite", "background",
              "manifest", "ping"}
 # directories of the release site that this checker does not check page by page
-FOREIGN = ("javadoc", "maven")
+FOREIGN = ("javadoc",)
+# the custom domain of the project's GitHub Pages: the content of CNAME
+PAGES_DOMAIN = "java-docs.lateo.dev"
 CALLOUT_KINDS = {"lt-callout-info", "lt-callout-warning", "lt-callout-danger"}
 MAX_CALLOUTS = 2
 
@@ -187,10 +190,17 @@ def main(argv):
     for f in pages:
         if f.startswith("guide/") and f not in expected:
             fail(f, "a page under guide/ without a guide file")
-    for f in ("index.html", ".nojekyll", "assets/content.css", "assets/print.css", "assets/site.css",
+    for f in ("index.html", ".nojekyll", "CNAME", "assets/content.css", "assets/print.css", "assets/site.css",
               "assets/NOTICE.txt"):
         if f not in file_set:
             fail(f, "missing")
+    if "CNAME" in file_set:
+        with open(os.path.join(site, "CNAME"), "rb") as fh:
+            cname = fh.read()
+        if cname != PAGES_DOMAIN.encode("ascii"):
+            fail("CNAME", f"holds {cname!r}, expected {PAGES_DOMAIN!r} without a newline")
+    if os.path.lexists(os.path.join(site, "maven")):
+        fail("maven", "a Maven repository in the site: the releases are published on Maven Central")
 
     parsed = {}
     raw = {}
@@ -299,7 +309,7 @@ def main(argv):
 
     foreign_note = ", ".join(f"{d}/ {'checked as link target' if d in present_foreign else 'absent'}" for d in FOREIGN)
     print(f"site check: {len(pages)} pages, {len(files) - len(pages)} other files, {links} relative links and "
-          f"anchors checked, {accepted} into absent javadoc/ or maven/ accepted ({foreign_note})")
+          f"anchors checked, {accepted} into an absent javadoc/ accepted ({foreign_note})")
     for f in pages:
         print(f"  {f} {os.path.getsize(os.path.join(site, f))} bytes")
     if failures:

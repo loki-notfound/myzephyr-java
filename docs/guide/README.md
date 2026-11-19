@@ -3,7 +3,7 @@
 This guide explains how to use zephyr-java in an application. It covers desktop and server JVMs
 with the JAR, and Android apps with the AAR. It assumes you know Java; it does not assume you know
 monero-java. The [README](../../README.md) has the coordinates and a complete quick-start program.
-The API reference is the [Javadoc of the current release](https://loki-notfound.github.io/myzephyr-java/javadoc/).
+The API reference is the [Javadoc of the current release](https://java-docs.lateo.dev/javadoc/).
 
 **Not affiliated with ZephyrProtocol.** An independent project.
 

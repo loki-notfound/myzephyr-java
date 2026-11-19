@@ -33,27 +33,20 @@
 #                                    signing: both artifacts in repository layout with their
 #                                    checksums (not a release asset; bin/sign_central_bundle.sh
 #                                    signs it and writes the zip to upload)
-#  5. bin/make_maven_repo.sh         dist/<version>/maven/, the static Maven repository
-#  6. bin/make_site.sh               dist/<version>/site/, the GitHub Pages content: the index,
-#                                    the user guide and its assets (site/build_site.py), the
-#                                    Javadoc, and the repository as site/maven/ (the only copy:
-#                                    the top-level maven/ is removed afterwards), checked by
-#                                    site/check_site.py
-#     bin/merge_previous_release.sh  the previous release's Maven repository (bin/previous-release.env,
-#                                    its sha256-checked site archive, downloaded or PREV_SITE_ARCHIVE)
-#                                    merged into site/maven/, every artifactId's maven-metadata.xml
-#                                    listing all versions, the index written anew with the older
-#                                    releases (site/build_site.py --maven); skipped when there is
-#                                    no bin/previous-release.env (a first release)
-#  7. site-<version>.tar.gz          the site as one reproducible archive, a release asset
+#  5. bin/make_site.sh               dist/<version>/site/, the GitHub Pages content: the index,
+#                                    the user guide and its assets, .nojekyll and CNAME
+#                                    (site/build_site.py) and the Javadoc, checked by
+#                                    site/check_site.py; no Maven repository (Maven Central)
+#  6. site-<version>.tar.gz          the site as one reproducible archive, a release asset
 #                                    (reproducible: sorted names, mtime SOURCE_DATE_EPOCH,
 #                                    numeric owner 0, no atime/ctime pax records, gzip -n
-#  8. bin/make_manifest.sh           manifest.json in dist/<version>/
-#  9. bin/make_manifest.sh --sums-only
+#  7. bin/make_manifest.sh           manifest.json in dist/<version>/
+#  8. bin/make_manifest.sh --sums-only
 #                                    SHA256SUMS over the top-level files of dist/<version>/ (the
 #                                    release assets), checked
 # dist/<version>/site/ stays for the Pages publication; its files are covered by the archive's
 # hash, not listed in SHA256SUMS, so sha256sum -c SHA256SUMS works on the downloaded assets.
+# dist/<version>/central/ stays for bin/sign_central_bundle.sh; manifest.json lists its files.
 #
 # Reproducibility: SOURCE_DATE_EPOCH is the commit time of this checkout unless set; it is
 # exported to every step, and Maven gets it as project.build.outputTimestamp (ISO 8601).
@@ -74,7 +67,6 @@
 #   BUILD_ANDROID_ABIS  Android ABIs to package (default "arm64-v8a armeabi-v7a x86_64"; empty:
 #                       none, and then no AAR)
 #   SOURCE_DATE_EPOCH   optional, see above
-#   PREV_SITE_ARCHIVE   optional, a local copy of the previous release's site archive (step 6)
 # Every platform named must have its stripped library and its debug file; a missing one stops
 # the script.
 #
@@ -215,21 +207,11 @@ tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 --numeric-owne
 phase "make_central_bundle.sh"
 bin/make_central_bundle.sh "$DIST"
 
-# 5, 6: the Maven repository and the Pages site; the repository lives in site/maven/ only, with
-# the previous releases merged in
-phase "make_maven_repo.sh"
-bin/make_maven_repo.sh "$DIST"
+# 5: the Pages site
 phase "make_site.sh"
 bin/make_site.sh "$DIST"
-rm -rf "$DIST/maven"
-if [ -f bin/previous-release.env ]; then
-  phase "merge_previous_release.sh"
-  bin/merge_previous_release.sh "$DIST"
-else
-  echo "no bin/previous-release.env: no previous release to merge into the site"
-fi
 
-# 7: the site as one reproducible archive
+# 6: the site as one reproducible archive
 phase "site-$VERSION.tar.gz"
 tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 --numeric-owner \
     --mode=u+rwX,go+rX,go-w \
@@ -237,11 +219,11 @@ tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 --numeric-owne
     -C "$DIST" -cf - site | gzip -n -9 > "$DIST/site-$VERSION.tar.gz"
 echo "site-$VERSION.tar.gz: $(tar -tzf "$DIST/site-$VERSION.tar.gz" | wc -l) entries"
 
-# 8: manifest.json (of the release files above, the archive included)
+# 7: manifest.json (of the release files above, the archive included)
 phase "make_manifest.sh"
 BUILD_LINUX_ARCHES="$LINUX_ARCHES" BUILD_ANDROID_ABIS="$ANDROID_ABIS" bin/make_manifest.sh "$DIST"
 
-# 9: SHA256SUMS over the release assets (the top-level files)
+# 8: SHA256SUMS over the release assets (the top-level files)
 phase "make_manifest.sh --sums-only"
 bin/make_manifest.sh --sums-only "$DIST"
 (cd "$DIST" && sha256sum -c --quiet SHA256SUMS)

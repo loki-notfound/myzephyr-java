@@ -1,14 +1,17 @@
 """Builds the project's site from docs/guide/ into an output directory: the landing page
 (index.html), one page per guide file (guide/index.html from docs/guide/README.md, then
 guide/<NN-name>.html for every docs/guide/NN-*.md in sorted order), the house stylesheet and the
-site's assets (assets/), and .nojekyll. No JavaScript, no inline style, no external resource, and
-relative links only, so the site works under any sub-path (GitHub Pages serves it under
-/myzephyr-java/). A Markdown file in docs/guide/ without a place in that order fails the build.
+site's assets (assets/), .nojekyll, and CNAME: GitHub Pages serves the site at
+https://java-docs.lateo.dev, and the CNAME file (the domain alone, without a newline, as the
+gh-pages branch has it) keeps that domain when a release replaces the branch's content. No
+JavaScript, no inline style, no external resource, and relative links only, so the site also works
+from files or under a sub-path. A Markdown file in docs/guide/ without a place in that order fails
+the build.
 
 Links from the guide to other guide files become links to their pages (the anchor must exist);
 links to other files of the repository become links to them on GitHub (the file must exist, and
 an anchor into a Markdown file must name one of its headings); a link to the Javadoc on the
-project's Pages (https://loki-notfound.github.io/myzephyr-java/javadoc/...) becomes a relative
+project's Pages (https://java-docs.lateo.dev/javadoc/...) becomes a relative
 link into javadoc/. The converter (site/markdown.py) fails on any Markdown it does not know.
 
 A code block takes its language and nothing else, with one exception: a Java block whose info
@@ -24,14 +27,14 @@ git, or in a tree that is not the top of its own repository (an unpacked git arc
 "built from a source tree without a git commit" instead. Nothing else varies: the same commit
 gives the same bytes on any machine and at any time.
 
-Usage: python3 -I site/build_site.py --out <dir> [--maven <dir>] [--index-only]
-  --maven <dir>   a site's Maven repository: the index lists every version found there other
-                  than this one as an older release (the release build passes the merged
-                  repository, bin/merge_previous_release.sh; the guide-only build that of the
-                  published site)
-  --index-only    write only <dir>/index.html (into an existing site)
-Without --index-only the outputs of an earlier build in <dir> (index.html, .nojekyll, guide/,
-assets/) are replaced; anything else in <dir> (javadoc/, maven/) is left alone.
+The landing page gives the dependency lines for Maven Central (no repository line: Maven and
+Android Studio projects use Maven Central already). Releases before the move to Maven Central are
+reached through the release list, with one sentence on the former groupId and the Maven repository
+on this site that served them (FORMER_GROUP_ID, LAST_PAGES_REPOSITORY_VERSION).
+
+Usage: python3 -I site/build_site.py --out <dir>
+The outputs of an earlier build in <dir> (index.html, .nojekyll, CNAME, guide/, assets/) are
+replaced; anything else in <dir> (javadoc/) is left alone.
 """
 
 import importlib.util
@@ -61,7 +64,9 @@ md = _load_markdown()
 esc = md.escape_html
 
 REPO_URL = "https://github.com/loki-notfound/myzephyr-java"
-PAGES_URL = "https://loki-notfound.github.io/myzephyr-java"
+PAGES_URL = "https://java-docs.lateo.dev"
+# the content of CNAME: the custom domain GitHub Pages serves the site at
+PAGES_DOMAIN = "java-docs.lateo.dev"
 POLICY = "default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'"
 ASSETS = ["content.css", "print.css", "site.css", "favicon.svg", "favicon-32.png", "apple-touch-icon-180.png",
           "STYLE-VERSION", "NOTICE.txt", "LICENSE-style.txt", "TRADEMARKS.txt"]
@@ -71,8 +76,10 @@ CODE_LABELS = {"java": "Java", "kotlin": "Kotlin", "groovy": "Groovy", "sh": "Sh
 NAMED_EXAMPLE = re.compile(r"^java examples/([A-Z][A-Za-z0-9]*)\.java$")
 EXAMPLES = os.path.join(ROOT, "src", "test", "java", "examples")
 MAX_CALLOUTS = 2
-GROUP_PATH = "io/github/loki-notfound"
-GROUP_ID = GROUP_PATH.replace("/", ".")
+# the releases up to LAST_PAGES_REPOSITORY_VERSION were published under FORMER_GROUP_ID in a Maven
+# repository on this site, which ended with the move to Maven Central
+FORMER_GROUP_ID = "io.github.loki-notfound"
+LAST_PAGES_REPOSITORY_VERSION = "2.3.0-sec.2-java.4"
 SCHEME = re.compile(r"^(\d+)\.(\d+)\.(\d+)-sec\.(\d+)-java\.(\d+)$")
 FINGERPRINT = "31DA 39AB 43E0 CA67 F1F3  A661 BA2A FF22 DF8A 4A13"
 DONATION_ADDRESS = ("ZEPHs8MmrN556ieVvv9YUZf3J5pW2uN1z5S88mb9DksG9bcEcqVGg9XbuQc6Q9e9Ka6bjMHYgaSidWfL1r1DGLyngj8"
@@ -85,9 +92,11 @@ class BuildError(Exception):
 
 # ------------------------------------------------------------------ inputs
 
-def pom_version():
+def pom_coordinates():
+    """(groupId, version) of pom.xml."""
     ns = {"m": "http://maven.apache.org/POM/4.0.0"}
-    return ET.parse(os.path.join(ROOT, "pom.xml")).getroot().find("m:version", ns).text.strip()
+    root = ET.parse(os.path.join(ROOT, "pom.xml")).getroot()
+    return root.find("m:groupId", ns).text.strip(), root.find("m:version", ns).text.strip()
 
 
 def aar_artifact_id():
@@ -123,24 +132,6 @@ def version_order(v):
     if not m:
         raise BuildError(f"version {v} does not follow the release scheme <x>.<y>.<z>-sec.<N>-java.<M>")
     return tuple(int(x) for x in m.groups())
-
-
-def older_releases(maven, version):
-    """{version: [artifactId, ...]} of every version in a site's Maven repository but this one."""
-    base = os.path.join(maven, GROUP_PATH)
-    if not os.path.isdir(base):
-        raise BuildError(f"{maven} has no {GROUP_PATH}/")
-    ids = sorted(a for a in os.listdir(base) if os.path.isfile(os.path.join(base, a, "maven-metadata.xml")))
-    if not ids:
-        raise BuildError(f"{maven} has no artifact under {GROUP_PATH}/")
-    older = {}
-    for aid in ids:
-        adir = os.path.join(base, aid)
-        for v in sorted(d for d in os.listdir(adir) if os.path.isdir(os.path.join(adir, d))):
-            version_order(v)
-            if v != version:
-                older.setdefault(v, []).append(aid)
-    return older
 
 
 def guide_pages():
@@ -302,30 +293,19 @@ def guide_body(page, by_rel):
     return "\n".join(block_html(b) for b in page["blocks"])
 
 
-def index_body(version, aar_id, older):
+def index_body(group_id, version, aar_id):
     def h2(ident, text):
         return heading_html(2, ident, esc(text))
 
-    gradle = f"""repositories {{
-    maven {{ url = uri("{PAGES_URL}/maven") }}
-}}
-
-android {{
+    gradle = f"""android {{
     packaging {{ resources.excludes += "/META-INF/DEPENDENCIES" }}
 }}
 
 dependencies {{
-    implementation("{GROUP_ID}:{aar_id}:{version}")
+    implementation("{group_id}:{aar_id}:{version}")
 }}"""
-    maven = f"""<repositories>
-  <repository>
-    <id>zephyr-java</id>
-    <url>{PAGES_URL}/maven</url>
-  </repository>
-</repositories>
-
-<dependency>
-  <groupId>{GROUP_ID}</groupId>
+    maven = f"""<dependency>
+  <groupId>{group_id}</groupId>
   <artifactId>zephyr-java</artifactId>
   <version>{version}</version>
 </dependency>"""
@@ -339,38 +319,29 @@ dependencies {{
         '<p class="lt-callout-title">Not affiliated with ZephyrProtocol.</p>\n'
         "<p>An independent project. Report Zephyr vulnerabilities to the ZephyrProtocol team, not here.</p>\n"
         "</div>",
+        f"<p>Published on Maven Central under the groupId <code>{esc(group_id)}</code>. Maven uses Maven Central "
+        "by default and an Android Studio project lists <code>mavenCentral()</code> among its repositories, so a "
+        "project adds the dependency and no repository line.</p>",
         h2("android-gradle-kotlin-dsl", "Android (Gradle, Kotlin DSL)"),
+        "<p>In the app module's <code>build.gradle.kts</code>; the packaging line is required "
+        '(<a href="guide/10-android.html#the-dependency">why</a>):</p>',
         code_block_html("Kotlin", gradle),
         h2("desktop-and-server-maven", "Desktop and server (Maven)"),
         code_block_html("XML", maven),
     ]
-    if older:
-        items = []
-        for v in sorted(older, key=version_order, reverse=True):
-            # the Android artifact first, as in the sections above
-            coords = ", ".join(f"<code>{GROUP_ID}:{aid}:{v}</code>"
-                               for aid in sorted(older[v], key=lambda a: (not a.endswith("-android"), a)))
-            items.append(f'<li>{v} (<a href="{REPO_URL}/releases/tag/v{v}">release</a>): {coords}</li>')
-        parts += [
-            h2("older-releases", "Older releases"),
-            "<p>The Maven repository keeps every release, so a build can stay on an older version with the same "
-            'repository line. The <a href="javadoc/index.html">Javadoc</a> on this site is that of version '
-            f"{esc(version)} only; an older version's Javadoc is its "
-            "<code>zephyr-java-&lt;version&gt;-javadoc.jar</code>, in the repository and among the files of its "
-            "release.</p>",
-            "<ul>\n" + "\n".join(items) + "\n</ul>",
-        ]
     parts += [
         h2("documentation", "Documentation"),
         "<ul>\n"
         '<li><a href="guide/index.html">User guide</a>, also as Markdown in the repository '
         f'(<a href="{REPO_URL}/blob/main/docs/guide/README.md">docs/guide</a> on GitHub)</li>\n'
         f'<li><a href="javadoc/index.html">Javadoc</a> of version {esc(version)}</li>\n'
-        f'<li><a href="{REPO_URL}/releases">Releases</a> with the build manifest and the signed SHA256SUMS</li>\n'
+        f'<li><a href="{REPO_URL}/releases">Releases</a> with the build manifest and the signed SHA256SUMS, '
+        f"older versions included; up to {LAST_PAGES_REPOSITORY_VERSION} they were published under "
+        f"<code>{FORMER_GROUP_ID}</code> in a Maven repository on this site, which is no longer served.</li>\n"
         f'<li><a href="{REPO_URL}">Source</a></li>\n'
         "</ul>",
         h2("verifying", "Verifying"),
-        "<p>Release tags and SHA256SUMS are signed with the maintainer key</p>",
+        "<p>Release tags, SHA256SUMS and every file on Maven Central are signed with the maintainer key</p>",
         f'<p class="lt-fingerprint"><code>{FINGERPRINT}</code></p>',
         f'<p>whose public key is <a href="{REPO_URL}/blob/main/KEYS.asc">KEYS.asc</a> in the repository.</p>',
         h2("donations", "Donations"),
@@ -479,8 +450,8 @@ def render_guide_page(n, pages, by_rel, meta):
     return render(out, title, description, body, toc_ids, pages, page, meta, crumbs, pager)
 
 
-def render_index(pages, meta, aar_id, older):
-    body = index_body(meta["version"], aar_id, older)
+def render_index(pages, meta, aar_id):
+    body = index_body(meta["group_id"], meta["version"], aar_id)
     toc_ids = re.findall(r'<h2 id="([^"]*)">([^<]*)<a class="heading-anchor"', body)
     toc_ids = [(i, t.replace("&amp;", "&")) for i, t in toc_ids]
     description = ("Java bindings for the Zephyr Protocol wallet core, for Android (AAR) and for desktop and server "
@@ -495,36 +466,16 @@ def write(path, text):
 
 
 def main(argv):
-    out = None
-    maven = None
-    index_only = False
-    args = list(argv)
-    while args:
-        a = args.pop(0)
-        if a in ("--out", "--maven") and args:
-            if a == "--out":
-                out = args.pop(0)
-            else:
-                maven = args.pop(0)
-        elif a == "--index-only":
-            index_only = True
-        else:
-            raise BuildError(f"unknown argument {a}; usage: build_site.py --out <dir> [--maven <dir>] [--index-only]")
-    if not out:
-        raise BuildError("no --out <dir>")
-    out_arg = out
-    out = os.path.abspath(out)
+    if len(argv) != 2 or argv[0] != "--out":
+        raise BuildError("usage: build_site.py --out <dir>")
+    out_arg = argv[1]
+    out = os.path.abspath(out_arg)
 
-    version = pom_version()
+    group_id, version = pom_coordinates()
     version_order(version)
     commit, date, dirty = source_state()
-    meta = {"version": version, "commit": commit, "date": date, "dirty": dirty}
+    meta = {"group_id": group_id, "version": version, "commit": commit, "date": date, "dirty": dirty}
     aar_id = aar_artifact_id()
-    older = {}
-    if maven:
-        if not os.path.isdir(maven):
-            raise BuildError(f"--maven {maven} is not a directory")
-        older = older_releases(maven, version)
 
     pages = guide_pages()
     by_rel = {p["rel"]: p for p in pages}
@@ -533,32 +484,28 @@ def main(argv):
         raise BuildError(f"site/assets/ holds {present}, expected {sorted(ASSETS)}")
 
     # render everything before writing anything
-    files = {"index.html": render_index(pages, meta, aar_id, older)}
-    if not index_only:
-        for n in range(len(pages)):
-            files[pages[n]["out"]] = render_guide_page(n, pages, by_rel, meta)
+    files = {"index.html": render_index(pages, meta, aar_id)}
+    for n in range(len(pages)):
+        files[pages[n]["out"]] = render_guide_page(n, pages, by_rel, meta)
 
-    if index_only:
-        if not os.path.isdir(out):
-            raise BuildError(f"--index-only: {out} is not a directory")
-    else:
-        os.makedirs(out, exist_ok=True)
-        for name in ("guide", "assets"):
-            shutil.rmtree(os.path.join(out, name), ignore_errors=True)
-        for name in ("index.html", ".nojekyll"):
-            if os.path.lexists(os.path.join(out, name)):
-                os.remove(os.path.join(out, name))
-        os.makedirs(os.path.join(out, "assets"))
-        for name in ASSETS:
-            shutil.copyfile(os.path.join(HERE, "assets", name), os.path.join(out, "assets", name))
-        write(os.path.join(out, ".nojekyll"), "")
+    os.makedirs(out, exist_ok=True)
+    for name in ("guide", "assets"):
+        shutil.rmtree(os.path.join(out, name), ignore_errors=True)
+    for name in ("index.html", ".nojekyll", "CNAME"):
+        if os.path.lexists(os.path.join(out, name)):
+            os.remove(os.path.join(out, name))
+    os.makedirs(os.path.join(out, "assets"))
+    for name in ASSETS:
+        shutil.copyfile(os.path.join(HERE, "assets", name), os.path.join(out, "assets", name))
+    write(os.path.join(out, ".nojekyll"), "")
+    write(os.path.join(out, "CNAME"), PAGES_DOMAIN)
     for name in sorted(files):
         write(os.path.join(out, name), files[name])
 
     source = (f"commit {commit}{' with local changes' if dirty else ''}, {date}" if commit
               else "no git commit")
-    what = "index.html" if index_only else f"{len(files)} pages and {len(ASSETS)} assets"
-    print(f"site: {what} in {out_arg} (version {version}, {source}, {len(older)} older release(s) listed)")
+    print(f"site: {len(files)} pages, {len(ASSETS)} assets, .nojekyll and CNAME ({PAGES_DOMAIN}) in {out_arg} "
+          f"(version {version}, {source})")
 
 
 if __name__ == "__main__":
