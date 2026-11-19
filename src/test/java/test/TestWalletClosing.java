@@ -36,6 +36,7 @@ import org.junit.jupiter.api.io.TempDir;
 import zephyr.common.ZephyrError;
 import zephyr.daemon.model.ZephyrNetworkType;
 import zephyr.wallet.ZephyrWalletFull;
+import zephyr.daemon.model.ZephyrKeyImage;
 import zephyr.wallet.model.ZephyrOutputWallet;
 import zephyr.wallet.model.ZephyrTxConfig;
 import zephyr.wallet.model.ZephyrWalletConfig;
@@ -480,10 +481,12 @@ public class TestWalletClosing {
 
   /**
    * The calls that cannot run inside a listener callback are refused there with ZephyrError,
-   * before anything reaches the core: every sync, startSyncing(), scanTxs(), rescanSpent() and
-   * rescanBlockchain(), the multisig calls that lock the core's sync mutex, and every call that
-   * relays (the core notifies the listeners inline). Reads and the same calls without relay keep
-   * working. Offline, on an in-memory wallet without funds: nothing could be built or sent.
+   * before anything reaches the core: every sync, startSyncing(), scanTxs(), rescanBlockchain(),
+   * the multisig calls that lock the core's sync mutex, every call that relays (the core notifies
+   * the listeners inline), and the calls that change the wallet's outputs under the refresh that
+   * delivers the callback (rescanSpent(), importOutputs(), importKeyImages(), importMultisigHex(),
+   * whose core function also refreshes). Reads and the same calls without relay keep working.
+   * Offline, on an in-memory wallet without funds: nothing could be built or sent.
    */
   @Test
   public void callsThatCannotRunInACallbackAreRefused() throws Exception {
@@ -510,6 +513,9 @@ public class TestWalletClosing {
     refused.put("relayTx", () -> wallet.relayTx("00"));
     refused.put("relayTxs", () -> wallet.relayTxs(Arrays.asList("00")));
     refused.put("submitTxs", () -> wallet.submitTxs("00"));
+    refused.put("importMultisigHex", () -> wallet.importMultisigHex(Arrays.asList("not multisig info")));
+    refused.put("importKeyImages", () -> wallet.importKeyImages(new ArrayList<ZephyrKeyImage>()));
+    refused.put("importOutputs", () -> wallet.importOutputs("00"));
     Map<String, Call> allowed = new LinkedHashMap<String, Call>();
     allowed.put("getHeight", wallet::getHeight);
     allowed.put("getBalance", wallet::getBalance);

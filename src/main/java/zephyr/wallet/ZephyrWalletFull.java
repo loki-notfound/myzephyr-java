@@ -628,12 +628,24 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
    * layer, before they attach a thread or call into Java. On which threads callbacks run, and that
    * they can run on several threads at once, is described at {@link ZephyrWalletListenerI}.</p>
    *
-   * <p>From inside a callback the wallet can be read, and listeners added or removed; the calls
-   * that cannot run there throw ZephyrError: every {@code sync}, {@code startSyncing},
-   * {@code scanTxs}, {@code rescanSpent}, {@code rescanBlockchain}, {@code makeMultisig},
-   * {@code exchangeMultisigKeys}, every call that relays ({@code createTx}, {@code createTxs},
-   * {@code sweepUnlocked}, {@code sweepOutput}, {@code sweepDust} with relay; {@code relayTx},
-   * {@code relayTxs}, {@code submitTxs}) and {@code close}.</p>
+   * <p>From inside a callback the wallet can be read, listeners added or removed, and the other
+   * calls made, except those that cannot run there, which throw ZephyrError before they reach the
+   * core:</p>
+   * <ul>
+   * <li>every {@code sync}, {@code scanTxs}, {@code rescanBlockchain}, {@code makeMultisig} and
+   * {@code exchangeMultisigKeys}: the core function locks the core's sync mutex, which the
+   * refresh that delivers the callback holds (the thread would wait for itself);</li>
+   * <li>every call that relays ({@code createTx}, {@code createTxs}, {@code sweepUnlocked},
+   * {@code sweepOutput} and {@code sweepDust} with relay; {@code relayTx}, {@code relayTxs},
+   * {@code submitTxs}) and {@code importKeyImages}: the core notifies the listeners again, from
+   * inside the notification that is running;</li>
+   * <li>{@code rescanSpent}, {@code importOutputs}, {@code importKeyImages} and
+   * {@code importMultisigHex}: they change the wallet's outputs while the refresh that delivers
+   * the callback stands between two of its steps ({@code importMultisigHex} also runs a refresh of
+   * its own);</li>
+   * <li>{@code startSyncing}: it would start the core's sync thread from inside a sync;</li>
+   * <li>{@code close}: it would wait for the callback that calls it.</li>
+   * </ul>
    */
   @Override
   public void addListener(ZephyrWalletListenerI listener) {
@@ -1446,6 +1458,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
 
   @Override
   public int importOutputs(String outputsHex) {
+    refuseInCallback("importOutputs()");
     beginCall();
     try {
       return importOutputsJni(outputsHex);
@@ -1472,6 +1485,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
 
   @Override
   public ZephyrKeyImageImportResult importKeyImages(List<ZephyrKeyImage> keyImages) {
+    refuseInCallback("importKeyImages()");
     beginCall();
     try {
     
@@ -2183,6 +2197,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
 
   @Override
   public int importMultisigHex(List<String> multisigHexes) {
+    refuseInCallback("importMultisigHex()");
     beginCall();
     try {
       try {
@@ -2922,10 +2937,17 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   }
 
   /**
-   * Refuses, on a thread that is delivering a listener callback, a call that cannot run there: a
-   * sync or scan would lock the core's sync mutex, which the refresh that delivers the callback
-   * holds (the thread would wait for itself), and a relaying call makes the core notify the
-   * listeners again from inside the running notification. Called before anything else of the call.
+   * Refuses, on a thread that is delivering a listener callback, a call that cannot run there.
+   * Called before anything else of the call. The rule, read from the core's functions: a call is
+   * refused when its core function locks the core's sync mutex (sync, scan_txs, rescan_blockchain
+   * through lock_and_sync, make_multisig, exchange_multisig_keys), which the refresh that delivers
+   * the callback holds; when it notifies the listeners inline, from inside the running notification
+   * (create_txs, sweep_unlocked, sweep_output and sweep_dust with relay, relay_txs and submit_txs
+   * through on_spend_txs, import_key_images through wallet2's on_money_spent); or when it changes
+   * the wallet's outputs between two steps of the refresh that delivers the callback (rescan_spent,
+   * import_outputs, import_key_images, import_multisig_hex, which also refreshes). startSyncing()
+   * and close() are refused for their own reasons (a sync thread started from inside a sync; a
+   * close() that would wait for its own callback). The list is in the Javadoc of addListener().
    */
   private void refuseInCallback(String call) {
     if (jniListener.inCallback()) throw new ZephyrError("Cannot call " + call + " from inside a listener callback; call it after the callback has returned");
