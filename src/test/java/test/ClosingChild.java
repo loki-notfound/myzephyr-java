@@ -1,12 +1,16 @@
 package test;
 
 import java.io.File;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
 import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -94,6 +98,7 @@ public class ClosingChild {
       case "rescanclose": rescanClose(args[1]); break;
       case "scanclose": scanClose(args[1]); break;
       case "fgtoggle": foregroundToggle(args[1]); break;
+      case "h1held": h1Held(args[1], args[2]); break;
       default: fail("unknown scenario " + args[0]);
     }
     log("RESULT ok");
@@ -771,5 +776,145 @@ public class ClosingChild {
     if (syncer.isAlive()) fail("the syncer did not end");
     log(outcome.get());
     if (!outcome.get().equals("sync(): ZephyrError: Wallet is closed") && !outcome.get().startsWith("sync(): returned")) fail("sync() ended with " + outcome.get());
+  }
+
+  /** H1, held window: seconds the core caches the node's height (30) and a margin for its 1 s clock. */
+  static final long H1_CACHE_S = 32;
+
+  /**
+   * H1 with the window reached on purpose. The wallet talks to the node through a local
+   * {@link Forwarder}. The core caches the node's height for 30 s from its connection check; once
+   * that has expired, the core's sync thread asks the node for it again (get_info) at the start of
+   * its sync, before its refresh begins and resets the core's stop flag. The forwarder holds that
+   * request; close() (after stopSyncing() in the "stop" variant) comes while it is held, and the
+   * request goes on 500 ms after close() began. A stop that is not repeated is lost then, and close()
+   * waits for the whole catch-up scan; with the stop repeated, close() returns within the limit.
+   */
+  private static void h1Held(String path, String variant) throws Exception {
+    String uri = System.getProperty("zephyr.daemon.uri");
+    if (uri == null) fail("zephyr.daemon.uri not set");
+    URI node = new URI(uri);
+    Forwarder forwarder = new Forwarder(node.getHost(), node.getPort());
+    ZephyrWalletFull wallet = ZephyrWalletFull.openWallet(path, password(), ZephyrNetworkType.MAINNET, "http://127.0.0.1:" + forwarder.port());
+    long connected = System.nanoTime();
+    log("opened through the local forwarder; blocks behind the node: " + (wallet.getDaemonHeight() - Math.max(wallet.getHeight(), wallet.getRestoreHeight())));
+    Counting listener = new Counting("none");
+    wallet.addListener(listener);
+    long waitMs = TimeUnit.NANOSECONDS.toMillis(TimeUnit.SECONDS.toNanos(H1_CACHE_S) - (System.nanoTime() - connected));
+    log("waiting " + waitMs + " ms until the core's cached node height has expired");
+    if (waitMs > 0) Thread.sleep(waitMs);
+    forwarder.holdNext("\"get_info\"");
+    wallet.startSyncing(1000L);
+    if (!forwarder.awaitHeld(20000)) fail("the core's sync thread did not ask the node for its height within 20 s: the window before its refresh was not reached");
+    log("the core's sync thread waits for the node's answer to get_info, before its refresh");
+    if (variant.equals("stop")) wallet.stopSyncing();
+    Thread releaser = new Thread(() -> {
+      try {
+        Thread.sleep(500);
+      } catch (InterruptedException e) {
+        // let it go now
+      }
+      log("the forwarder lets the request go");
+      forwarder.release();
+    }, "releaser");
+    releaser.start();
+    log((variant.equals("stop") ? "stopSyncing() and " : "") + "close() while the request is held");
+    long ms = timedClose(wallet);
+    forwarder.close();
+    log("after close: " + listener.counts());
+    if (ms > H1_LIMIT_MS) fail("close() with the core's sync thread held before its refresh" + (variant.equals("stop") ? " (after stopSyncing())" : "") + " waited " + ms + " ms (limit " + H1_LIMIT_MS + " ms): the stop was lost");
+    if (!listener.threads.isEmpty()) assertCallbackThreadsEnded(listener.threads);
+  }
+
+  /**
+   * A local TCP forwarder to the node for one child: each connection the wallet opens gets its own
+   * connection to the node, and bytes are copied both ways unchanged. Once armed with
+   * {@link #holdNext}, it holds the first piece of a request from the wallet that contains the
+   * marker until {@link #release}.
+   */
+  private static class Forwarder {
+    private final ServerSocket server;
+    private final String host;
+    private final int port;
+    private final AtomicReference<byte[]> marker = new AtomicReference<byte[]>();
+    private final CountDownLatch held = new CountDownLatch(1);
+    private final CountDownLatch released = new CountDownLatch(1);
+    private final List<Socket> sockets = new CopyOnWriteArrayList<Socket>();
+
+    Forwarder(String host, int port) throws Exception {
+      this.host = host;
+      this.port = port;
+      server = new ServerSocket(0, 50, InetAddress.getLoopbackAddress());
+      Thread acceptor = new Thread(this::accept, "forwarder");
+      acceptor.setDaemon(true);
+      acceptor.start();
+    }
+
+    int port() { return server.getLocalPort(); }
+    void holdNext(String text) { marker.set(text.getBytes(StandardCharsets.US_ASCII)); }
+    boolean awaitHeld(long ms) throws InterruptedException { return held.await(ms, TimeUnit.MILLISECONDS); }
+    void release() { released.countDown(); }
+
+    void close() {
+      release();
+      try {
+        server.close();
+      } catch (Exception e) {
+        // closed
+      }
+      for (Socket socket : sockets) {
+        try {
+          socket.close();
+        } catch (Exception e) {
+          // closed
+        }
+      }
+    }
+
+    private void accept() {
+      try {
+        while (true) {
+          Socket wallet = server.accept();
+          Socket node = new Socket(host, port);
+          sockets.add(wallet);
+          sockets.add(node);
+          pump(wallet, node, true);
+          pump(node, wallet, false);
+        }
+      } catch (Exception e) {
+        // the forwarder was closed
+      }
+    }
+
+    private void pump(Socket from, Socket to, boolean fromWallet) {
+      Thread thread = new Thread(() -> {
+        byte[] buffer = new byte[65536];
+        try (InputStream in = from.getInputStream(); OutputStream out = to.getOutputStream()) {
+          int n;
+          while ((n = in.read(buffer)) > 0) {
+            byte[] m = marker.get();
+            if (fromWallet && m != null && contains(buffer, n, m) && marker.compareAndSet(m, null)) {
+              held.countDown();
+              released.await();
+            }
+            out.write(buffer, 0, n);
+            out.flush();
+          }
+        } catch (Exception e) {
+          // one side closed its connection: both are closed
+        }
+      }, fromWallet ? "forwarder-to-node" : "forwarder-to-wallet");
+      thread.setDaemon(true);
+      thread.start();
+    }
+
+    private static boolean contains(byte[] buffer, int length, byte[] marker) {
+      outer:
+      for (int i = 0; i + marker.length <= length; i++) {
+        for (int j = 0; j < marker.length; j++) if (buffer[i + j] != marker[j]) continue outer;
+        return true;
+      }
+      return false;
+    }
   }
 }

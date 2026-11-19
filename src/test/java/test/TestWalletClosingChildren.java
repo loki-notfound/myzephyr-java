@@ -270,6 +270,26 @@ public class TestWalletClosingChildren {
   }
 
   /**
+   * H1 with the window reached on purpose: a local forwarder holds the core's sync thread at its
+   * request for the node's height, before its refresh begins, while close() comes; the request goes
+   * on 500 ms later. close() must return within {@value ClosingChild#H1_LIMIT_MS} ms (the stop is
+   * repeated), not after the whole catch-up scan. Two runs; each waits about 32 s first, until the
+   * core's cached node height has expired.
+   */
+  @RepeatedTest(2)
+  public void closeWhileTheSyncThreadIsHeldBeforeItsRefresh(RepetitionInfo repetition) throws Exception {
+    assumeNodeAndWallet();
+    run("h1held-start-" + repetition.getCurrentRepetition(), true, "h1held", "start").check();
+  }
+
+  /** The held window with stopSyncing() before close(). Two runs. */
+  @RepeatedTest(2)
+  public void stopAndCloseWhileTheSyncThreadIsHeldBeforeItsRefresh(RepetitionInfo repetition) throws Exception {
+    assumeNodeAndWallet();
+    run("h1held-stop-" + repetition.getCurrentRepetition(), true, "h1held", "stop").check();
+  }
+
+  /**
    * H2: close(true) while the core's sync thread is paused inside a refresh (a listener blocks in
    * onNewBlock for 2 s): the wallet is saved after that thread has stopped, and it reopens with the
    * scanned blocks. Three runs.
