@@ -62,7 +62,8 @@ leaves out protobuf (below, Changed).
   `ZephyrError` with the runtime's text, or "Must provide ..." in `getTxs(String...)`,
   `relayTx(ZephyrTxWallet)`, `relayTxs(List)` and `importMultisigHex(String...)`.
   `toAtomicUnits(double)` throws `ZephyrError` "Amount is not a finite number: " for NaN and the
-  infinities. `OutOfMemoryError` stays as it was.
+  infinities. `OutOfMemoryError` stays as it was, and a native library that cannot be loaded gives
+  the Java runtime's own errors (guide, "What is not a ZephyrError").
 - **Calls refused inside a listener callback.** They throw `ZephyrError` "Cannot call <call> from
   inside a listener callback; call it after the callback has returned": every `sync`, `scanTxs`,
   `rescanBlockchain`, `startSyncing`, `rescanSpent`, `makeMultisig`, `exchangeMultisigKeys`;
@@ -142,12 +143,14 @@ leaves out protobuf (below, Changed).
   dropped as before.
 - **A failure of the core in some native calls ended the process.** 21 native functions did not
   catch the core's exceptions, among them the account and subaddress calls, `getAddress`, the key
-  getters and the native functions of `ZephyrUtils`. Several more parsed their input before their
-  `try` block. Observed on 2026-11-19 with a development build whose bridge was `java.4`'s in those
-  places: each of these ended the process with `SIGABRT`. They were `createSubaddress` with an
-  account index out of range, `createTx`, `sweepUnlocked`, `sweepOutput` and `getPaymentUri` with
-  an amount or fee above 2^64, and `ZephyrUtils.binaryBlocksToMap` with a block that does not
-  parse. Now every native call turns a failure of the core into a `ZephyrError` with the core's
+  getters and five of the seven native functions of `ZephyrUtils`. Several more parsed their input
+  before their `try` block. Observed on 2026-11-19 with a development build whose bridge was
+  `java.4`'s in those places: each of these ended the process with `SIGABRT`. They were
+  `createSubaddress` with an account index out of range, `createTx`, `sweepUnlocked`,
+  `sweepOutput` and `getPaymentUri` with an amount or fee of 2^64 or more, and
+  `ZephyrUtils.binaryBlocksToMap` with a block that does not parse. `getReserveProofAccount` with
+  an amount of 2^64 or more ended the process the same way, in the bridge's own conversion of the
+  amount. Now every native call turns these failures into a `ZephyrError` with the failure's
   message.
 - **`ZephyrUtils.mapToBinary` crashed the process for a result of more than about 1 MB**: the
   bridge copied the bytes through an array on the native stack (observed on 2026-11-19 with the
@@ -194,9 +197,9 @@ leaves out protobuf (below, Changed).
   listener costs what it cost in `java.4`. A wallet whose listener was added and removed pays the
   core's per-block listener work, about 11 % per scan in a measurement of 2026-11-18. Add the first
   listener before `startSyncing()`.
-- The JNI bridge throws `ZephyrError` for every core exception, in every native call
-  (`OutOfMemoryError` for a failed allocation), deletes the local references of each callback, and
-  checks each class lookup in `JNI_OnLoad`.
+- The JNI bridge throws `ZephyrError` for every core exception, in every native call, and
+  `OutOfMemoryError` for a failed allocation, also while it copies a call's arguments. It deletes
+  the local references of each callback and checks each class lookup in `JNI_OnLoad`.
 - The Javadoc of the wallet model's classes is complete; a missing comment in the classes kept
   complete fails the Javadoc step. Four model classes got an explicit documented constructor.
 
@@ -216,8 +219,9 @@ of these sources, against a mainnet node, read-only; nothing was sent or relayed
 
 - the offline tests, 72 on the final code. Among them are every public method of a closed
   wallet, the refusals inside a callback, a failed save at close and `close()` racing calls on
-  another thread. Failures of the core in eight native calls, the amounts table and the logging
-  with planted secrets are covered too;
+  another thread. Nine failing cases in eight native calls are covered too: failures of the core
+  in six calls, the bridge's own conversion of an amount, and a large conversion. So are the
+  amounts table and the logging with planted secrets;
 - the closing tests in child processes (each fails on a crash, a hang or a thread left attached)
   on the final code: 45 passed, 20 opt-in runs skipped. Among them `close()` during a foreground
   `sync()` in 10 of 10 runs, right after `startSyncing()` and `stopSyncing()`, and listeners added
