@@ -34,9 +34,9 @@ network type or a closed wallet, throw a `ZephyrError` as well.
 | the RPC classes, an RPC or HTTP error | `ZephyrRpcError`, a `ZephyrError` with the RPC code or HTTP status | [ZephyrRpcError](11-the-rpc-classes.md#zephyrrpcerror) |
 | the RPC classes, no connection | a plain `ZephyrError` whose message is the cause's text | — |
 
-The JNI bridge turns every C++ exception of the core into a `ZephyrError`, except a failure to
-allocate memory, which becomes an `OutOfMemoryError`. The Java side turns any other
-`RuntimeException` or `AssertionError` of a wallet call into a `ZephyrError` with the same
+The JNI bridge turns every C++ exception of the core into a `ZephyrError`, in every native call,
+except a failure to allocate memory, which becomes an `OutOfMemoryError`. The Java side turns any
+other `RuntimeException` or `AssertionError` of a wallet call into a `ZephyrError` with the same
 message. It leaves out the cause, which can carry the data that failed to parse.
 
 ## What is not a ZephyrError
@@ -52,15 +52,15 @@ message. It leaves out the cause, which can carry the data that failed to parse.
   `NumberFormatException` for text that is not a number. `ZephyrTls`, the RPC classes and the
   connection manager were not checked for the rule.
 
-**Some native calls still do not catch the core's failure.** Among them are the account and
-subaddress calls and `getAddress` (read in the bridge's code). An exception that leaves native code
-uncaught can end the process. An invalid account or subaddress index is the likely trigger, so pass
-only indexes the wallet reported. This was not run.
-
 **Releases up to `2.3.0-sec.2-java.4`** let the core's failure through as `java.lang.Exception` in
-many calls: opening and creating wallets, `save`, `moveTo`, `getData`, the balance calls, the
-account calls and others. Observed on 2026-11-17 with the released JAR: a wrong password threw
-`java.lang.Exception` "invalid password". In their source, an unknown hash in a transfer or output
+many calls: opening and creating wallets, `save`, `moveTo`, `getData`, the balance calls,
+`getReserveInfo`, `getCirculatingSupply` and others. Observed on 2026-11-17 with the released JAR:
+a wrong password threw `java.lang.Exception` "invalid password". Some native calls did not catch
+the core's failure at all, and it ended the process. Among them were the account and subaddress
+calls, `getAddress`, the key getters and the calls that build a transaction from a config. Observed
+on 2026-11-19 with a development build whose bridge is the same in those places: `createSubaddress`
+with an account index out of range, and `createTx` with an amount above 2^64, ended the process
+with `SIGABRT`. In their source, an unknown hash in a transfer or output
 query threw a plain `RuntimeException`, and argument checks an `AssertionError`. A `null`
 attribute key or value, in `getAttribute(null)`, `setAttribute(null, v)` or
 `setAttribute(k, null)`, aborted the process. That was read in the bridge's code and observed on
@@ -158,21 +158,21 @@ What the library logs in `2.3.0-sec.2-java.5` (read in the source):
 | `setPrintStackTrace(true)` on a `ZephyrRpcConnection` | the redacted request body, with a stack trace, on stderr |
 | any `ZephyrUtils.setLogLevel` call, `configureNativeLogging` | the core's log, which holds the primary address, amounts and transaction hashes ([The native log](#the-native-log)) |
 
-The redacted names, matched without regard to case at any depth:
-
-- in requests: `password`, `old_password`, `new_password`, `seed`, `seed_offset`, `spendkey`,
-  `viewkey` and `tx_key`;
-- in responses of a wallet RPC server: `key`, `seed`, `tx_key`, `tx_key_list`, `tx_metadata`,
-  `tx_metadata_list`, `signed_txset`, `multisig_txset`, `multisig_info` and `info`.
+The redacted names are one list. It applies alike to requests, responses and the parameters of
+`ZephyrRpcError`, at any depth and without regard to case. The names are `password`, `old_password`,
+`new_password`, `seed`, `seed_offset`, `spendkey`, `viewkey`, `tx_key`, `key`, `tx_key_list`,
+`tx_metadata`, `tx_metadata_list`, `signed_txset`, `multisig_txset`, `multisig_info` and `info`.
 
 `key` and `info` are generic names: a node's answer with an output's public key under `key` is
 redacted too. Some fields are private but not secret, and are printed: key images, transaction
 hashes, a transaction's hex, an unsigned transaction set, exported outputs, signed key images and
 addresses. A log at levels 2 and 3 is still private data.
 
-Two more places print, without secrets: a failed check of `ZephyrConnectionManager` and a failed
-poll of `ZephyrDaemonRpc` print their stack trace, which can name the node's host and port.
-`ZephyrDaemonRpc` logs unexpected fields of a node's answer at `WARNING`.
+Other places print, without secrets. A failed check of `ZephyrConnectionManager` and a failed poll
+of `ZephyrDaemonRpc` print their stack trace, which can name the node's host and port.
+`ZephyrDaemonRpc` logs unexpected fields of a node's answer at `WARNING`, and the output lines of a
+`zephyrd` process it started at `FINER`. `ZephyrTransfer` prints a fixed warning on `System.err`
+when two versions of a transfer disagree and one has the amount 0.
 
 On Android, `System.out` and `System.err` go to logcat. In a released app, keep `FINE` logging of
 the library off and do not call `setLogLevel` or `configureNativeLogging`. Without them the core
@@ -213,6 +213,7 @@ Whether the log then keeps growing after the last listener is removed was not ru
 These runs used a developer build of the `2.3.0-sec.2-java.4` sources on Linux. A level-0 log of the
 released JAR held the same lines on 2026-11-17: the primary address, the wallet path, and the
 amounts and hashes of the outputs. They were not repeated with `2.3.0-sec.2-java.5`, which does
-not change the core or the bridge's logging calls. Levels above 1 were not tried. On Android,
+not change the core's sources or its logging. The bridge's own two error lines changed, and
+neither carries wallet data. Levels above 1 were not tried. On Android,
 `configureNativeLogging` has not been tried; nothing the core logs appears in logcat
 ([Logs](10-android.md#logs)).

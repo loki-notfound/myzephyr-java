@@ -5,6 +5,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import zephyr.wallet.ZephyrWalletFull;
@@ -42,9 +43,9 @@ public class GuideThreads {
   }
 
   // one thread per wallet: it syncs on a schedule and saves between two syncs, so a save never
-  // meets a refresh (background syncing is not used)
-  static void syncOnWalletThread(ScheduledExecutorService walletThread, ZephyrWalletFull wallet) {
-    walletThread.scheduleWithFixedDelay(() -> {
+  // meets a refresh (background syncing is not used); the future ends the schedule before the close
+  static ScheduledFuture<?> syncOnWalletThread(ScheduledExecutorService walletThread, ZephyrWalletFull wallet) {
+    ScheduledFuture<?> syncs = walletThread.scheduleWithFixedDelay(() -> {
       try {
         wallet.sync();
         wallet.save();  // between two syncs on this thread: no refresh runs
@@ -52,11 +53,13 @@ public class GuideThreads {
         logError(e);    // an exception that left the task would end the schedule
       }
     }, 0, 30, TimeUnit.SECONDS);
+    return syncs;
   }
 
-  // closing on the wallet thread: close(true) stops a sync, waits for the calls in flight and the
-  // core's background sync thread, then saves and closes
-  static Future<?> closeOnWalletThread(ExecutorService walletThread, ZephyrWalletFull wallet) {
+  // closing on the wallet thread: end the schedule first, then close(true) waits for the calls in
+  // flight and the core's background sync thread, saves and closes
+  static Future<?> closeOnWalletThread(ExecutorService walletThread, ScheduledFuture<?> syncs, ZephyrWalletFull wallet) {
+    syncs.cancel(false);  // no sync after the close; a sync under way ends first
     return walletThread.submit(() -> wallet.close(true));
   }
 

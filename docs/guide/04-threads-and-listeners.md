@@ -21,7 +21,7 @@ stay responsive, such as Android's main thread. A sync or a send on the main thr
 app. Use an executor or a coroutine dispatcher for I/O. The same holds for `close()`, which waits
 for the calls in flight ([Closing a wallet that syncs](#closing-a-wallet-that-syncs)).
 
-## Callbacks run on threads you did not create
+## Callbacks run on threads inside the core's calls
 
 A callback runs on a thread that is inside a core call that notifies (read in the core's code).
 That is the core's own background sync thread (`startSyncing()`), or a thread of yours inside
@@ -157,12 +157,17 @@ The refused calls, and the reason for each, which follows from the core function
 | `startSyncing` | it would start the core's sync thread from inside a sync |
 | `close()`, `close(true)` | `close()` would wait for the callback that calls it; the message is "Cannot close the wallet from inside one of its own calls or listener callbacks" |
 
-Not refused: `signMultisigTxHex` and `setDaemonConnection` (neither locks the sync mutex,
-notifies, writes the wallet or changes what the refresh uses), and the reads. A read is not always free of
-callbacks, though. A read that can include pool transactions (`getTxs`, `getTransfers` and the
-like) first refreshes the core's view of the node's pool. A transaction to the wallet found there
-is notified at once, on the same thread. So your listeners can be called again from inside the
-callback that made the read.
+Not refused: `signMultisigTxHex`, `setDaemonConnection` and the reads. `signMultisigTxHex`
+changes only the signed outputs' multisig nonces and the stored transaction keys, which a refresh
+does not use. `setDaemonConnection` waits for the node request under way and points the core at
+the new node, from which the paused refresh goes on. Neither locks the sync mutex or notifies.
+
+A read is not always free of callbacks, though. A read that can include pool transactions (`getTxs`,
+`getTransfers` and the like) first refreshes the core's view of the node's pool. A transaction to
+the wallet found there is notified at once, on the same thread. So your listeners can be called
+again from inside the callback that made the read. That read also moves the time of the core's last
+pool query under the paused refresh (read in the core's code). Whether the refresh can then miss a
+pool transaction is not known.
 
 Save after `sync()` has returned, or from a thread of your own after a callback has handed the
 event over. A sync and its save on one thread of yours never meet a refresh. That is the safe way
@@ -171,7 +176,7 @@ to save a wallet that stays open, because a `save()` is not exclusive with backg
 wallet's own thread instead of `startSyncing()`, and save after each sync:
 
 ```java examples/GuideThreads.java
-walletThread.scheduleWithFixedDelay(() -> {
+ScheduledFuture<?> syncs = walletThread.scheduleWithFixedDelay(() -> {
   try {
     wallet.sync();
     wallet.save();  // between two syncs on this thread: no refresh runs
@@ -180,6 +185,8 @@ walletThread.scheduleWithFixedDelay(() -> {
   }
 }, 0, 30, TimeUnit.SECONDS);
 ```
+
+Keep the `ScheduledFuture` to end the schedule before the wallet closes.
 
 The refusals are per wallet. A callback that syncs, scans or relays **another** wallet is not
 refused, but it should not do so either. Two wallets whose callbacks call each other's sync wait
@@ -265,8 +272,8 @@ that held a refresh or a node request on purpose took longer. Longer waits:
 - a relay that hangs, read in the core's code and not seen in a run. A call that relays while a
   sync runs on another thread can hang when the core recycles its notification queue at the end
   of that sync. Nothing drains the queue after `stopSyncing()`, so the relay never returns and
-  `close()` waits for it. The window is microseconds wide. Relaying while no sync runs on another
-  thread does not meet it.
+  `close()` waits for it. The window is narrow (read in the code, not measured). Relaying while no
+  sync runs on another thread does not meet it.
 
 On Android, never call `close()` on the main thread: a wait of seconds is an "Application Not
 Responding" dialog there.
@@ -280,6 +287,7 @@ With one thread per wallet ([Calls from several threads](#calls-from-several-thr
 goes through that thread too:
 
 ```java examples/GuideThreads.java
+syncs.cancel(false);  // no sync after the close; a sync under way ends first
 return walletThread.submit(() -> wallet.close(true));
 ```
 
@@ -322,10 +330,12 @@ and a save never meets a refresh.
 > syncing refreshes. Close each wallet with `close()` or `close(true)` first; the library adds no
 > shutdown hook that would do it for you.
 
-Observed on 2026-11-18: a program whose `main` returned with a wallet open and background syncing
-inside a refresh did not exit, in 20 of 20 runs. It did not crash; it hung in the JVM's exit, with
-or without a listener. When `main` returned while the core's sync thread waited between two syncs,
-the program exited normally. Whether `System.exit()` hangs the same way was not run.
+Observed on 2026-11-18 with a development build from before the later closing fixes: a program
+whose `main` returned with a wallet open and background syncing inside a refresh did not exit. That
+happened in 20 of 20 runs with a listener, and in a probe without one. It did not crash; it hung in
+the JVM's exit. When `main` returned while the core's sync thread waited between two syncs, the
+program exited normally. This was not repeated on the final code of `2.3.0-sec.2-java.5`. Whether
+`System.exit()` hangs the same way was not run.
 On Android an app's process is normally killed rather than exited; this was not run on Android.
 
 ## What is not known
@@ -335,6 +345,8 @@ For `2.3.0-sec.2-java.5`, none of these was established:
 - whether calls from several threads at the same time are safe, apart from `close()`;
 - in particular, writes (`createTxs`, `setTxNote`, creating accounts) next to other calls;
 - what the first `addListener` does while a sync runs on another thread (the core's race above);
+- whether a read from a callback that refreshes the pool can make the paused refresh miss a pool
+  transaction;
 - the two longer waits of `close()` that were read in the core's code;
 - how any of this behaves on Android: ART, CheckJNI in debuggable apps, the attach per callback,
   and `close()` while the app's process is being ended.
@@ -348,7 +360,8 @@ Releases up to `2.3.0-sec.2-java.4` had the defects that `2.3.0-sec.2-java.5` fi
 2026-11-17 with the released `java.4` JAR:
 
 - **`close()` during a `sync()` on another thread crashed the process**, in 4 of 4 runs, with a
-  segmentation fault (exit status 134);
+  segmentation fault (exit status 134). The crash point differed in each run, so it can also
+  corrupt memory without a crash;
 - **`close()` while background syncing scanned** left a native thread attached, and the JVM never
   exited (3 of 3 runs). `stopSyncing()` right before `close()` did not help (2 of 2 runs);
 - **an exception that left a callback during background syncing** left a native thread attached,
@@ -372,6 +385,7 @@ wallet.save();
 wallet.close();
 ```
 
-No quiet interval is known to be safe. In the runs of 2026-11-17, `close()` 3 s after
-`stopSyncing()` was clean in 4 of 4 runs; that is what was run, not a safe interval. This is a
-workaround, not a guarantee.
+No quiet interval is known to be safe. A scan can pause between batches while it fetches blocks
+from the node, so a short interval can still meet a running batch. In the runs of 2026-11-17,
+`close()` 3 s after `stopSyncing()` was clean in 4 of 4 runs; that is what was run, not a safe
+interval. This is a workaround, not a guarantee.

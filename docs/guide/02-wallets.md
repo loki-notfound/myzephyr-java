@@ -134,6 +134,9 @@ observed on 2026-11-17 with the released JAR. On those releases a `catch (Zephyr
 catch it; catch `Exception` around `openWallet` there
 ([Errors and exceptions](09-errors.md)).
 
+Each failed open, such as one with a wrong password, leaks the half-built wallet inside the core
+(read in the core's code). In a process that runs for long, limit the password retries.
+
 ## Wallet bytes
 
 Apps that keep their own storage (an encrypted database, Android's private files) need no wallet
@@ -204,7 +207,8 @@ password.". `changePassword` saves the wallet, so it follows the rules of `save(
 
 ## When to save
 
-`save()` writes the cache (and the keys) to the wallet's files. A cache that was not saved only
+`save()` writes the cache to the wallet's files. The keys file is written when the wallet is
+created, moved or its password changed. A cache that was not saved only
 costs a re-sync of the blocks since the last save. But transaction notes and the secret keys of
 sent transactions exist only in the cache. Save, or with bytes call `getData()` and store the
 arrays again:

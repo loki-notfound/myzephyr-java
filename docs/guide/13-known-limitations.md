@@ -51,7 +51,7 @@ The defects that `2.3.0-sec.2-java.5` fixed are listed at the end
 |---|---|---|
 | `close()` has no time limit: it waits for the calls in flight and the core's sync thread | by design in `2.3.0-sec.2-java.5` | [Closing a wallet that syncs](04-threads-and-listeners.md#closing-a-wallet-that-syncs) |
 | inside a listener callback, the calls that sync, scan, relay, import, save or close the wallet are refused with `ZephyrError` | by design in `2.3.0-sec.2-java.5` | [What a callback may call](04-threads-and-listeners.md#what-a-callback-may-call) |
-| callbacks of two threads can run at the same time; a listener must be thread-safe | by design in `2.3.0-sec.2-java.5` | [Callbacks run on threads you did not create](04-threads-and-listeners.md#callbacks-run-on-threads-you-did-not-create) |
+| callbacks of two threads can run at the same time; a listener must be thread-safe | by design in `2.3.0-sec.2-java.5` | [Callbacks run on threads inside the core's calls](04-threads-and-listeners.md#callbacks-run-on-threads-inside-the-cores-calls) |
 | `onOutputReceived` and `onOutputSpent` repeat at confirmation and unlock; the spent notification at unlock is a summary | by design, in the Javadoc and the core's code | [The five callbacks](04-threads-and-listeners.md#the-five-callbacks) |
 | calls from several threads on one wallet, apart from `close()`, are not known to be safe | not established | [Calls from several threads](04-threads-and-listeners.md#calls-from-several-threads) |
 | an invalid account or subaddress index may end the process: some native calls do not catch the core's failure | read in the code; not run | [What is not a ZephyrError](09-errors.md#what-is-not-a-zephyrerror) |
