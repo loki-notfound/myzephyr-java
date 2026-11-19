@@ -314,6 +314,20 @@ public class TestWalletClosingChildren {
     run("churn-" + repetition.getCurrentRepetition(), true, "churn").check();
   }
 
+  /** F3: rescanBlockchain() cut short by close() ends with ZephyrError("Wallet is closed"). */
+  @Test
+  public void rescanCutShortByClose() throws Exception {
+    assumeNodeAndWallet();
+    run("rescanclose", true, "rescanclose").check();
+  }
+
+  /** F3: scanTxs() cut short by close() during its refresh ends with ZephyrError("Wallet is closed"). */
+  @Test
+  public void scanTxsCutShortByClose() throws Exception {
+    assumeNodeAndWallet();
+    run("scanclose", true, "scanclose").check();
+  }
+
   /** A listener removed and another added from main during a foreground sync(): at once, no callback after the removal. */
   @Test
   public void listenersChangedDuringForegroundSync() throws Exception {

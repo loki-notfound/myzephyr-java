@@ -20,6 +20,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import zephyr.common.ZephyrError;
+import zephyr.daemon.ZephyrDaemonRpc;
+import zephyr.daemon.model.ZephyrBlock;
 import zephyr.daemon.model.ZephyrNetworkType;
 import zephyr.wallet.ZephyrWalletFull;
 import zephyr.wallet.model.ZephyrOutputWallet;
@@ -91,6 +93,8 @@ public class ClosingChild {
       case "w1": w1(args[1]); break;
       case "exitopen": exitOpen(args[1]); break;
       case "churn": churn(args[1]); break;
+      case "rescanclose": rescanClose(args[1]); break;
+      case "scanclose": scanClose(args[1]); break;
       case "fgtoggle": foregroundToggle(args[1]); break;
       default: fail("unknown scenario " + args[0]);
     }
@@ -655,6 +659,76 @@ public class ClosingChild {
     timedClose(wallet);
     if (toggled.blocks.get() == 0) fail("the toggled listener never received a callback");
     assertCallbackThreadsEnded(toggled.threads, churner);
+  }
+
+  /**
+   * F3 of the review of S1b: close() while another thread's rescanBlockchain() runs: the rescan,
+   * cut short, ends with ZephyrError("Wallet is closed"), never as if it had completed. A rescan
+   * delivers no sync progress on this wallet, so close() comes once the wallet's height has moved
+   * 200 blocks past the restore height.
+   */
+  private static void rescanClose(String path) throws Exception {
+    ZephyrWalletFull wallet = open(path);
+    long restoreHeight = wallet.getRestoreHeight();
+    AtomicReference<String> outcome = new AtomicReference<String>();
+    Thread rescanner = new Thread(() -> outcome.set(attempt("rescanBlockchain()", () -> { wallet.rescanBlockchain(); return "returned"; })), "rescanner");
+    rescanner.start();
+    long end = System.currentTimeMillis() + WAIT_MS;
+    while (wallet.getHeight() < restoreHeight + 200) {
+      if (!rescanner.isAlive()) fail("rescanBlockchain() ended before its refresh was under way: " + outcome.get());
+      if (System.currentTimeMillis() > end) fail("the wallet's height did not pass " + (restoreHeight + 200) + " within " + WAIT_MS + " ms");
+      Thread.sleep(20);
+    }
+    log("before close: height " + wallet.getHeight());
+    timedClose(wallet);
+    rescanner.join(WAIT_MS);
+    if (rescanner.isAlive()) fail("the rescanner did not end");
+    log(outcome.get());
+    if (!"rescanBlockchain(): ZephyrError: Wallet is closed".equals(outcome.get())) fail("rescanBlockchain() cut short by close() ended with " + outcome.get());
+  }
+
+  /**
+   * F3 of the review of S1b: close() while another thread's scanTxs() refreshes the wallet: the
+   * scan, cut short, ends with ZephyrError("Wallet is closed"). The transaction is one of a block
+   * shortly above the wallet's restore height, read from the node (read-only; its hash is not
+   * printed): the core processes it, moves the wallet's refresh up to that block and refreshes
+   * from there to the tip. That refresh delivers no sync progress, so close() comes once the
+   * wallet's height has moved 200 blocks past the transaction's block.
+   */
+  private static void scanClose(String path) throws Exception {
+    String uri = System.getProperty("zephyr.daemon.uri");
+    if (uri == null) fail("zephyr.daemon.uri not set");
+    String txHash = null;
+    long txHeight = -1;
+    ZephyrWalletFull wallet = open(path);
+    long restoreHeight = wallet.getRestoreHeight();
+    ZephyrDaemonRpc daemon = new ZephyrDaemonRpc(uri);
+    for (long height = restoreHeight + 10; height < restoreHeight + 400 && txHash == null; height++) {
+      ZephyrBlock block = daemon.getBlockByHeight(height);
+      if (block.getTxHashes() != null && !block.getTxHashes().isEmpty()) {
+        txHash = block.getTxHashes().get(0);
+        txHeight = height;
+      }
+    }
+    daemon.getRpcConnection().setCredentials(null, null); // closes its HTTP client and with it its connection to the node
+    if (txHash == null) fail("no transaction in the 390 blocks above the restore height");
+    log("scanTxs() of a transaction in block " + txHeight + " (restore height " + restoreHeight + ")");
+    String hash = txHash;
+    AtomicReference<String> outcome = new AtomicReference<String>();
+    Thread scanner = new Thread(() -> outcome.set(attempt("scanTxs()", () -> { wallet.scanTxs(Arrays.asList(hash)); return "returned"; })), "scanner");
+    scanner.start();
+    long end = System.currentTimeMillis() + WAIT_MS;
+    while (wallet.getHeight() < txHeight + 200) {
+      if (!scanner.isAlive()) fail("scanTxs() ended before its refresh was under way: " + outcome.get());
+      if (System.currentTimeMillis() > end) fail("the wallet's height did not pass block " + (txHeight + 200) + " within " + WAIT_MS + " ms");
+      Thread.sleep(20);
+    }
+    log("before close: height " + wallet.getHeight());
+    timedClose(wallet);
+    scanner.join(WAIT_MS);
+    if (scanner.isAlive()) fail("the scanner did not end");
+    log(outcome.get());
+    if (!"scanTxs(): ZephyrError: Wallet is closed".equals(outcome.get())) fail("scanTxs() cut short by close() ended with " + outcome.get());
   }
 
   /**

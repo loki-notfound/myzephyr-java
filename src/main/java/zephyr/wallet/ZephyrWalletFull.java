@@ -1036,6 +1036,13 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     }
   }
   
+  /**
+   * {@inheritDoc}
+   *
+   * <p>A scan that {@code close()} cuts short (it ends the core's refresh after the transactions,
+   * at its next batch of blocks) throws ZephyrError("Wallet is closed"), never as if it had
+   * completed. Throws ZephyrError when called from inside a listener callback.</p>
+   */
   @Override
   public void scanTxs(Collection<String> txHashes) {
     refuseInCallback("scanTxs()");
@@ -1044,7 +1051,9 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
       String[] txMetadatasArr = txHashes.toArray(new String[txHashes.size()]); // convert to array for jni
       try {
         scanTxsJni(txMetadatasArr);
+        if (isClosed) throw new ZephyrError("Wallet is closed"); // cut short: not complete
       } catch (Exception e) {
+        if (isClosed) throw new ZephyrError("Wallet is closed");
         throw daemonError(e);
       }
     } catch (RuntimeException | AssertionError e) {
@@ -1071,6 +1080,13 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     }
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * <p>A rescan that {@code close()} cuts short (it ends the core's refresh at its next batch of
+   * blocks) throws ZephyrError("Wallet is closed"), never as if it had completed. Throws
+   * ZephyrError when called from inside a listener callback.</p>
+   */
   @Override
   public void rescanBlockchain() {
     refuseInCallback("rescanBlockchain()");
@@ -1078,7 +1094,9 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     try {
       try {
         rescanBlockchainJni();
+        if (isClosed) throw new ZephyrError("Wallet is closed"); // cut short: not complete
       } catch (Exception e) {
+        if (isClosed) throw new ZephyrError("Wallet is closed");
         throw daemonError(e);
       }
     } catch (RuntimeException | AssertionError e) {
