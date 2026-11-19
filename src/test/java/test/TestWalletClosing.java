@@ -587,6 +587,38 @@ public class TestWalletClosing {
   }
 
   /**
+   * T1 of the review of S1c: the core's listener set, which the core's sync thread copies without
+   * a lock, is called once per wallet, by the first addListener(): every later addition and
+   * removal of a Java listener, also from inside a callback, only switches the native listener's
+   * delivery. Counted by the native listener itself (its calls of the core's add_listener and
+   * remove_listener, as the bridge reports them on every switch); a switch that calls the core again
+   * makes the count grow.
+   */
+  @Test
+  public void coreListenerSetIsCalledOnlyByTheFirstAddition() throws Exception {
+    ZephyrWalletFull wallet = inMemoryWallet();
+    assertEquals(0, field(wallet, "coreListenerCalls"), "core listener calls before the first addListener()");
+    Recorder first = new Recorder();
+    wallet.addListener(first);
+    assertEquals(1, field(wallet, "coreListenerCalls"), "core listener calls after the first addListener()");
+    for (int i = 0; i < 1000; i++) {
+      wallet.removeListener(first);
+      wallet.addListener(first);
+    }
+    wallet.addListener(new ZephyrWalletListener() {
+      @Override public void onNewBlock(long height) {
+        wallet.removeListener(this); // the last listener, from inside its callback: delivery off
+      }
+    });
+    wallet.removeListener(first);
+    assertEquals(null, deliverNewBlock(wallet), "the callback threw");
+    assertEquals(Boolean.FALSE, field(wallet, "listenerDelivery"), "delivering after the last listener removed itself");
+    wallet.addListener(first);
+    assertEquals(Boolean.TRUE, field(wallet, "listenerDelivery"));
+    assertEquals(1, field(wallet, "coreListenerCalls"), "core listener calls after 2,003 delivery switches");
+  }
+
+  /**
    * The delivery switch follows the Java listener set when several threads add and remove
    * listeners at once, some of them from inside callbacks: after every interleaving it is on
    * exactly while the set is not empty.

@@ -616,6 +616,11 @@ public class ClosingChild {
    * JVM must not crash; the toggled listener receives callbacks while it is registered. The
    * wallet's first listener is added (and removed) before startSyncing(), as the Javadoc of
    * addListener() asks: that first addition is the one change of the core's set that remains.
+   *
+   * <p>A smoke test: a crash shows the race, a pass does not prove it absent (without a memory
+   * checker, a copy of a one-element set taken during a change mostly survives). That later
+   * switches never call the core's set is proven offline, by the native listener's own count
+   * ({@code TestWalletClosing.coreListenerSetIsCalledOnlyByTheFirstAddition}).</p>
    */
   private static void churn(String path) throws Exception {
     ZephyrWalletFull wallet = open(path);

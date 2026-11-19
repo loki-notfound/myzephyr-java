@@ -273,8 +273,9 @@ struct wallet_jni_listener : public monero_wallet_listener {
   jobject jlistener;
   std::atomic<bool> delivering; // whether callbacks reach Java; written by setListenerJni and closeJni
   bool in_core;                 // whether it is in the core's listeners; used by setListenerJni only (under Java's listening lock)
+  int core_calls;               // calls of the core's add_listener and remove_listener for it (setListenerJni only); its result, for the tests
 
-  wallet_jni_listener(JNIEnv* env, jobject listener) : delivering(false), in_core(false) {
+  wallet_jni_listener(JNIEnv* env, jobject listener) : delivering(false), in_core(false), core_calls(0) {
     jlistener = env->NewGlobalRef(listener);
   }
 
@@ -805,32 +806,34 @@ JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getAddressIndexJni
  * once per wallet, and a Java listener removed from inside a callback cannot delete the native
  * listener that is delivering that callback. Delivery is switched on only after the addition, so
  * nothing the core delivers from inside add_listener reaches Java on the caller's thread. Every
- * other call only sets delivering, without calling the core. A failed addition is undone in the
- * core and leaves the listener out of the core's listeners (and freed at close); the next call
- * with delivering on tries the addition again. Called by Java under its listening lock.
+ * other call only sets delivering, without calling the core. A failed addition is not undone: the
+ * core's remove_listener would change the set a second time, and the listener may stay in it,
+ * inert while delivering is off, until closeJni deletes it after the core; the next call with
+ * delivering on calls add_listener again, whose insertion of a listener already in the set changes
+ * nothing. Called by Java under its listening lock. Returns how often the core's add_listener and
+ * remove_listener were called for this listener (0 without one), which only the tests read: after
+ * the first addition it must not grow.
  */
-JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_setListenerJni(JNIEnv *env, jobject instance, jobject jlistener, jboolean delivering) {
+JNIEXPORT jint JNICALL Java_zephyr_wallet_ZephyrWalletFull_setListenerJni(JNIEnv *env, jobject instance, jobject jlistener, jboolean delivering) {
   MTRACE("Java_zephyr_wallet_ZephyrWalletFull_setListenerJni");
   wallet_jni_listener* listener = get_handle<wallet_jni_listener>(env, instance, JNI_LISTENER_HANDLE);
   try {
     if (listener == nullptr) {
-      if (delivering != JNI_TRUE || jlistener == nullptr) return;
+      if (delivering != JNI_TRUE || jlistener == nullptr) return 0;
       listener = new wallet_jni_listener(env, jlistener);
       env->SetLongField(instance, get_handle_field(env, instance, JNI_LISTENER_HANDLE), reinterpret_cast<jlong>(listener));
     }
     if (delivering == JNI_TRUE && !listener->in_core) {
       monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
-      try {
-        wallet->add_listener(*listener);
-      } catch (...) {
-        try { wallet->remove_listener(*listener); } catch (...) { } // not left in the core's listeners
-        throw;
-      }
+      ++listener->core_calls;
+      wallet->add_listener(*listener); // on failure: thrown below, in_core and delivering stay false
       listener->in_core = true;
     }
     listener->delivering.store(delivering == JNI_TRUE, std::memory_order_release);
+    return listener->core_calls;
   } catch (...) {
     rethrow_cpp_exception_as_java_exception(env);
+    return 0;
   }
 }
 

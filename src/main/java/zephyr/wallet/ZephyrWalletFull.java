@@ -105,7 +105,8 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   private final Object closeLock = new Object(); // one close() at a time
   private final Object listening = new Object(); // a change of the listener set and the native listener's delivery switch, together
   private boolean listenerDelivery;              // whether the native listener passes callbacks to Java; guarded by listening
-  
+  private int coreListenerCalls;                 // calls of the core's listener set by the native listener, as setListenerJni reports them; read by the tests only; guarded by listening
+
   /**
    * Private constructor with a handle to the memory address of the wallet in c++.
    * 
@@ -2512,7 +2513,7 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
   
   private native String decodeIntegratedAddressJni(String integratedAddress);
   
-  private native void setListenerJni(WalletJniListener listener, boolean delivering);
+  private native int setListenerJni(WalletJniListener listener, boolean delivering); // returns the native listener's calls of the core's listener set
   
   private native Object[] syncJni(long startHeight);
   
@@ -2988,14 +2989,16 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
    * The first switch on creates the native listener and adds it to the core's listeners; it stays
    * there until close(), so the core's listener set, which its sync thread copies without a lock,
    * changes once per wallet at most (not on every change from no listener to one, and never by a
-   * removal). Called holding the listening lock, inside the call lock. A callback's thread that
-   * waits for the lock waits only for a switch: callbacks reach Java only once the native listener
-   * was added and switched on, so the one call into the core (that first addition) is over by then.
+   * removal; a failed first addition is not undone, and is tried again by the next switch on, an
+   * insertion that finds the listener in the set already when the failure came after it). Called
+   * holding the listening lock, inside the call lock. A callback's thread that waits for the lock
+   * waits only for a switch: callbacks reach Java only once the native listener was added and
+   * switched on, so the one call into the core (that first addition) is over by then.
    */
   private void updateDelivery() {
     boolean wanted = !listeners.isEmpty();
     if (wanted == listenerDelivery) return;
-    setListenerJni(jniListener, wanted);
+    coreListenerCalls = setListenerJni(jniListener, wanted);
     listenerDelivery = wanted;
   }
 

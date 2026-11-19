@@ -129,7 +129,7 @@ JNIEXPORT jlong JNICALL Java_zephyr_wallet_ZephyrWalletFull_getDaemonMaxPeerHeig
 
 JNIEXPORT jlong JNICALL Java_zephyr_wallet_ZephyrWalletFull_getHeightByDateJni(JNIEnv *, jobject, jint, jint, jint);
 
-JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_setListenerJni(JNIEnv *, jobject, jobject, jboolean);
+JNIEXPORT jint JNICALL Java_zephyr_wallet_ZephyrWalletFull_setListenerJni(JNIEnv *, jobject, jobject, jboolean);
 
 JNIEXPORT jobjectArray JNICALL Java_zephyr_wallet_ZephyrWalletFull_syncJni(JNIEnv *, jobject, jlong);
 
