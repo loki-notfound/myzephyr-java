@@ -208,7 +208,7 @@ password.". `changePassword` saves the wallet, so it follows the rules of `save(
 ## When to save
 
 `save()` writes the cache to the wallet's files. The keys file is written when the wallet is
-created, moved or its password changed. A cache that was not saved only
+created, moved, made multisig or its password changed. A cache that was not saved only
 costs a re-sync of the blocks since the last save. But transaction notes and the secret keys of
 sent transactions exist only in the cache. Save, or with bytes call `getData()` and store the
 arrays again:

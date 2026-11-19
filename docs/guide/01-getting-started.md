@@ -10,9 +10,10 @@ store yourself.
 
 ## What zephyr-java does and does not do
 
-The full wallet, `ZephyrWalletFull`, is the complete API. With real funds on mainnet, releases up
-to `2.3.0-sec.2-java.4` (2026-11-06 to 2026-11-10) created, opened and synced wallets, showed
-balances per asset, sent transfers, converted ZPH to ZRS and swept accounts. `2.3.0-sec.2-java.5`
+The full wallet, `ZephyrWalletFull`, is the complete API. During the work on the releases up to
+`2.3.0-sec.2-java.4` (2026-11-06 to 2026-11-10), zephyr-java ran on mainnet with real funds. It
+created, opened and synced wallets, showed balances per asset, sent transfers, converted ZPH to
+ZRS and swept accounts. `2.3.0-sec.2-java.5`
 was tested read-only: it has not sent, converted or swept
 ([What was tested](13-known-limitations.md#what-was-tested)). The wallet also reports the state of
 the reserve ([Conversions and the reserve](08-conversions-and-the-reserve.md)).
@@ -134,7 +135,8 @@ version. A developer build made on a newer host has that host's glibc as its flo
 | `ZephyrTls` | `zephyr.common` | the root certificates the native wallet trusts |
 
 Wallet calls block the calling thread. Listener callbacks arrive on the core's thread, or on a
-thread inside a call that syncs or relays; [Threads and listeners](04-threads-and-listeners.md)
+thread inside a call that syncs, scans, imports, relays or reads the pool;
+[Threads and listeners](04-threads-and-listeners.md)
 has the rules. Amounts are
 `BigInteger` atomic units, 10^12 per coin ([Amounts](05-assets-and-balances.md#amounts)).
 
