@@ -29,9 +29,9 @@ dependencies {
 > Maven metadata; nothing reads it at run time.
 
 A project whose repositories do not include `mavenCentral()` adds it where the others are
-declared: with `repositoriesMode` set to `FAIL_ON_PROJECT_REPOS`, as in Android Studio's template,
-that is the settings file, since a `repositories { }` block in a module's build file then stops
-the build.
+declared. With `repositoriesMode` set to `FAIL_ON_PROJECT_REPOS`, as in Android Studio's template,
+that is the settings file. A `repositories { }` block in a module's build file then stops the
+build.
 
 The same in the Groovy DSL (`app/build.gradle`):
 
@@ -59,7 +59,7 @@ zephyr-java-android = { module = "dev.lateo:zephyr-java-android", version.ref = 
 The AAR is published as `zephyr-java-android` (the JAR for the JVM is `zephyr-java`). It brings
 three dependencies: Jackson (`jackson-core`, `jackson-databind`, 2.13.5) and the Apache HTTP client
 5 (`httpclient5` 5.2.1, used by the RPC classes). It brings no Kotlin standard library, no Bouncy
-Castle and no Apache commons-codec. jeromq is compile-only
+Castle, no Apache commons-codec and, from `2.3.0-sec.2-java.5` on, no jeromq
 ([Dependencies](11-the-rpc-classes.md#dependencies)).
 
 ### Jackson on API 24 and 25
@@ -97,16 +97,21 @@ other library that stays on Jackson 2.13. On Android zephyr-java has run with 2.
   against the AAR with AGP 9.5.0 passes `zipalign -c -P 16`, with the libraries stored.
 
 **Size.** The libraries are stored uncompressed, so each ABI adds its library's full size to the
-APK. The libraries in the `2.3.0-sec.2-java.4` AAR:
+APK. From `2.3.0-sec.2-java.5` on, the natives carry no Trezor code and no protobuf, which makes
+them 19 to 20 % smaller ([Build-layer patches](14-building-and-verifying.md#build-layer-patches)).
+The libraries of a release build of the `2.3.0-sec.2-java.5` sources on 2026-11-19, against those
+of the `2.3.0-sec.2-java.4` AAR:
 
-| ABI | Bytes | MB | MiB | Compressed inside the AAR |
-|---|---|---|---|---|
-| `arm64-v8a` | 20,141,000 | 20.14 | 19.21 | 7,484,104 bytes |
-| `armeabi-v7a` | 18,019,980 | 18.02 | 17.19 | 7,165,617 bytes |
-| `x86_64` | 23,897,880 | 23.90 | 22.79 | 8,590,609 bytes |
+| ABI | Bytes | MB | MiB | Compressed inside the AAR | `java.4`: bytes | `java.4`: compressed |
+|---|---|---|---|---|---|---|
+| `arm64-v8a` | 16,058,024 | 16.06 | 15.31 | 6,013,648 bytes | 20,141,000 | 7,484,104 bytes |
+| `armeabi-v7a` | 14,559,540 | 14.56 | 13.89 | 5,949,224 bytes | 18,019,980 | 7,165,617 bytes |
+| `x86_64` | 19,013,608 | 19.01 | 18.13 | 7,096,048 bytes | 23,897,880 | 8,590,609 bytes |
 
-So each ABI adds about 20 MB for `arm64-v8a`, 18 MB for `armeabi-v7a` and 24 MB for `x86_64`. The
-size of a finished APK or of a Play delivery was not measured.
+That build came before the last changes to the JNI bridge, so the release's own libraries can
+differ slightly; its AAR shows them. So each ABI adds about 16 MB for `arm64-v8a`, 15 MB for
+`armeabi-v7a` and 19 MB for `x86_64`. The size of a finished APK or of a Play delivery was not
+measured.
 
 An app built as an Android App Bundle reaches each device from Google Play with the library of that
 device's ABI only. The Android documentation, "About Android App Bundles", describes it. An APK you distribute
@@ -120,21 +125,22 @@ android {
 }
 ```
 
-The `x86_64` library ran on the Android emulator; the ARM libraries had not run on hardware by
-release `2.3.0-sec.2-java.4` ([What was tested](13-known-limitations.md#what-was-tested)).
+The `x86_64` library of earlier releases ran on the Android emulator; the ARM libraries have not
+run on hardware. For `2.3.0-sec.2-java.5` nothing had run on Android when this section was
+written, on 2026-11-19 ([What was tested](13-known-limitations.md#what-was-tested)).
 
 ## The RPC classes below API 26
 
-`ZephyrDaemonRpc` and `ZephyrWalletRpc` send their requests through the Apache HTTP client, which
-needs `java.time`; Android has it from API 26 (8.0). On API 24 and 25 every request throws a
-`ZephyrError` with the `NoClassDefFoundError` in its causes:
+`ZephyrDaemonRpc` sends its requests through the Apache HTTP client, which needs `java.time`;
+Android has it from API 26 (8.0). On API 24 and 25 every request throws a `ZephyrError` with the
+`NoClassDefFoundError` in its causes:
 
 ```text
-The RPC classes need java.time: Android 8.0 (API 26) or newer, or core library desugaring in the app (user guide, chapter 6)
+The RPC classes need java.time: Android 8.0 (API 26) or newer, or core library desugaring in the app (user guide, "The RPC classes below API 26")
 ```
 
-Releases up to `2.3.0-sec.2-java.4` print "chapter 6" in that message; the section it means is
-this one. Later releases name this section instead.
+The section it names is this one. Releases up to `2.3.0-sec.2-java.4` print "chapter 6" in its
+place; they mean the same section.
 
 An app with minSdk 24 or 25 that uses the RPC classes enables core library desugaring in the app
 module:
@@ -232,9 +238,14 @@ This block uses Android classes, so it is not compiled with the tests.
 
 While the app is in the background, Android may stop it at any time. Store the wallet when the app
 goes to the background (`onStop`), and stop background syncing (`stopSyncing()`) if you do not
-need it there. Do not close the wallet while a sync may still run
-([Closing a wallet that syncs](04-threads-and-listeners.md#closing-a-wallet-that-syncs)). None of
-the observations of that section were made on Android.
+need it there. A save is not exclusive with background syncing, and `close(true)` is
+([When to save](02-wallets.md#when-to-save)).
+
+`close()` waits for the calls in flight and for the core's sync thread, without a time limit
+([Closing a wallet that syncs](04-threads-and-listeners.md#closing-a-wallet-that-syncs)). Call it
+on a worker thread, never on the main thread. In releases up to `2.3.0-sec.2-java.4`, a `close()`
+while a sync ran could crash the process; let the sync end first there. None of the observations
+of that section were made on Android.
 
 ## Logs
 
@@ -270,9 +281,22 @@ The AAR's `proguard.txt` is applied to every app that uses it. It keeps:
   its exports by class and method name;
 - `ZephyrWalletFull$WalletJniListener` with all members, because the native side looks it up by
   name and calls its five callbacks by name and signature;
+- the two private fields `jniWalletHandle` and `jniListenerHandle` of `ZephyrWalletFull`, under
+  these names, because the native side reads and writes them by name (from `2.3.0-sec.2-java.5`);
 - the model packages `zephyr.wallet.model`, `zephyr.daemon.model` and `zephyr.common`, because
-  Jackson maps the native JSON onto them by reflection;
+  Jackson maps the native JSON onto them by reflection, and the native side throws
+  `zephyr.common.ZephyrError` by name;
 - annotations and generic signatures, which Jackson reads at run time.
+
+From `2.3.0-sec.2-java.5` on it also carries three `-dontwarn` rules: `org.brotli.dec.**`,
+`org.ietf.jgss.**` and `org.slf4j.impl.StaticLoggerBinder`. The Apache HTTP client and its logging
+interface refer to these classes, and neither the AAR nor Android provides them. Without the rules
+an app built with R8 minification stopped with "Missing class" errors, with `2.3.0-sec.2-java.4`
+as well. Observed on 2026-11-19 with AGP 9.5 in R8's full mode: a minified app built against an
+AAR of the `java.5` sources, and the fields and callbacks above kept their names.
+
+The AAR's Android namespace is `dev.lateo.zephyrjava`. It names only the package of the AAR's
+manifest; the Java packages are `zephyr.*`.
 
 Your own listener classes need no rule: the native side calls the library's listener, which calls
 yours through ordinary Java.

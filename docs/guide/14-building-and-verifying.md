@@ -157,20 +157,25 @@ Two builds from the same commit give the same files:
 
 ## Maven Central
 
-The releases are published on Maven Central under `dev.lateo`. The release build writes the
-bundle for it, `dist/<version>/central/` (`bin/make_central_bundle.sh`): both artifacts in Maven
-repository layout (`dev/lateo/zephyr-java/<version>/`, `dev/lateo/zephyr-java-android/<version>/`),
-each with its sources jar, Javadoc jar and POM, the AAR also with its Gradle module metadata, and
-an `.md5`, `.sha1`, `.sha256` and `.sha512` next to every file. Every file is a release file byte
+The releases are published on Maven Central under `dev.lateo`, from `2.3.0-sec.2-java.5` on. The
+release build writes the bundle for it, `dist/<version>/central/` (`bin/make_central_bundle.sh`).
+It holds both artifacts in Maven repository layout (`dev/lateo/zephyr-java/<version>/`,
+`dev/lateo/zephyr-java-android/<version>/`). Each comes with its sources jar, Javadoc jar and POM,
+the AAR also with its Gradle module metadata. An `.md5`, `.sha1`, `.sha256` and `.sha512` lie next
+to every file. Every file is a release file byte
 for byte, except the AAR's Javadoc jar, which is the JAR's under the AAR's name: both compile the
 same sources. The script refuses a `-SNAPSHOT` version and a POM without the fields Central
 requires (name, description, url, licence, developer, scm).
 
 The bundle is not a release asset; `manifest.json` lists its files. The maintainer signs it with
-`bin/sign_central_bundle.sh`, which checks the checksums, refuses when the maintainer key's secret
-key is absent, writes an `.asc` next to every file but the checksums, verifies them and writes the
-zip that is uploaded to the Central Portal. `--dry-run` runs the checks and lists the files without
-signing.
+`bin/sign_central_bundle.sh`. The script checks the checksums and refuses when the maintainer
+key's secret key is absent. It writes an `.asc` next to every file but the checksums, verifies
+them, and writes the zip that is uploaded to the Central Portal. `--dry-run` runs the checks and
+lists the files without signing.
+
+Releases up to `2.3.0-sec.2-java.4` were published under `io.github.loki-notfound` in a Maven
+repository on the project's GitHub Pages. That repository is no longer served; those releases
+remain as GitHub releases with their signed `SHA256SUMS`.
 
 ## Signatures
 
@@ -196,8 +201,9 @@ sha256sum -c SHA256SUMS
 Run `git verify-tag` in a clone of this repository, and the last two commands in the directory of
 the release files. Then compare `core` in `manifest.json` with `bin/pins.env` at the tag. A file
 from Maven Central is checked against its `.asc` the same way, for example
-`gpg --verify zephyr-java-<version>.jar.asc zephyr-java-<version>.jar`; its sha256 is in
-`SHA256SUMS` (the jars, the AAR and the POMs) or in `manifest.json` (`central_bundle`).
+`gpg --verify zephyr-java-<version>.jar.asc zephyr-java-<version>.jar`. Its sha256 is in
+`SHA256SUMS` (the jars, the AAR, the POMs and the AAR's module metadata) or in `manifest.json`
+(`central_bundle`, for the AAR's copy of the Javadoc jar).
 
 ## Reproducing a release
 

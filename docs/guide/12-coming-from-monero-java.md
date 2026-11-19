@@ -33,7 +33,7 @@ The twenty classes you meet first:
 |---|---|
 | `monero.wallet.MoneroWalletFull` | `zephyr.wallet.ZephyrWalletFull` |
 | `monero.wallet.MoneroWallet` | `zephyr.wallet.ZephyrWallet` |
-| `monero.wallet.MoneroWalletRpc` | `zephyr.wallet.ZephyrWalletRpc` |
+| `monero.wallet.MoneroWalletRpc` | none: `zephyr.wallet.ZephyrWalletRpc` was removed in `2.3.0-sec.2-java.5` |
 | `monero.daemon.MoneroDaemonRpc` | `zephyr.daemon.ZephyrDaemonRpc` |
 | `monero.common.MoneroUtils` | `zephyr.common.ZephyrUtils` |
 | `monero.common.MoneroRpcConnection` | `zephyr.common.ZephyrRpcConnection` |
@@ -110,10 +110,16 @@ knows Zephyr's prefixes, which are multi-byte varints: on mainnet, primary addre
 Zephyr core, not Monero's 12. Keccak-256 and hex are the library's own code (`Keccak256`,
 `GenUtils`), so there is no dependency on Bouncy Castle or Apache commons-codec.
 
-**Amounts.** `ZephyrUtils.toAtomicUnits(double)` converts through a `double` and fails or truncates
-for some values; use `BigDecimal` ([Amounts](05-assets-and-balances.md#amounts)).
+**Amounts.** `ZephyrUtils.toAtomicUnits(double)` converts through a `double` and drops decimals
+beyond the twelfth; up to `2.3.0-sec.2-java.4` it also failed for some values. Use `BigDecimal`
+([Amounts](05-assets-and-balances.md#amounts)).
 
-**The RPC classes are a first pass**, for the base coin only ([The RPC classes](11-the-rpc-classes.md)).
+**Exceptions.** From `2.3.0-sec.2-java.5` on, every call of `ZephyrWalletFull` and `ZephyrUtils`
+throws `ZephyrError`. Releases up to `2.3.0-sec.2-java.4` let some core failures through as
+`java.lang.Exception` ([Errors and exceptions](09-errors.md)).
+
+**No wallet RPC client.** `ZephyrWalletRpc` was removed in `2.3.0-sec.2-java.5`; `ZephyrDaemonRpc`
+stays ([The RPC classes](11-the-rpc-classes.md)).
 
 ## Both libraries in one program
 

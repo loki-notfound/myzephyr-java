@@ -19,8 +19,9 @@ Outside its scope, or not ready:
 
 - **macOS and Windows.** Their native libraries are not packaged; on those systems you build the
   library yourself ([The native library](#the-native-library)).
-- **The RPC classes.** `ZephyrWalletRpc` and `ZephyrDaemonRpc` are a first pass; `ZephyrWalletRpc`
-  serves the base coin only ([The RPC classes](11-the-rpc-classes.md)).
+- **The RPC classes.** `ZephyrDaemonRpc` reads a node; beyond the node's information and block
+  headers it is not tested. The wallet RPC client, `ZephyrWalletRpc`, was removed in
+  `2.3.0-sec.2-java.5` ([The RPC classes](11-the-rpc-classes.md)).
 - **Testnet and stagenet.** They never reach the rules of the current assets
   ([Network types](02-wallets.md#network-types)).
 - **Conversions other than ZPH → ZRS.** They use the same code path but have not been run on
@@ -100,7 +101,7 @@ If both fail, `loadNativeLibrary()` throws a `ZephyrError`. It carries the first
 suppressed exception, so you see both reasons. `ZephyrUtils.isNativeLibraryLoaded()` tells you
 whether the library is there, and `ZephyrUtils.getVersion()` returns the library's version.
 
-macOS and Windows libraries are not packaged in `2.3.0-sec.2-java.4`. On those systems the
+macOS and Windows libraries are not packaged in `2.3.0-sec.2-java.5`. On those systems the
 library has to be on `java.library.path`, which means building it yourself.
 
 A developer build from a checkout puts the library in `build/`. The Maven test runs point
@@ -126,7 +127,7 @@ version. A developer build made on a newer host has that host's glibc as its flo
 | `ZephyrWalletListener` | `zephyr.wallet.model` | the callbacks for sync progress, blocks, balances and outputs |
 | `ZephyrAssets`, `ZephyrBalance` | `zephyr.wallet.model` | the asset names and a balance per asset |
 | `ZephyrTxConfig`, `ZephyrTxWallet` | `zephyr.wallet.model` | what to send, and the transaction that comes back |
-| `ZephyrError` | `zephyr.common` | the library's exception; some calls let the core's `java.lang.Exception` through instead |
+| `ZephyrError` | `zephyr.common` | the library's exception, which every call of `ZephyrWalletFull` and `ZephyrUtils` throws |
 | `ZephyrUtils` | `zephyr.common` | the native library, address checks, amount helpers |
 | `ZephyrTls` | `zephyr.common` | the root certificates the native wallet trusts |
 
