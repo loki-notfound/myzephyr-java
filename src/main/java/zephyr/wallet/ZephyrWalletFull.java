@@ -625,17 +625,15 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
    * during a {@code sync()}): added while a sync runs, it changes that set under the copy once.
    * Once the native listener is in place, the core does its per-block listener work (a balance
    * check) also while no Java listener is registered; the callbacks then return in the native
-   * layer, before they attach a thread or call into Java.</p>
+   * layer, before they attach a thread or call into Java. On which threads callbacks run, and that
+   * they can run on several threads at once, is described at {@link ZephyrWalletListenerI}.</p>
    *
-   * <p>Callbacks run on the thread of the sync that delivers them (the caller of {@code sync()},
-   * the core's own thread for {@code startSyncing()}) or of a call that relays; callbacks of
-   * different threads can overlap. From inside a callback the wallet can be read, and listeners
-   * added or removed; the calls that cannot run there throw ZephyrError: every {@code sync},
-   * {@code startSyncing}, {@code scanTxs}, {@code rescanSpent}, {@code rescanBlockchain},
-   * {@code makeMultisig}, {@code exchangeMultisigKeys}, every call that relays
-   * ({@code createTx}, {@code createTxs}, {@code sweepUnlocked}, {@code sweepOutput},
-   * {@code sweepDust} with relay; {@code relayTx}, {@code relayTxs}, {@code submitTxs}) and
-   * {@code close}.</p>
+   * <p>From inside a callback the wallet can be read, and listeners added or removed; the calls
+   * that cannot run there throw ZephyrError: every {@code sync}, {@code startSyncing},
+   * {@code scanTxs}, {@code rescanSpent}, {@code rescanBlockchain}, {@code makeMultisig},
+   * {@code exchangeMultisigKeys}, every call that relays ({@code createTx}, {@code createTxs},
+   * {@code sweepUnlocked}, {@code sweepOutput}, {@code sweepDust} with relay; {@code relayTx},
+   * {@code relayTxs}, {@code submitTxs}) and {@code close}.</p>
    */
   @Override
   public void addListener(ZephyrWalletListenerI listener) {

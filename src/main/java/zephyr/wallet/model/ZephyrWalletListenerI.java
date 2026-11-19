@@ -4,6 +4,23 @@ import java.math.BigInteger;
 
 /**
  * Interface to receive wallet notifications.
+ *
+ * <p>The threads callbacks run on (read from the core's code): a callback runs on a thread that is
+ * inside a core call that notifies. That is the core's own background sync thread
+ * ({@code startSyncing()}), or a Java thread inside {@code sync()}, {@code rescanBlockchain()},
+ * {@code scanTxs()}, {@code importMultisigHex()}, {@code importKeyImages()} (on a wallet connected
+ * to a node) or a call that relays ({@code createTx}, {@code createTxs}, {@code sweepUnlocked},
+ * {@code sweepOutput} and {@code sweepDust} with relay; {@code relayTx}, {@code relayTxs},
+ * {@code submitTxs}). {@code onNewBlock} and {@code onSyncProgress} come from a sync (background
+ * syncing, {@code sync()}, {@code rescanBlockchain()}); the other calls deliver output and balance
+ * callbacks. The core queues its notifications in one queue that has no thread of its own: each
+ * of these threads runs queued notifications while it waits for its own, so a callback can run on
+ * another of these threads than the one whose work caused it. Callbacks of different threads can run at the same time: a listener must be
+ * thread-safe (an application with a UI hands the data to its UI thread and returns).
+ * {@code addListener()} and {@code removeListener()} never deliver a callback themselves; a
+ * listener that is added receives the notifications from the next one on, and a listener that is
+ * removed receives none once the callbacks already under way have returned. Which wallet calls a
+ * callback may make is described at {@code ZephyrWalletFull.addListener()}.</p>
  */
 public interface ZephyrWalletListenerI {
   

@@ -631,4 +631,58 @@ public class TestWalletClosing {
     for (ZephyrWalletListener listener : kept) wallet.removeListener(listener);
     assertEquals(Boolean.FALSE, field(wallet, "listenerDelivery"), "delivering with no listener registered");
   }
+
+  /**
+   * Two threads deliver callbacks at the same time (the core's sync thread and a relaying thread
+   * can): every listener receives every callback, each thread's "inside a callback" state is its
+   * own (close() is refused inside the callbacks of both, and the state ends with each thread's
+   * delivery), and nothing escapes.
+   */
+  @Test
+  public void concurrentDeliveriesKeepTheirOwnCallbackState() throws Exception {
+    ZephyrWalletFull wallet = inMemoryWallet();
+    AtomicInteger calls = new AtomicInteger(), refused = new AtomicInteger();
+    wallet.addListener(new ZephyrWalletListener() {
+      @Override public void onNewBlock(long height) {
+        calls.incrementAndGet();
+        try {
+          wallet.close();
+        } catch (ZephyrError e) {
+          refused.incrementAndGet();
+        }
+      }
+    });
+    Object receiver = callbackReceiver(wallet);
+    Method inCallback = receiver.getClass().getDeclaredMethod("inCallback");
+    inCallback.setAccessible(true);
+    int perThread = 2000;
+    CountDownLatch start = new CountDownLatch(1);
+    List<String> failures = new CopyOnWriteArrayList<String>();
+    List<Thread> deliverers = new ArrayList<Thread>();
+    for (int i = 0; i < 2; i++) {
+      Thread deliverer = new Thread(() -> {
+        try {
+          start.await();
+          for (int n = 0; n < perThread; n++) {
+            Throwable t = deliverNewBlock(wallet);
+            if (t != null) failures.add("escaped: " + t);
+          }
+          if ((Boolean) inCallback.invoke(receiver)) failures.add(Thread.currentThread().getName() + " still counts as inside a callback");
+        } catch (Throwable t) {
+          failures.add(t.toString());
+        }
+      }, "deliverer-" + i);
+      deliverer.start();
+      deliverers.add(deliverer);
+    }
+    start.countDown();
+    for (Thread deliverer : deliverers) {
+      deliverer.join(TimeUnit.SECONDS.toMillis(60));
+      assertFalse(deliverer.isAlive(), deliverer.getName() + " still delivering after 60 s");
+    }
+    assertTrue(failures.isEmpty(), "failures: " + failures);
+    assertEquals(2 * perThread, calls.get(), "callbacks received");
+    assertEquals(2 * perThread, refused.get(), "close() refused inside the callbacks");
+    assertFalse(wallet.isClosed());
+  }
 }
