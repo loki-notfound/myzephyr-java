@@ -903,10 +903,11 @@ public class ClosingChild {
 
   /**
    * One call whose core function throws, offline (an in-memory wallet, no node, relay off, nothing
-   * built): the call must throw ZephyrError with the core's message. Up to the bridge change these
-   * exceptions left the native call outside a try block, which ended the process (SIGABRT). The
-   * case "largebinary" must return: the bridge copied the converted bytes through an array on the
-   * native stack, which overflowed (SIGSEGV) for a result of more than about 1 MB.
+   * built): the call must throw ZephyrError with the core's message (for "reserveproof", the
+   * message of the bridge's own conversion of the amount). Up to the bridge change these exceptions
+   * left the native call outside a try block, which ended the process (SIGABRT). The case
+   * "largebinary" must return: the bridge copied the converted bytes through an array on the native
+   * stack, which overflowed (SIGSEGV) for a result of more than about 1 MB.
    */
   private static void coreFailure(String which) throws Exception {
     if (which.equals("largebinary")) {
@@ -942,6 +943,8 @@ public class ClosingChild {
         case "sweepunlocked": expectCoreFailure(which, () -> wallet.sweepUnlocked(tooLarge), unconvertible); break;
         case "sweepoutput": expectCoreFailure(which, () -> wallet.sweepOutput(tooLarge.copy().setKeyImage("00")), unconvertible); break;
         case "paymenturi": expectCoreFailure(which, () -> wallet.getPaymentUri(tooLarge), unconvertible); break;
+        // an amount the bridge itself cannot convert to the core's unsigned 64-bit type
+        case "reserveproof": expectCoreFailure(which, () -> wallet.getReserveProofAccount(0, TWO_TO_THE_64, "message"), "bad lexical cast"); break;
         default: fail("unknown case " + which);
       }
     } finally {

@@ -205,17 +205,19 @@ public class TestWalletExceptions {
   }
 
   /**
-   * The cases of {@link ClosingChild}'s scenario "corefailure", each a call whose core function
-   * throws offline. In releases up to 2.3.0-sec.2-java.4 the exception left the native call outside
-   * a try block and ended the process.
+   * The cases of {@link ClosingChild}'s scenario "corefailure", each a call whose core function, or
+   * the bridge's own conversion of an argument ("reserveproof"), throws offline. In releases up to
+   * 2.3.0-sec.2-java.4 the exception left the native call outside a try block and ended the
+   * process; "largebinary" overflowed the native stack instead.
    */
   private static final List<String> CORE_FAILURES = Collections.unmodifiableList(Arrays.asList(
-      "createsubaddress", "createtx", "createtxfee", "sweepunlocked", "sweepoutput", "paymenturi", "blocks", "largebinary"));
+      "createsubaddress", "createtx", "createtxfee", "sweepunlocked", "sweepoutput", "paymenturi", "blocks", "largebinary",
+      "reserveproof"));
 
   /**
    * A core failure in a native call is a ZephyrError with the core's message, never the end of the
    * process: an account index out of range, a config number above the core's 64-bit range, a block
-   * blob that does not parse; and a large conversion returns. Each case runs in a JVM of its own
+   * blob that does not parse, an amount of 2^64 for a reserve proof; and a large conversion returns. Each case runs in a JVM of its own
    * ({@link ClosingChild}, scenario "corefailure"), since on the code before the change each one
    * ended its process; no node needed. Every case runs; the failures are reported together.
    */
