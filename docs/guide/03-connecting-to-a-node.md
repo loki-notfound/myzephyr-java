@@ -195,6 +195,12 @@ first sync ([When to save](02-wallets.md#when-to-save)).
 `startSyncing(periodInMs)` sets another period; `stopSyncing()` ends it. Listeners added with
 `addListener` receive the events of background syncs too.
 
+`stopSyncing()` returns at once and only asks the core to stop (read in the core's code). The
+batch of blocks in progress still runs. A stop that comes right before a refresh begins is lost,
+and that sync then runs to the node's height before the background thread ends. No call reports
+when it has ended; `close()` waits for it by itself
+([Closing a wallet that syncs](04-threads-and-listeners.md#closing-a-wallet-that-syncs)).
+
 ```java examples/GuideNode.java
 wallet.startSyncing(30000L);
 ```
