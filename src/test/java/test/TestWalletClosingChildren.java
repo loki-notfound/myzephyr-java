@@ -32,8 +32,9 @@ import org.junit.jupiter.api.Test;
  * {@code hs_err} file and prints no "Wallet is closed" on stderr. A child that finds the node or the
  * wallet unfit for its scenario (one that could not fail there) prints "SKIP" with the reason and
  * ends with status {@value ClosingChild#SKIP_STATUS}; the test is then skipped, not passed. The core's threads are attached
- * as daemon threads, so a JVM that exits no longer shows that every callback thread was detached;
- * the background scenarios check the callback threads themselves ({@link ClosingChild}). Every child has a time limit
+ * as daemon threads (once per thread, detached when the thread exits), so a JVM that exits no longer
+ * shows that every callback thread was detached; the background scenarios check the callback threads
+ * themselves, right after close() returned ({@link ClosingChild}). Every child has a time limit
  * ({@value #CHILD_LIMIT_S} s, and {@value #EXIT_LIMIT_S} s from the moment its main returns); one
  * that passes it gets a thread dump (SIGQUIT, where {@code kill} exists), is destroyed and fails.</p>
  *

@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 import java.util.logging.Level;
@@ -2738,12 +2739,16 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     /** Set while this thread delivers a callback of this wallet: close() from there is refused. */
     private final ThreadLocal<Boolean> inCallback = new ThreadLocal<Boolean>();
     
+    /** Callbacks the bridge delivered into Java; read by the tests only (a scan without listeners must make none). */
+    private final AtomicLong upcalls = new AtomicLong();
+    
     boolean inCallback() {
       return Boolean.TRUE.equals(inCallback.get());
     }
     
     /** Runs one notification: reads its data and announces it; nothing escapes. */
     private void deliver(String callback, Runnable notification) {
+      upcalls.incrementAndGet();
       if (isClosed) return; // during or after close(): the notification is dropped
       boolean outermost = !inCallback();
       inCallback.set(Boolean.TRUE);

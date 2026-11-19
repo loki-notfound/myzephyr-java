@@ -42,6 +42,7 @@
 #include <cstring>
 #include <iostream>
 #include <mutex>
+#include <pthread.h>
 #include <thread>
 #include "chacha.h" // TODO: explicitly include because wallet2.h #include "crypto/chacha.h" is ignored
 #include "zephyr_jni_bridge.h"
@@ -153,6 +154,24 @@ extern "C"
 #endif
 
 static JavaVM *cachedJVM;
+
+// Marks the native threads the bridge attached to the JVM; its destructor detaches such a thread
+// when it exits (see attachJVM). Created once, in JNI_OnLoad; without it (creation failed) a thread
+// is attached for one callback at a time.
+static pthread_key_t attached_thread_key;
+static bool attached_thread_key_created = false;
+
+// The key's destructor: runs when a thread the bridge attached exits, after its start routine has
+// returned, so no Java or JNI frame is on its stack (the core's threads end by returning from their
+// function; nothing calls pthread_exit from inside a callback). The value is the JavaVM, which lives
+// as long as the process (HotSpot's is a static object, ART's runtime is never destroyed in an app);
+// once a JVM has been destroyed, GetEnv reports the thread as detached and nothing is called. A
+// thread that is no longer attached (detached by someone else meanwhile) is left alone.
+static void detach_attached_thread(void* value) {
+  JavaVM* jvm = static_cast<JavaVM*>(value);
+  JNIEnv* env = nullptr;
+  if (jvm != nullptr && jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) == JNI_OK) jvm->DetachCurrentThread();
+}
 //static jclass class_ArrayList;
 static jclass class_WalletListener;
 //static jclass class_TransactionInfo;
@@ -161,6 +180,7 @@ static jclass class_WalletListener;
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *jvm, void *reserved) {
   cachedJVM = jvm;
+  if (!attached_thread_key_created) attached_thread_key_created = pthread_key_create(&attached_thread_key, detach_attached_thread) == 0;
   JNIEnv *env;
   if (jvm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6) != JNI_OK) {
     return -1;
@@ -187,16 +207,24 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *jvm, void *reserved) {
 }
 #endif
 
-// Attaches a native thread of the core (the background sync thread) for the length of one
-// callback, as a daemon thread: should a thread ever stay attached, it cannot keep the JVM alive.
-// Returns the thread's state before (JNI_OK: attached already, JNI_EDETACHED: attached now), or
-// JNI_ERR.
+// Gives the current thread a JNIEnv for a callback. A native thread of the core (the background
+// sync thread) is attached once, on its first callback, as a daemon thread (it cannot keep the JVM
+// alive), and stays attached until it exits: the key's destructor detaches it then, so a thread
+// that ends is never left attached. The core's close() joins its sync thread, whose exit detaches
+// it, so that thread is detached before close() returns. (Attaching and detaching for every
+// callback meant thousands of attaches per second during a scan, each one a new java.lang.Thread.)
+// Only threads attached here carry the key: a thread that was attached already (a Java thread
+// inside sync() or a relaying call, or a thread another library attached) is never detached by the
+// bridge. Returns JNI_OK when the thread is attached for its lifetime (now or before),
+// JNI_EDETACHED when it is attached for this callback only (the key could not be created or set;
+// detachJVM() then detaches it), JNI_ERR when it cannot be attached.
 int attachJVM(JNIEnv **env) {
   int envStat = cachedJVM->GetEnv((void **) env, JNI_VERSION_1_6);
   if (envStat == JNI_EDETACHED) {
     if (cachedJVM->AttachCurrentThreadAsDaemon((void **) env, nullptr) != 0) {
       return JNI_ERR;
     }
+    if (attached_thread_key_created && pthread_setspecific(attached_thread_key, cachedJVM) == 0) return JNI_OK;
   } else if (envStat == JNI_EVERSION) {
     return JNI_ERR;
   }
@@ -204,7 +232,7 @@ int attachJVM(JNIEnv **env) {
 }
 
 // Ends a callback: a pending Java exception is printed and cleared (nothing is rethrown into the
-// core), then a thread attached by attachJVM() is detached again.
+// core), then a thread attached for this callback only (JNI_EDETACHED) is detached again.
 void detachJVM(JNIEnv *env, int envStat) {
   if (env->ExceptionCheck()) {
     env->ExceptionDescribe(); // prints and clears
@@ -217,8 +245,8 @@ void detachJVM(JNIEnv *env, int envStat) {
 }
 
 // The end of every callback, also when the core's data throws a C++ exception on the way: declared
-// right after attachJVM(), it runs last (detachJVM()), so a callback never leaves its thread
-// attached.
+// right after attachJVM(), it runs last (detachJVM()), so a callback never leaves an exception
+// pending, nor a thread attached for that callback only.
 struct callback_scope {
   JNIEnv* env;
   int envStat;
@@ -226,9 +254,10 @@ struct callback_scope {
   ~callback_scope() { detachJVM(env, envStat); }
 };
 
-// The local references a callback makes, deleted before it returns (before callback_scope
-// detaches): the callbacks of a foreground sync run inside the syncJni native frame, where local
-// references would otherwise pile up until sync() returns.
+// The local references a callback makes, deleted before it returns (before callback_scope ends
+// it): the callbacks of a foreground sync run inside the syncJni native frame, and an attached
+// native thread of the core has no native frame at all, so local references would otherwise pile
+// up until sync() returns or the thread exits.
 struct callback_local_refs {
   JNIEnv* env;
   std::vector<jobject> refs;

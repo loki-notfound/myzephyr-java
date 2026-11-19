@@ -38,11 +38,12 @@ import zephyr.wallet.model.ZephyrWalletListener;
 /**
  * The program {@link TestWalletClosingChildren} runs in a JVM of its own, one scenario per run.
  * Success is the JVM ending by itself after main returns, which is what the parent checks. The
- * core's own threads are attached to the JVM as daemon threads for each callback, so a thread left
- * attached would no longer keep the JVM alive: the background scenarios check the callback
- * threads themselves instead (each callback's {@code java.lang.Thread} must have ended once
- * {@code close()} has returned, which it does only when the bridge detached it). A scenario that
- * sees something wrong prints a line starting with "FAIL" and exits with status 2.
+ * core's own threads are attached to the JVM as daemon threads (once per thread, on its first
+ * callback, and detached when the thread exits), so a thread left attached would no longer keep
+ * the JVM alive: the background scenarios check the callback threads themselves instead (each
+ * callback thread's {@code java.lang.Thread} must have ended as soon as {@code close()} has
+ * returned, which it does only when the bridge detached it). A scenario that sees something wrong
+ * prints a line starting with "FAIL" and exits with status 2.
  *
  * <p>Arguments: the scenario, then the wallet path (the keys file of a wallet without a cache,
  * so it scans from its restore height), except for "silent", "freedclose" and "corefailure" (which
@@ -183,11 +184,13 @@ public class ClosingChild {
   }
 
   /**
-   * The background scenarios, after close() returned: every thread that delivered a callback of
-   * the core's sync thread must have ended. The bridge attaches that native thread for each
-   * callback and detaches it at the callback's end, which ends the callback's java.lang.Thread; a
-   * thread left attached stays alive (as a daemon thread it no longer keeps the JVM from exiting,
-   * so the JVM's exit does not show it).
+   * The background scenarios, right after close() returned: every thread that delivered a callback
+   * of the core's sync thread must have ended. The bridge attaches that native thread once, on its
+   * first callback, and detaches it when the thread exits; the core's close() joins that thread, so
+   * the detach has happened before close() returns, and a detached thread's java.lang.Thread has
+   * ended. A thread left attached stays alive (as a daemon thread it no longer keeps the JVM from
+   * exiting, so the JVM's exit does not show it). The count of distinct callback threads shows how
+   * often the bridge attached a thread.
    *
    * <p>The scenarios that use it make no wallet call on their own threads that could deliver a
    * callback (no sync, scan, relay or pool read there; addListener() and removeListener() never
@@ -206,6 +209,17 @@ public class ClosingChild {
     log("all " + checked + " callback thread(s) ended");
   }
 
+  /** Threads the JVM started or had attached so far (every attach of a native thread counts). */
+  private static long threadsStarted() {
+    return ManagementFactory.getThreadMXBean().getTotalStartedThreadCount();
+  }
+
+  /** How many threads were started or attached during a scan that delivered callbacks. */
+  private static void logThreadsStarted(long before, Counting listener) {
+    int callbacks = listener.progress.get() + listener.blocks.get() + listener.balances.get() + listener.received.get() + listener.spent.get();
+    log("THREADS-STARTED " + (threadsStarted() - before) + " during the scan, for " + callbacks + " callbacks on " + listener.threads.size() + " distinct callback thread(s)");
+  }
+
   private static void threads(String when) {
     List<String> names = new ArrayList<String>();
     for (Thread t : Thread.getAllStackTraces().keySet()) names.add(t.getName() + (t.isDaemon() ? "(d)" : ""));
@@ -219,6 +233,7 @@ public class ClosingChild {
     long daemonHeight = wallet.getDaemonHeight();
     Counting listener = new Counting(target);
     wallet.addListener(listener);
+    long started = threadsStarted();
     wallet.startSyncing(1000L);
     log("startSyncing(1000) returned");
     long end = System.currentTimeMillis() + WAIT_MS;
@@ -231,9 +246,10 @@ public class ClosingChild {
     threads("before stop");
     wallet.stopSyncing();
     timedClose(wallet);
+    assertCallbackThreadsEnded(listener.threads);
+    logThreadsStarted(started, listener);
     log("after close: " + listener.counts());
     threads("after close");
-    assertCallbackThreadsEnded(listener.threads);
   }
 
   /**
@@ -277,17 +293,19 @@ public class ClosingChild {
     ZephyrWalletFull wallet = open(path);
     Counting listener = new Counting("none");
     wallet.addListener(listener);
+    long started = threadsStarted();
     wallet.startSyncing(1000L);
     awaitFirstProgress(listener);
     log("before close: height " + wallet.getHeight() + "; " + listener.counts());
     timedClose(wallet);
+    assertCallbackThreadsEnded(listener.threads);
+    logThreadsStarted(started, listener);
     int before = listener.progress.get() + listener.blocks.get();
     Thread.sleep(2000);
     int after = listener.progress.get() + listener.blocks.get();
     if (after != before) fail((after - before) + " callbacks after close() returned");
     log("after close: " + listener.counts());
     threads("end");
-    assertCallbackThreadsEnded(listener.threads);
   }
 
   /** stopSyncing() directly followed by close(), during a busy background scan. */
@@ -478,6 +496,7 @@ public class ClosingChild {
     wallet.close(true);
     long end = System.currentTimeMillis();
     log("CLOSE-WAIT-MS " + (end - start));
+    assertCallbackThreadsEnded(listener.threads);
     releaser.join();
     if (!cache.isFile()) fail("no wallet file after close(true)");
     long written = cache.lastModified();
@@ -491,7 +510,6 @@ public class ClosingChild {
         + (height == heldAt.get() + 1 ? " (the held block ended its batch)" : ""));
     if (height <= restoreHeight) fail("the saved wallet holds no scanned block: height " + height);
     if (height < heldAt.get() + 1) fail("the saved wallet ends at height " + height + ", below the block the listener held the refresh at (" + heldAt.get() + ")");
-    assertCallbackThreadsEnded(listener.threads);
   }
 
   private interface Call {
@@ -568,10 +586,12 @@ public class ClosingChild {
   }
 
   /**
-   * W1: a listener added and removed again leaves no native listener registered with the core, so a
-   * background scan with no listener makes no callback upcalls. Every upcall from the core's thread
-   * attaches it as a new java.lang.Thread, so the count of threads the JVM started during the scan
-   * shows them. A listener added during the scan receives callbacks again.
+   * W1: a listener added and removed again leaves the native listener switched off, so a background
+   * scan with no listener makes no callback upcalls: the wallet's own count of the callbacks that
+   * reached Java (read by reflection) must not grow during that scan. The count of threads the JVM
+   * started during the scan, which showed the upcalls while the bridge attached a thread for every
+   * callback, is still logged and limited; with one attach per thread it can no longer show them.
+   * A listener added during the scan receives callbacks again.
    */
   private static void w1(String path) throws Exception {
     ZephyrWalletFull wallet = open(path);
@@ -582,6 +602,7 @@ public class ClosingChild {
     wallet.removeListener(removed);
     ThreadMXBean threadBean = ManagementFactory.getThreadMXBean();
     long startedBefore = threadBean.getTotalStartedThreadCount();
+    long upcallsBefore = upcalls(wallet);
     wallet.startSyncing(1000L);
     long target = Math.min(from + 2500, daemonHeight - 1);
     long end = System.currentTimeMillis() + WAIT_MS;
@@ -590,8 +611,9 @@ public class ClosingChild {
       Thread.sleep(50);
     }
     long started = threadBean.getTotalStartedThreadCount() - startedBefore;
+    long upcalls = upcalls(wallet) - upcallsBefore;
     long scanned = wallet.getHeight() - from;
-    log("W1-THREADS-STARTED " + started + " while " + scanned + " blocks were scanned with no listener registered");
+    log("W1-THREADS-STARTED " + started + " and W1-UPCALLS " + upcalls + " while " + scanned + " blocks were scanned with no listener registered");
     Counting added = new Counting("none");
     wallet.addListener(added);
     awaitFirstProgress(added);
@@ -600,10 +622,21 @@ public class ClosingChild {
     wallet.stopSyncing();
     timedClose(wallet);
     if (removed.progress.get() + removed.blocks.get() + removed.balances.get() > 0) fail("the removed listener got callbacks: " + removed.counts());
+    if (upcalls > 0) fail(upcalls + " callbacks reached Java during a scan of " + scanned + " blocks with no listener: the native listener kept delivering");
     if (started > W1_THREAD_LIMIT) fail(started + " threads started during a scan of " + scanned + " blocks with no listener: the native listener stayed registered with the core");
     // main added and removed the listeners, during the scan too: neither call delivers a callback itself
     if (added.threads.contains(Thread.currentThread()) || removed.threads.contains(Thread.currentThread())) fail("a callback was delivered on main, inside its own addListener() or removeListener()");
     assertCallbackThreadsEnded(added.threads);
+  }
+
+  /** The wallet's count of callbacks the bridge delivered into Java (a private field, for the tests only). */
+  private static long upcalls(ZephyrWalletFull wallet) throws Exception {
+    Field listenerField = ZephyrWalletFull.class.getDeclaredField("jniListener");
+    listenerField.setAccessible(true);
+    Object listener = listenerField.get(wallet);
+    Field upcallsField = listener.getClass().getDeclaredField("upcalls");
+    upcallsField.setAccessible(true);
+    return ((AtomicLong) upcallsField.get(listener)).get();
   }
 
   /**
