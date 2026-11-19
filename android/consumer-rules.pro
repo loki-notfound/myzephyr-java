@@ -34,3 +34,13 @@
 # Jackson reads its annotations (@JsonProperty, @JsonIgnore, ...) and the generic signatures of
 # fields and methods (List<ZephyrOutput>, Map<String, BigInteger>) at run time.
 -keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
+
+# The Apache HTTP client (httpclient5, used by the RPC classes) and slf4j-api refer to classes that
+# neither the AAR nor Android provides: Brotli decompression (an optional dependency of
+# httpclient5), Kerberos/SPNEGO authentication (org.ietf.jgss, part of the desktop JDK only) and
+# slf4j 1.7's static binding (supplied by a logging backend when there is one; without it slf4j
+# falls back to its no-operation logger). zephyr-java uses none of them. Without these rules a
+# minified app build stops in R8 with "Missing class" errors (seen with AGP 9.5, R8 full mode).
+-dontwarn org.brotli.dec.**
+-dontwarn org.ietf.jgss.**
+-dontwarn org.slf4j.impl.StaticLoggerBinder
