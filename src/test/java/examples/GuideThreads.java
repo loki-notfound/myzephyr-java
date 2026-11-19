@@ -4,6 +4,8 @@ import java.math.BigInteger;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import zephyr.wallet.ZephyrWalletFull;
 import zephyr.wallet.model.ZephyrWalletListener;
@@ -39,13 +41,23 @@ public class GuideThreads {
     });
   }
 
-  // one thread per wallet: every call goes through it, so close() never runs during sync();
-  // background syncing must have been stopped, and its scan finished, before
+  // one thread per wallet: it syncs on a schedule and saves between two syncs, so a save never
+  // meets a refresh (background syncing is not used)
+  static void syncOnWalletThread(ScheduledExecutorService walletThread, ZephyrWalletFull wallet) {
+    walletThread.scheduleWithFixedDelay(() -> {
+      try {
+        wallet.sync();
+        wallet.save();  // between two syncs on this thread: no refresh runs
+      } catch (Exception e) {
+        logError(e);    // an exception that left the task would end the schedule
+      }
+    }, 0, 30, TimeUnit.SECONDS);
+  }
+
+  // closing on the wallet thread: close(true) stops a sync, waits for the calls in flight and the
+  // core's background sync thread, then saves and closes
   static Future<?> closeOnWalletThread(ExecutorService walletThread, ZephyrWalletFull wallet) {
-    return walletThread.submit(() -> {
-      wallet.save();   // runs after a sync() submitted earlier has returned
-      wallet.close();
-    });
+    return walletThread.submit(() -> wallet.close(true));
   }
 
   // a listener that notes when the last callback came; add it before startSyncing()
@@ -60,7 +72,9 @@ public class GuideThreads {
     return lastCallbackMillis;
   }
 
-  // background syncing, a workaround: stop it, wait until no callback has come for a while, then close
+  // releases up to 2.3.0-sec.2-java.4 only, a workaround for background syncing: stop it, wait until
+  // no callback has come for a while, then close (2.3.0-sec.2-java.5 refuses save() in a callback
+  // and makes close() wait by itself)
   static void stopAndClose(ZephyrWalletFull wallet, AtomicLong lastCallbackMillis, long quietMillis) throws InterruptedException {
     wallet.stopSyncing();  // returns at once; the batch in progress goes on
     while (System.currentTimeMillis() - lastCallbackMillis.get() < quietMillis) {
