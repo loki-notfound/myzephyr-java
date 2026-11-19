@@ -143,9 +143,9 @@ throwable output of most loggers. For a `ZephyrError` without a code, `getMessag
 > [!WARNING]
 > **Up to `2.3.0-sec.2-java.4` the library logged secrets at some settings.** At `FINE` the
 > transaction config and the transactions with their secret keys; from `setLogLevel(2)` request
-> bodies with passwords and mnemonics; and `ZephyrRpcError.toString()` the parameters unredacted,
-> apart from the passwords. Keep `FINE` logging of the library and `setLogLevel` off on those
-> releases.
+> bodies with passwords and mnemonics; and `ZephyrRpcError.toString()` the parameters, passwords
+> included. Keep `FINE` logging of the library and `setLogLevel` off on those releases, and do not
+> log `ZephyrRpcError.toString()`.
 
 What the library logs in `2.3.0-sec.2-java.5` (read in the source):
 
