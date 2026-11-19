@@ -60,8 +60,7 @@ decimal-places message for every conversion pair ([Building a conversion](#build
 Zephyr's stable asset has a reserve of ZPH behind it. Whether a conversion is allowed depends on
 the state of that reserve ([The ten pairs](#the-ten-pairs)), and a wallet app usually shows it.
 Two wallet calls report it: `getReserveInfo()` and `getCirculatingSupply()`. Both ask the node;
-they are not computed from the wallet's own outputs. Both need a connected full wallet;
-`ZephyrWalletRpc` does not support them ([ZephyrWalletRpc](11-the-rpc-classes.md#zephyrwalletrpc)).
+they are not computed from the wallet's own outputs. Both need a full wallet connected to a node.
 
 ## getReserveInfo()
 

@@ -181,8 +181,7 @@ with the transaction key: `checkTxKey` shows neither that the transaction paid t
 the amount. With a proof (`checkTxProof`) it gets the signature check and the confirmations, not
 the amount. *Status:* core behaviour, confirmed on mainnet on 2026-11-07; `checkTxProof`
 uses the same code (read in the code, not tested). A core fix would read the destination asset's
-entry; it is not a security fix, so the backports leave it. Through `ZephyrWalletRpc` the amount
-comes back `null` for a different reason ([ZephyrWalletRpc](11-the-rpc-classes.md#zephyrwalletrpc)).
+entry; it is not a security fix, so the backports leave it.
 
 ## getOutputs() reports no asset
 

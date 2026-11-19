@@ -1,8 +1,8 @@
 # 11. The RPC classes
 
-`ZephyrDaemonRpc` talks to a node's RPC interface, and `ZephyrWalletRpc` to a `zephyr-wallet-rpc`
-process instead of running the wallet in your own process. This chapter covers what each one does
-in `2.3.0-sec.2-java.4`, their errors, their TLS and their dependencies. The full wallet,
+`ZephyrDaemonRpc` talks to a node's RPC interface, through `ZephyrRpcConnection`. This chapter
+covers what it does in `2.3.0-sec.2-java.5`, its errors, its TLS and its dependencies, and the
+wallet RPC client that releases up to `2.3.0-sec.2-java.4` had. The full wallet,
 `ZephyrWalletFull`, is the complete API.
 
 The blocks marked "Java, compiled" in this chapter come from `src/test/java/examples/GuideRpc.java`.
@@ -27,29 +27,17 @@ their pricing record were read from a mainnet node on the desktop, and `ZephyrDa
 mainnet node on the Android emulator. The calls of `ZephyrDaemonRpc` other than the node's
 information and block headers are inherited from monero-java; not tested against Zephyr.
 
-## ZephyrWalletRpc
+## The wallet RPC client was removed
 
-**The RPC classes are a first pass.** `ZephyrWalletRpc` serves the base coin. Its per-asset
-balance calls, the per-subaddress balance map, `getReserveInfo` and `getCirculatingSupply` throw a
-`ZephyrError` until the port to `zephyr-wallet-rpc` is done, for example:
+Releases up to `2.3.0-sec.2-java.4` had `ZephyrWalletRpc`, a client for a `zephyr-wallet-rpc`
+process. It was a first pass that served the base coin only. `2.3.0-sec.2-java.5` removes it,
+with `zephyr.common.SslOptions` and the jeromq dependency that only its ZMQ listener used. Nobody
+was known to use it.
 
-```text
-Not supported by ZephyrWalletRpc until the RPC port: reserve info
-```
-
-The other messages end in "per-asset balances", "the per-subaddress balance map" and "circulating
-supply". *Status:* planned work (the port to `zephyr-wallet-rpc`).
-
-Through the RPC classes the two core quirks of the history look different
-([checkTxKey returns amount 0](06-history.md#checktxkey-returns-amount-0),
-[getOutputs() reports no asset](06-history.md#getoutputs-reports-no-asset)).
-`zephyr-wallet-rpc` returns the `checkTxKey` amount per asset and the asset of every output, which
-this first pass does not read. So `getReceivedAmount()` comes back `null` and the outputs carry no
-asset.
-
-**`isClosed()` and error code -13.** monero-java recognises a closed RPC wallet by error code -8
-with "No wallet file"; `zephyr-wallet-rpc` v2.3.0 answers -13. `isClosed()` returned `false` for a
-closed wallet until the fix of 2026-11-07; it now accepts both codes.
+Use `ZephyrWalletFull`, which runs the wallet in your process and has the whole API. An app that
+must talk to a `zephyr-wallet-rpc` process can send its JSON-RPC requests with
+`ZephyrRpcConnection.sendJsonRequest`, which stays. `ZephyrDaemonRpc`, `ZephyrRpcConnection` and
+`ZephyrRpcError` stay as they were.
 
 ## ZephyrRpcError
 
@@ -64,10 +52,10 @@ A failure to connect is not a `ZephyrRpcError`: it arrives as a plain `ZephyrErr
 the cause's text (read in the source). An HTTP error's message holds the HTTP status and the body
 of the answer, which is text from the server.
 
-Its `toString()` appends the method and the parameters as JSON, and the parameters can hold the
-wallet's password or the node's login password
-([Logging safely](09-errors.md#logging-safely)). Catch `ZephyrError` and log the method, the code and
-the message:
+Its `toString()` appends the method and the parameters as JSON. From `2.3.0-sec.2-java.5` on,
+the values of secret parameters such as passwords print as `<redacted>`; `getRpcParams()` still
+holds them ([Logging safely](09-errors.md#logging-safely)). Catch `ZephyrError` and log the
+method, the code and the message:
 
 ```java examples/GuideRpc.java
 if (e instanceof ZephyrRpcError) return "RPC " + ((ZephyrRpcError) e).getRpcMethod() + " failed: " + e.getCode() + " " + e.getMessage();
@@ -76,18 +64,15 @@ return "no RPC answer: " + e.getMessage();  // for example no connection: a plai
 
 ## TLS and Android
 
-The RPC classes use the trust store of the Java runtime. `ZephyrTls` does not affect them; it is
+`ZephyrDaemonRpc` uses the trust store of the Java runtime. `ZephyrTls` does not affect them; it is
 for the native wallet ([TLS to a node](03-connecting-to-a-node.md#tls-to-a-node)).
 
-They send their requests through the Apache HTTP client, which needs `java.time`. On Android below
-API 26 an app needs core library desugaring for them
+It sends its requests through the Apache HTTP client, which needs `java.time`. On Android below
+API 26 an app needs core library desugaring for it
 ([The RPC classes below API 26](10-android.md#the-rpc-classes-below-api-26)).
 
 ## Dependencies
 
 The RPC classes use the Apache HTTP client 5 (`httpclient5` 5.2.1) and Jackson 2.13.5, which both
-artifacts bring.
-
-**jeromq** is a compile-only dependency. Only `ZephyrWalletRpc`'s ZMQ listener uses it; an app that
-uses that listener adds `org.zeromq:jeromq` itself. The shipped R8 rules carry a `-dontwarn` for
-it, so an app without jeromq builds cleanly.
+artifacts bring. The jeromq dependency is gone: up to `2.3.0-sec.2-java.4` it was compile-only,
+for the wallet RPC client's ZMQ listener.
