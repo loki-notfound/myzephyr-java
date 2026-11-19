@@ -34,10 +34,10 @@ and what was not tested.
 
 `ZephyrWalletFull` is a wallet that runs in your process. It creates, restores and opens wallets,
 syncs against a Zephyr node, sends transfers, converts between ZPH, ZSD, ZRS and ZYS, and reports
-the state of the reserve. With real funds on mainnet, releases up to `java.4` (2026-11-06 to
-2026-11-10) created, opened and synced wallets, showed balances per asset, sent transfers,
-converted ZPH to ZRS and swept accounts. `java.5` was tested read-only: it has not sent,
-converted or swept.
+the state of the reserve. During the work on the releases up to `java.4` (2026-11-06 to
+2026-11-10), zephyr-java ran on mainnet with real funds. It created, opened and synced wallets,
+showed balances per asset, sent transfers, converted ZPH to ZRS and swept accounts. `java.5` was
+tested read-only: it has not sent, converted or swept.
 
 Outside its scope, or not ready:
 
