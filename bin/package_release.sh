@@ -22,11 +22,17 @@
 #                                    by the default profile's javadoc-jar execution); the pure
 #                                    tests run on the depends-built x86_64 library. A developer's
 #                                    plain mvn package has no Javadoc jar by design
-#  3. android/ ./gradlew             the AAR (with the Android natives), its sources jar and POM,
-#                                    artifactId zephyr-java-android (ARTIFACT_ID in
-#                                    android/gradle.properties; the JAR is zephyr-java)
-#  4. dist/<version>/                the artifacts under release names, the debug symbols as a
+#  3. android/ ./gradlew             the AAR (with the Android natives), its sources jar, POM and
+#                                    Gradle module metadata, artifactId zephyr-java-android
+#                                    (ARTIFACT_ID in android/gradle.properties; the JAR is
+#                                    zephyr-java)
+#  4. dist/<version>/                the artifacts under release names, the JAR's POM (pom.xml,
+#                                    the file Maven publishes), the debug symbols as a
 #                                    reproducible tar.gz
+#     bin/make_central_bundle.sh     dist/<version>/central/, the Maven Central bundle before
+#                                    signing: both artifacts in repository layout with their
+#                                    checksums (not a release asset; bin/sign_central_bundle.sh
+#                                    signs it and writes the zip to upload)
 #  5. bin/make_maven_repo.sh         dist/<version>/maven/, the static Maven repository
 #  6. bin/make_site.sh               dist/<version>/site/, the GitHub Pages content: the index,
 #                                    the user guide and its assets (site/build_site.py), the
@@ -160,7 +166,8 @@ if ! grep -q ' index\.html$' <<< "$JAVADOC_LIST"; then
   exit 1
 fi
 
-# 3: the AAR, its sources jar and POM (a fresh local repository, so each file exists once)
+# 3: the AAR, its sources jar, POM and module metadata (a fresh local repository, so each file
+# exists once)
 if [ -n "$ANDROID_ABIS" ]; then
   : "${ANDROID_HOME:?set ANDROID_HOME to the Android SDK}"
   phase "gradle assembleRelease publishReleasePublicationToLocalRepository"
@@ -174,10 +181,13 @@ rm -rf "$DIST" && mkdir -p "$DIST"
 cp "target/zephyr-java-$VERSION.jar" "$DIST/zephyr-java-$VERSION.jar"
 cp "target/zephyr-java-$VERSION-sources.jar" "$DIST/zephyr-java-$VERSION-sources.jar"
 cp "target/zephyr-java-$VERSION-javadoc.jar" "$DIST/zephyr-java-$VERSION-javadoc.jar"
+# the JAR's POM: pom.xml as it is, the file Maven installs and deploys
+cp pom.xml "$DIST/zephyr-java-$VERSION.pom"
 if [ -n "$ANDROID_ABIS" ]; then
   # a SNAPSHOT version is published with a timestamped file name; the repository is fresh
   AAR_ID="$(sed -n 's/^ARTIFACT_ID=//p' android/gradle.properties)"
-  REPO="android/build/repo/io/github/loki-notfound/$AAR_ID"
+  GROUP_PATH="$(sed -n 's/^GROUP=//p' android/gradle.properties | tr . /)"
+  REPO="android/build/repo/$GROUP_PATH/$AAR_ID"
   one() {
     local F
     F="$(find "$REPO" -type f -name "$1" | sort)"
@@ -187,6 +197,7 @@ if [ -n "$ANDROID_ABIS" ]; then
   cp "$(one '*.aar')" "$DIST/$AAR_ID-$VERSION.aar"
   cp "$(one '*-sources.jar')" "$DIST/$AAR_ID-$VERSION-sources.jar"
   cp "$(one '*.pom')" "$DIST/$AAR_ID-$VERSION.pom"
+  cp "$(one '*.module')" "$DIST/$AAR_ID-$VERSION.module"
 fi
 chmod 0644 "$DIST"/*
 # the debug files of the packaged platforms, with their platform directories, reproducible:
@@ -199,6 +210,10 @@ done
 tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 --numeric-owner --format=gnu \
     --mode=u+rwX,go+rX,go-w --exclude=build-env \
     -C build/debug -cf - "${PLATFORMS[@]}" | gzip -9n > "$DIST/debug-symbols-$VERSION.tar.gz"
+
+# the Maven Central bundle (a directory, not a release asset)
+phase "make_central_bundle.sh"
+bin/make_central_bundle.sh "$DIST"
 
 # 5, 6: the Maven repository and the Pages site; the repository lives in site/maven/ only, with
 # the previous releases merged in

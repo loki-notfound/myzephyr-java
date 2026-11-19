@@ -41,6 +41,10 @@
 #                the release whose Maven repository bin/merge_previous_release.sh merged into the
 #                site: version and site_archive_sha256 from bin/previous-release.env (null
 #                without that file, a first release)
+#   central_bundle
+#                the Maven Central bundle before signing, dist/<version>/central/
+#                (bin/make_central_bundle.sh): path, size and sha256 of every file but the checksum
+#                files, so the signed SHA256SUMS covers what the maintainer signs for Central
 #   artifacts    every file in dist/<version>/ except manifest.json and SHA256SUMS: name, size,
 #                sha256; for the site archive site-<version>.tar.gz also its entry count
 #                The site directory (dist/<version>/site/, with the Maven repository in
@@ -312,6 +316,18 @@ def main():
             with tarfile.open(path, "r:gz") as t:
                 entry["entries"] = len(t.getmembers())
         artifacts.append(entry)
+    # the Maven Central bundle before signing (bin/make_central_bundle.sh): every file but the
+    # checksum files, by its repository path; an empty list without the directory
+    central_bundle = []
+    bundle = os.path.join(dist, "central")
+    for dirpath, dirnames, filenames in os.walk(bundle):
+        dirnames.sort()
+        for name in sorted(filenames):
+            if name.endswith((".md5", ".sha1", ".sha256", ".sha512")):
+                continue
+            path = os.path.join(dirpath, name)
+            central_bundle.append({"path": os.path.relpath(path, bundle).replace(os.sep, "/"),
+                                   "size": os.path.getsize(path), "sha256": sha256(path)})
     manifest = {
         "zephyr_java": {
             "version": version,
@@ -334,6 +350,7 @@ def main():
         "previous_release": previous_release,
         "depends": depends_packages(),
         "artifacts": artifacts,
+        "central_bundle": central_bundle,
     }
     with open(os.path.join(dist, "manifest.json"), "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2, sort_keys=True)
