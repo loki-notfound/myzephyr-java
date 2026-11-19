@@ -35,6 +35,29 @@
 # fields and methods (List<ZephyrOutput>, Map<String, BigInteger>) at run time.
 -keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
 
+# Jackson reads the type argument of a type token from the generic superclass of the anonymous
+# subclass the library creates (new TypeReference<Map<String, Object>>() {} in ZephyrWalletFull,
+# ZephyrUtils, ZephyrDaemonRpc and zephyr.lib.utils.JsonUtils). R8's full mode keeps the Signature
+# attribute above only on classes that a rule keeps, and nothing kept these subclasses: every
+# parse through them failed with "TypeReference constructed without actual type information",
+# so a minified app could not create or open a wallet (seen with AGP 9.5). These are the rules R8
+# documents for type tokens; the classes may still be renamed or removed when unused.
+-keep,allowobfuscation,allowshrinking class com.fasterxml.jackson.core.type.TypeReference
+-keep,allowobfuscation,allowshrinking class * extends com.fasterxml.jackson.core.type.TypeReference
+
+# ZephyrWalletFull maps the native JSON of accounts, subaddresses, address book entries, key
+# images, transaction sets and blocks onto private nested classes (AccountsContainer and the other
+# *Container classes, ZephyrBlockWallet) by reflection, and writes key images to the native side
+# through one of them: their constructors, public fields and annotated setter must survive under
+# their names. Without this rule R8 renamed or removed them.
+-keep class zephyr.wallet.ZephyrWalletFull$*Container { *; }
+-keep class zephyr.wallet.ZephyrWalletFull$ZephyrBlockWallet { *; }
+
+# java.util.logging names the logger of ZephyrDaemonRpc after its class, so a logging configuration
+# for zephyr.daemon.ZephyrDaemonRpc applies only while the class keeps its name. (ZephyrWalletFull
+# keeps its name through the rule for native methods.)
+-keepnames class zephyr.daemon.ZephyrDaemonRpc
+
 # The Apache HTTP client (httpclient5, used by the RPC classes) and slf4j-api refer to classes that
 # neither the AAR nor Android provides: Brotli decompression (an optional dependency of
 # httpclient5), Kerberos/SPNEGO authentication (org.ietf.jgss, part of the desktop JDK only) and
