@@ -2232,14 +2232,25 @@ public class ZephyrWalletFull extends ZephyrWalletDefault {
     }
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * <p>The core refreshes the wallet after the import (wallet2's {@code import_multisig} ends with
+   * a refresh, when the wallet has outputs to update). An import whose refresh {@code close()} cuts
+   * short (at its next batch of blocks) throws ZephyrError("Wallet is closed"), never a count as if
+   * it had completed. Throws ZephyrError when called from inside a listener callback.</p>
+   */
   @Override
   public int importMultisigHex(List<String> multisigHexes) {
     refuseInCallback("importMultisigHex()");
     beginCall();
     try {
       try {
-        return importMultisigHexJni(multisigHexes.toArray(new String[multisigHexes.size()]));
+        int numOutputs = importMultisigHexJni(multisigHexes.toArray(new String[multisigHexes.size()]));
+        if (isClosed) throw new ZephyrError("Wallet is closed"); // cut short: not complete
+        return numOutputs;
       } catch (Exception e) {
+        if (isClosed) throw new ZephyrError("Wallet is closed");
         throw toZephyrError(e);
       }
     } catch (RuntimeException | AssertionError e) {
