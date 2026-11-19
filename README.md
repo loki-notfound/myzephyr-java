@@ -34,8 +34,10 @@ and what was not tested.
 
 `ZephyrWalletFull` is a wallet that runs in your process. It creates, restores and opens wallets,
 syncs against a Zephyr node, sends transfers, converts between ZPH, ZSD, ZRS and ZYS, and reports
-the state of the reserve. With real funds on mainnet it has created, opened and synced wallets,
-shown balances per asset, sent transfers, converted ZPH to ZRS and swept accounts.
+the state of the reserve. With real funds on mainnet, releases up to `java.4` (2026-11-06 to
+2026-11-10) created, opened and synced wallets, showed balances per asset, sent transfers,
+converted ZPH to ZRS and swept accounts. `java.5` was tested read-only: it has not sent,
+converted or swept.
 
 Outside its scope, or not ready:
 
@@ -57,7 +59,10 @@ dependency and no repository line. The project's site,
 `https://java-docs.lateo.dev`, carries the user guide and the Javadoc
 ([Documentation](#documentation)). Releases up to `2.3.0-sec.2-java.4` were published under
 `io.github.loki-notfound` in a Maven repository on the project's GitHub Pages. That repository is
-no longer served; those releases remain as GitHub releases.
+no longer served; those releases remain as GitHub releases. A build that still resolves one of
+them from that repository stops resolving. Move to `java.5`, or use the older release's JAR or AAR
+as a file dependency with its three runtime dependencies
+([Maven Central](docs/guide/14-building-and-verifying.md#maven-central)).
 
 Android (Gradle, Kotlin DSL). The AAR has its own artifactId, `zephyr-java-android`, and brings
 its POM's dependencies (Jackson and the Apache HTTP client) along. The dependency goes into the app
