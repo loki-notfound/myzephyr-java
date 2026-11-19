@@ -33,8 +33,8 @@ adds the amounts of all incoming transfers and names no asset; read the transfer
 
 `getTxs(hash)` throws a `ZephyrError` "Wallet missing requested tx hashes: " with the hashes when
 the wallet does not know a transaction. `getTransfers` and `getOutputs` with hashes in their query
-throw a plain `RuntimeException` with the same message. To get the known ones and the unknown
-hashes:
+throw the same `ZephyrError` (up to `2.3.0-sec.2-java.4` a plain `RuntimeException`). To get the
+known ones and the unknown hashes:
 
 ```java examples/GuideHistory.java
 List<String> missing = new ArrayList<>();
@@ -88,6 +88,9 @@ After a conversion is confirmed, `getTxs()` and `getTransfers()` show it as foll
 - The outgoing **destination** shows the **destination amount** in the destination currency
   (52.60432 ZRS). On the transaction that `createTxs` returned, the same destination still shows
   the source amount (50 ZPH). Code that compares the two must expect that.
+- On the transactions that `createTxs` and `sweepUnlocked` return, a destination reports the asset
+  `"ZEPH"`, the core's default, whatever the pair (read in the core's code; not observed). Take the
+  asset from the config's currency pair there.
 - An **incoming transfer** in the destination currency carries the minted amount, with account and
   subaddress set once confirmed.
 
@@ -189,9 +192,9 @@ entry; it is not a security fix, so the backports leave it.
 `getAssetType() == null`. On mainnet on 2026-11-08, all five outputs of a test wallet that had held
 ZPH and ZRS came back without an asset.
 
-**Why.** The core keeps an output's asset but does not serialize it in the output query. Balances,
-transfers and the listener's confirmed-output callbacks carry the asset; only the output query
-lacks it.
+**Why.** `wallet2` keeps an output's asset, but the core's output query neither copies it into
+the outputs it returns nor serializes it (read in the core's code). Balances, transfers and the
+listener's confirmed-output callbacks carry the asset; only the output query lacks it.
 
 **Workaround.** `ZephyrWallet.getOutputAssetType(output)`, from release `2.3.0-sec.2-java.2` on,
 takes the asset from the output's transaction. Coin control per asset filters the outputs through

@@ -49,7 +49,8 @@ return wallet.relayTxs(txs);                              // now every transacti
 `relayTxs(txs)` relays every transaction of the list and returns their hashes. Relaying only the
 first one of a split send would send part of it. `createTx` sets `setCanSplit(false)`: it returns
 one transaction or throws, and `relayTx(tx)` then sends it. `setRelay(true)` on the config builds
-and relays in one call, without a review.
+and relays in one call, without a review. Every call that relays is refused inside a listener
+callback ([What a callback may call](04-threads-and-listeners.md#what-a-callback-may-call)).
 
 ## What to show before you relay
 
@@ -80,9 +81,14 @@ mainnet sends of this project used the default. With `DEFAULT` the core chooses 
 core's code; not run). It takes the low tier, as `UNIMPORTANT`, when the pool has no backlog and the
 recent blocks are not full. Otherwise it takes the normal tier, as `NORMAL`. So the fee of the same send can
 differ from one moment to the next; show the fee of the built transaction, not an estimate. The
-other priorities, and `setFee`,
-`setUnlockHeight`, `setPaymentId` and `setCanSplit`, are inherited from monero-java; not tested
+other priorities, `setUnlockHeight` and `setCanSplit` are inherited from monero-java; not tested
 against Zephyr.
+
+Two settings cannot take effect in the full wallet (read in the core's code; not run):
+
+- **A payment ID is always refused.** A config with `setPaymentId` fails with "Standalone payment
+  IDs are obsolete. Use subaddresses or integrated addresses instead", `sweepUnlocked` included.
+- **`setFee` is never read.** The fee follows from the priority and the transaction's size.
 
 ## Several destinations
 
@@ -133,7 +139,8 @@ return wallet.sweepUnlocked(new ZephyrTxConfig()
 **`sweepUnlocked` without an account index sweeps every account.** Without an account index the
 core sweeps every account that has an unlocked balance in the source asset, one sweep per account.
 With an account index and no subaddress list it sweeps the whole account. Always set the account
-index. *Status:* core, read in the code. The core's list of subaddresses has an iterator slip (it
+index. `setSweepEachSubaddress(true)` has no effect: the core sets it back to false before it
+sweeps (read in the core's code). *Status:* core, read in the code. The core's list of subaddresses has an iterator slip (it
 tests one iterator and uses another), which adds subaddresses without funds. As far as the code
 shows it has no effect on the amounts, because only unlocked outputs of the source asset are
 spent.
