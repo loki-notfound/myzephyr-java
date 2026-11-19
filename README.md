@@ -65,7 +65,7 @@ module's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("dev.lateo:zephyr-java-android:2.3.0-sec.2-java.4")
+    implementation("dev.lateo:zephyr-java-android:2.3.0-sec.2-java.5")
 }
 ```
 
@@ -86,7 +86,7 @@ Desktop and server (Maven), the JAR with the Linux natives:
 <dependency>
   <groupId>dev.lateo</groupId>
   <artifactId>zephyr-java</artifactId>
-  <version>2.3.0-sec.2-java.4</version>
+  <version>2.3.0-sec.2-java.5</version>
 </dependency>
 ```
 
@@ -270,7 +270,7 @@ release:
 
 ```sh
 gpg --import KEYS.asc
-git verify-tag v2.3.0-sec.2-java.4
+git verify-tag v2.3.0-sec.2-java.5
 gpg --verify SHA256SUMS.asc SHA256SUMS
 sha256sum -c SHA256SUMS
 ```
@@ -298,7 +298,8 @@ zephyr-java is MIT licensed as well; see [`LICENCE.txt`](LICENCE.txt).
 
 Third-party data: the root certificates shipped in the library (`zephyr/common/cacert.pem`) are
 Mozilla's CA list in curl's PEM form, from [curl's CA extract](https://curl.se/docs/caextract.html),
-under the [Mozilla Public License 2.0](https://www.mozilla.org/MPL/2.0/).
+under the [Mozilla Public License 2.0](https://www.mozilla.org/MPL/2.0/). From
+`2.3.0-sec.2-java.5` on, the POMs of the JAR and the AAR name both licences.
 
 ## Donations
 

@@ -165,7 +165,9 @@ the AAR also with its Gradle module metadata. An `.md5`, `.sha1`, `.sha256` and 
 to every file. Every file is a release file byte
 for byte, except the AAR's Javadoc jar, which is the JAR's under the AAR's name: both compile the
 same sources. The script refuses a `-SNAPSHOT` version and a POM without the fields Central
-requires (name, description, url, licence, developer, scm).
+requires (name, description, url, licence, developer, scm). Both POMs name two licences: the MIT
+licence of the library, and the Mozilla Public License 2.0 of the shipped root certificates
+(`cacert.pem`).
 
 The bundle is not a release asset; `manifest.json` lists its files. The maintainer signs it with
 `bin/sign_central_bundle.sh`. The script checks the checksums and refuses when the maintainer
@@ -193,7 +195,7 @@ To check a release you downloaded:
 
 ```sh
 gpg --import KEYS.asc
-git verify-tag v2.3.0-sec.2-java.4
+git verify-tag v2.3.0-sec.2-java.5
 gpg --verify SHA256SUMS.asc SHA256SUMS
 sha256sum -c SHA256SUMS
 ```

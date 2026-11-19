@@ -102,6 +102,12 @@ publishing {
                         url.set("https://opensource.org/license/mit")
                         distribution.set("repo")
                     }
+                    license {
+                        name.set("Mozilla Public License 2.0")
+                        url.set("https://www.mozilla.org/MPL/2.0/")
+                        distribution.set("repo")
+                        comments.set("The root certificates shipped in the library, zephyr/common/cacert.pem (Mozilla's CA list in curl's PEM form)")
+                    }
                 }
                 developers {
                     developer {

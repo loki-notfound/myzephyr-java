@@ -18,7 +18,7 @@ android {
 }
 
 dependencies {
-    implementation("dev.lateo:zephyr-java-android:2.3.0-sec.2-java.4")
+    implementation("dev.lateo:zephyr-java-android:2.3.0-sec.2-java.5")
 }
 ```
 
@@ -41,7 +41,7 @@ android {
 }
 
 dependencies {
-    implementation 'dev.lateo:zephyr-java-android:2.3.0-sec.2-java.4'
+    implementation 'dev.lateo:zephyr-java-android:2.3.0-sec.2-java.5'
 }
 ```
 
@@ -50,7 +50,7 @@ With a version catalog, `gradle/libs.versions.toml` gets the entry and the modul
 
 ```toml
 [versions]
-zephyrJava = "2.3.0-sec.2-java.4"
+zephyrJava = "2.3.0-sec.2-java.5"
 
 [libraries]
 zephyr-java-android = { module = "dev.lateo:zephyr-java-android", version.ref = "zephyrJava" }

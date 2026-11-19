@@ -7,7 +7,7 @@ The API reference is the [Javadoc of the current release](https://java-docs.late
 
 **Not affiliated with ZephyrProtocol.** An independent project.
 
-This guide describes version `2.3.0-sec.2-java.4`.
+This guide describes version `2.3.0-sec.2-java.5`.
 
 | Chapter | What it covers |
 |---|---|

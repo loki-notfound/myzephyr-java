@@ -78,7 +78,7 @@ repositories {
 }
 
 dependencies {
-    implementation("dev.lateo:zephyr-java:2.3.0-sec.2-java.4")
+    implementation("dev.lateo:zephyr-java:2.3.0-sec.2-java.5")
 }
 ```
 
