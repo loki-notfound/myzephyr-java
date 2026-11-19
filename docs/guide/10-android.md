@@ -157,8 +157,8 @@ dependencies {
 
 (Groovy: `coreLibraryDesugaringEnabled = true` and
 `coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'`.) With these two lines
-`ZephyrDaemonRpc` runs on API 24. The native wallet, `ZephyrWalletFull`, does not use the HTTP
-client and needs neither. [The RPC classes](11-the-rpc-classes.md) covers what they do.
+`ZephyrDaemonRpc` ran on API 24, on the emulator with earlier releases. The native wallet,
+`ZephyrWalletFull`, does not use the HTTP client and needs neither. [The RPC classes](11-the-rpc-classes.md) covers what they do.
 
 ## The network
 
@@ -166,11 +166,11 @@ client and needs neither. [The RPC classes](11-the-rpc-classes.md) covers what t
 `<uses-permission android:name="android.permission.INTERNET" />` in its manifest.
 
 **Clear text.** The native wallet and the RPC classes open their own sockets. They do not read the
-app's Network Security Configuration. On API 35, an app with targetSdk 36 reached an `http://`
-node without any `usesCleartextTraffic` setting. Android refuses clear text by default for apps
-that target API 28 and later (Android documentation, "Network security configuration"). But the
-documentation of `android:usesCleartextTraffic` notes that the socket API does not honour that
-flag.
+app's Network Security Configuration. On the emulator with an earlier release, an app with targetSdk
+36 on API 35 reached an `http://` node without any `usesCleartextTraffic` setting. Android refuses
+clear text by default for apps that target API 28 and later (Android documentation, "Network
+security configuration"). But the documentation of `android:usesCleartextTraffic` notes that the
+socket API does not honour that flag.
 
 So the configuration neither blocks nor protects these connections.
 `cleartextTrafficPermitted="false"` does not stop an `http://` node. The configuration's trust
@@ -183,7 +183,7 @@ Android apps usually keep their data in the app's private storage or in their ow
 work:
 
 - **Files:** give `createWallet` a path inside `context.getFilesDir()`. The wallet writes
-  `<name>.keys` and `<name>` there on `save()`.
+  `<name>.keys` there when it is created, and `<name>` (the cache) on `save()`.
 - **Bytes:** create the wallet without a path, take `wallet.getData()` (keys and cache) and store
   the two arrays yourself; open later with `ZephyrWalletFull.openWalletData(...)`. This suits an
   encrypted database ([Wallet bytes](02-wallets.md#wallet-bytes)).
@@ -249,16 +249,17 @@ of that section were made on Android.
 
 ## Logs
 
-The core has no Android log output: nothing it logs appears in logcat (seen on the emulator, API 24
-and API 35). `ZephyrUtils.configureNativeLogging(path, false)` with a path in
-`context.getFilesDir()` would send it to a file; on Android this has not been tried
+The core has no Android log output: nothing it logs appears in logcat (seen on the emulator with
+earlier releases, API 24 and API 35). `ZephyrUtils.configureNativeLogging(path, false)` with a path
+in `context.getFilesDir()` would send it to a file; on Android this has not been tried
 ([The native log](09-errors.md#the-native-log)).
 
 zephyr-java's own messages (`ZephyrUtils.setLogLevel(...)`) are printed with `System.out`, and
 Android shows `System.out` and `System.err` in logcat under those tags. Creating the first
 `ZephyrRpcConnection` (an RPC class, or a wallet given a server URI) prints three SLF4J lines to
-`System.err`. Among them are "Failed to load class org.slf4j.impl.StaticLoggerBinder" and
-"Defaulting to no-operation (NOP) logger implementation". The Apache HTTP client finds no logging
+`System.err`, seen in logcat on the emulator with an earlier release. Among them are "Failed to
+load class org.slf4j.impl.StaticLoggerBinder" and "Defaulting to no-operation (NOP) logger
+implementation". The Apache HTTP client finds no logging
 backend and logs nothing. The lines are harmless.
 
 ## A first test on a device

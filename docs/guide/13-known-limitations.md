@@ -28,6 +28,7 @@ The defects that `2.3.0-sec.2-java.5` fixed are listed at the end
 | the asset of an output notification in the pool is empty | core, stays; observed on mainnet on 2026-11-07 | [Outputs in the pool carry no asset](04-threads-and-listeners.md#outputs-in-the-pool-carry-no-asset) |
 | `changePassword` fails for a wallet opened from bytes | core; confirmed on mainnet | [The password](02-wallets.md#the-password) |
 | `save()` and `close(true)` write nothing for a wallet without a path, and report no error | core, read in the code | [Wallet bytes](02-wallets.md#wallet-bytes) |
+| each failed open, such as one with a wrong password, leaks the half-built wallet in the core | core, read in the code | [Opening wallet files](02-wallets.md#opening-wallet-files) |
 | `sweepOutput` validates with `ZEPH` and is most likely unusable | core, read in the code; not tested | [Sweeping](07-sending.md#sweeping) |
 | `sweepUnlocked` without an account index sweeps every account with an unlocked balance in the source asset | core, read in the code | [Sweeping](07-sending.md#sweeping) |
 | a payment ID is always refused, `setFee` is never read, and `setSweepEachSubaddress(true)` has no effect | core, read in the code | [Fees and priorities](07-sending.md#fees-and-priorities), [Sweeping](07-sending.md#sweeping) |
@@ -42,7 +43,7 @@ The defects that `2.3.0-sec.2-java.5` fixed are listed at the end
 | once a listener was added, the core does its per-block listener work for the rest of the wallet's life | core; about 11 % per scan, measured on 2026-11-18 | [Add the first listener before startSyncing()](04-threads-and-listeners.md#add-the-first-listener-before-startsyncing) |
 | `save()`, `moveTo()`, `changePassword()` and `getData()` are not exclusive with background syncing, and no call reports when the core's sync thread has finished after `stopSyncing()` | core, read in the code; `close(true)` is exclusive | [Calls from several threads](04-threads-and-listeners.md#calls-from-several-threads) |
 | `setDaemonConnection` while a refresh runs on another thread resets fields the refresh uses without a lock | core, read in the code | [Calls from several threads](04-threads-and-listeners.md#calls-from-several-threads) |
-| the process can hang in its exit while background syncing refreshes | observed on 2026-11-18, 20 of 20 runs; open; close every wallet first | [Close every wallet before the process ends](04-threads-and-listeners.md#close-every-wallet-before-the-process-ends) |
+| the process can hang in its exit while background syncing refreshes | observed on 2026-11-18, 20 of 20 runs, with a development build from before the later closing fixes; not repeated on the final code; open; close every wallet first | [Close every wallet before the process ends](04-threads-and-listeners.md#close-every-wallet-before-the-process-ends) |
 | `close()` can wait up to the core's timeout of 3 min 30 s for a node request; read in the code, also up to a sync period, or for a relay that hangs when it meets the end of a sync on another thread | the timeout observed on 2026-11-19; the other two read in the code, not seen | [Closing a wallet that syncs](04-threads-and-listeners.md#closing-a-wallet-that-syncs) |
 
 ## zephyr-java
@@ -54,7 +55,6 @@ The defects that `2.3.0-sec.2-java.5` fixed are listed at the end
 | callbacks of two threads can run at the same time; a listener must be thread-safe | by design in `2.3.0-sec.2-java.5` | [Callbacks run on threads inside the core's calls](04-threads-and-listeners.md#callbacks-run-on-threads-inside-the-cores-calls) |
 | `onOutputReceived` and `onOutputSpent` repeat at confirmation and unlock; the spent notification at unlock is a summary | by design, in the Javadoc and the core's code | [The five callbacks](04-threads-and-listeners.md#the-five-callbacks) |
 | calls from several threads on one wallet, apart from `close()`, are not known to be safe | not established | [Calls from several threads](04-threads-and-listeners.md#calls-from-several-threads) |
-| an invalid account or subaddress index may end the process: some native calls do not catch the core's failure | read in the code; not run | [What is not a ZephyrError](09-errors.md#what-is-not-a-zephyrerror) |
 | `ZephyrUtils.toAtomicUnits(double)` goes through a `double` and drops decimals beyond the twelfth silently | specified Java behaviour; run on 2026-11-18 | [Amounts](05-assets-and-balances.md#amounts) |
 | `ZephyrDaemonRpc` needs API 26, or core library desugaring on API 24 and 25 | by design of the HTTP client | [The RPC classes below API 26](10-android.md#the-rpc-classes-below-api-26) |
 | the areas inherited from monero-java listed in chapter 1 | not tested | [What zephyr-java does and does not do](01-getting-started.md#what-zephyr-java-does-and-does-not-do) |
@@ -81,10 +81,11 @@ For `2.3.0-sec.2-java.5`, from 2026-11-18 to 2026-11-19, on Linux `x86_64` (Debi
 21), against a mainnet node, read-only. Nothing was sent or relayed. The runs used development
 builds of the sources as they stood on those days:
 
-- **The offline tests of the library**, 71 at the last code change before the guide was revised.
-  They call every public method of a closed wallet and the calls refused inside a callback. They
-  also cover a failed save at close, `close()` racing calls on another thread, the amounts table
-  and the library's logging with planted secrets.
+- **The offline tests of the library**, 72 at the last code change. They call every public method
+  of a closed wallet and the calls refused inside a callback. They also cover a failed save at
+  close, `close()` racing calls on another thread, and failures of the core in eight native calls,
+  each in a child process. The amounts table and the library's logging with planted secrets are
+  covered as well.
 - **The closing tests in child processes**, each of which fails on a crash, a hang or a thread
   left attached. They cover `close()` during a foreground `sync()` (10 of 10 runs), during busy
   background syncing, right after `startSyncing()` and `stopSyncing()`, and from a callback. Also
@@ -93,8 +94,9 @@ builds of the sources as they stood on those days:
 - **The read-only integration tests** against the node, and the TLS tests against a node with a
   publicly signed certificate.
 - All of these again under `-Xcheck:jni`, without a warning or fatal error from the JNI checks.
-- The offline tests and the closing tests also ran on 2026-11-18 on the Linux `x86_64` library
-  built in the release container, without Trezor and protobuf.
+- On 2026-11-18 the offline and closing tests of the code as it stood then also ran on the
+  Linux `x86_64` library built in the release container, without Trezor and protobuf. That was
+  before the last closing fixes: 65 offline tests and 35 closing tests.
 - **A minified Android app** (AGP 9.5, R8's full mode) was built against an AAR of these sources
   on 2026-11-19; it was not run. A JVM program with Gradle resolved the JAR from a local copy of
   the Maven Central bundle and ran it.
@@ -104,8 +106,9 @@ this section was written (2026-11-19).
 
 ### Runs of earlier releases
 
-These were made with earlier releases and not repeated for `2.3.0-sec.2-java.5`. The core they ran
-is the same in `java.5`; the Java layer and the JNI bridge around it changed:
+These were made with earlier releases and not repeated for `2.3.0-sec.2-java.5`. The core's
+sources are the same in `java.5`, which builds them without Trezor; the Java layer and the JNI
+bridge around the core changed:
 
 - **On mainnet with real funds, on the desktop** (2026-11-06 to 2026-11-10): create, open, sync,
   balances per asset, transfers, a ZPH → ZRS conversion and sweeps. Five transactions were
@@ -143,7 +146,7 @@ alignment, packaging). They have not run on hardware.
 ## Fixed in 2.3.0-sec.2-java.5
 
 These limitations of `2.3.0-sec.2-java.4` are gone. The conditions are those under which they
-were observed or read:
+were observed or read. The release notes list every fix:
 
 - `close()` from another thread during `sync()` crashed the process (4 of 4 runs with the released
   `java.4` JAR, 2026-11-17). Now `close()` waits, and the sync throws "Wallet is closed".
@@ -161,8 +164,28 @@ were observed or read:
   `ZephyrError`.
 - A `null` attribute key or value aborted the process (read in the bridge's code, observed on
   2026-11-18). Now it is refused.
-- `close(true)` did not catch a failing save in native code (read in the code). Now the wallet is
-  closed and freed, and `close(true)` throws.
+- Some native calls did not catch the core's failure, which then ended the process: among them
+  the account and subaddress calls, `getAddress` and the key getters. Three cases ended the
+  process, observed on 2026-11-19 with a development build whose bridge was the same in those
+  places. They were `createSubaddress` with an account index out of range, a transaction config
+  with an amount above 2^64, and a binary block that does not parse. Now every native call turns
+  a failure of the core into a `ZephyrError`.
+- `ZephyrUtils.mapToBinary` crashed the process for a result of more than about 1 MB (observed on
+  2026-11-19 with the same build). Now it returns.
+- `close(true)` saved while the core's sync thread could still be refreshing the wallet (observed
+  on 2026-11-18 with a development build whose save order at close was `java.4`'s). It also did
+  not catch a failing save in native code (read in the code). Now it saves after that thread has
+  ended; when the save fails, the wallet is closed and freed and `close(true)` throws.
+- `close()` from a callback of background syncing aborted the process ("trying joining itself",
+  observed on 2026-11-18 with a development build whose closing code was `java.4`'s). Now it is
+  refused.
+- `getReserveProofWallet` on a closed wallet crashed the process (observed on 2026-11-18 with the
+  same build), and `changePassword` had no check for a closed wallet. Now every call of a closed
+  wallet throws "Wallet is closed".
+- A wallet whose node connection failed right after it was opened or created was never freed. Now
+  it is closed before the exception is thrown.
+- A listener given to `sync(listener)` that removed itself made the sync throw "Listener is not
+  registered with wallet" at its end. It no longer does.
 - At `FINE` and from `setLogLevel(2)` the library logged transaction keys, passwords and
   mnemonics, and `ZephyrRpcError.toString()` printed the request parameters, passwords included.
   Now the library logs no transaction config or key, and redacts the secret values.

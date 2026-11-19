@@ -24,20 +24,21 @@ return record.getReserve();  // the price of one ZRS in ZPH, times 10^12
 
 `new ZephyrDaemonRpc(uri, username, password)` is for a node with RPC login. Block headers with
 their pricing record were read from a mainnet node on the desktop, and `ZephyrDaemonRpc` read a
-mainnet node on the Android emulator. The calls of `ZephyrDaemonRpc` other than the node's
-information and block headers are inherited from monero-java; not tested against Zephyr.
+mainnet node on the Android emulator with earlier releases. The calls of `ZephyrDaemonRpc` other
+than the node's information and block headers are inherited from monero-java; not tested against
+Zephyr.
 
 ## The wallet RPC client was removed
 
 Releases up to `2.3.0-sec.2-java.4` had `ZephyrWalletRpc`, a client for a `zephyr-wallet-rpc`
 process. It was a first pass that served the base coin only. `2.3.0-sec.2-java.5` removes it,
-with `zephyr.common.SslOptions` and the jeromq dependency that only its ZMQ listener used. Nobody
-was known to use it.
+with `zephyr.common.SslOptions` and the jeromq dependency that only its ZMQ listener used.
 
 Use `ZephyrWalletFull`, which runs the wallet in your process and has the whole API. An app that
 must talk to a `zephyr-wallet-rpc` process can send its JSON-RPC requests with
 `ZephyrRpcConnection.sendJsonRequest`, which stays. `ZephyrDaemonRpc`, `ZephyrRpcConnection` and
-`ZephyrRpcError` stay as they were.
+`ZephyrRpcError` stay, with the redaction described under [ZephyrRpcError](#zephyrrpcerror) and in
+[Logging safely](09-errors.md#logging-safely).
 
 ## ZephyrRpcError
 

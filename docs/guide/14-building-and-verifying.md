@@ -177,7 +177,15 @@ lists the files without signing.
 
 Releases up to `2.3.0-sec.2-java.4` were published under `io.github.loki-notfound` in a Maven
 repository on the project's GitHub Pages. That repository is no longer served; those releases
-remain as GitHub releases with their signed `SHA256SUMS`.
+remain as GitHub releases with their signed `SHA256SUMS`. A build that still resolves one of them
+from that repository stops resolving, whether it upgrades or not. There are two ways out:
+
+- move to `dev.lateo:zephyr-java:2.3.0-sec.2-java.5` or
+  `dev.lateo:zephyr-java-android:2.3.0-sec.2-java.5` from Maven Central;
+- take the older release's JAR or AAR from its GitHub release and check it against that
+  release's `SHA256SUMS`. Use it as a file dependency, and add its three runtime dependencies:
+  `com.fasterxml.jackson.core:jackson-core` and `com.fasterxml.jackson.core:jackson-databind`
+  2.13.5, and `org.apache.httpcomponents.client5:httpclient5` 5.2.1.
 
 ## Signatures
 
