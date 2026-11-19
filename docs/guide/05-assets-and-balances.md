@@ -71,26 +71,40 @@ Write the asset's ticker after the number (`1.50 ZPH`). Before a send, show the 
 with all 12 decimals ([What to show before you relay](07-sending.md#what-to-show-before-you-relay)).
 
 **Do not use `ZephyrUtils.toAtomicUnits(double)` for user input.** It is the only conversion from
-coins that `ZephyrUtils` has, and it builds the amount from the `double`'s text (`"" + amount`). It
-fails for values that `Double.toString` prints in scientific notation: below 0.001, and from
-10^7. It also drops or truncates decimals silently. Its results in `2.3.0-sec.2-java.4`:
+coins that `ZephyrUtils` has, and it goes through a `double`. A `double` holds about 17
+significant digits, so an amount with many coins and all 12 decimals does not fit it.
 
-| Input | Result |
-|---|---|
-| `0.0001`, `0.000999` | `NumberFormatException: Illegal embedded sign character` |
-| `0.001` | 1,000,000,000 |
-| `9999999.999` | 9,999,999,999,000,000,000 |
-| `1e7` | `NumberFormatException: For input string: "10E7"` |
-| `12345678.9` | `NumberFormatException: For input string: "3456789E7"` |
-| `1.5`, `0.1` | 1,500,000,000,000 and 100,000,000,000 |
-| `1.0000000000001` (13 decimals) | 1,000,000,000,000: the 13th decimal is dropped without an error |
-| `0.1 + 0.2` (that is `0.30000000000000004`) | 300,000,000,000: truncated without an error |
+In `2.3.0-sec.2-java.5` it converts the decimal that `Double.toString` prints, scientific notation
+included, and drops the decimals beyond the twelfth (toward zero) without an error. A value that is
+not a finite number throws a `ZephyrError` "Amount is not a finite number: " with the value; a
+negative value converts to a negative amount. **Releases up to `2.3.0-sec.2-java.4`** built the
+amount from the `double`'s text in a way that failed for scientific notation (below 0.001, and
+from 10^7) and gave a wrong amount for some values. The results of both:
+
+| Input | `2.3.0-sec.2-java.5` | up to `2.3.0-sec.2-java.4` |
+|---|---|---|
+| `0.0001`, `0.000999` | 100,000,000 and 999,000,000 | `NumberFormatException: Illegal embedded sign character` |
+| `0.001` | 1,000,000,000 | the same |
+| `9999999.999` | 9,999,999,999,000,000,000 | the same |
+| `1e7` | 10,000,000,000,000,000,000 | `NumberFormatException: For input string: "10E7"` |
+| `12345678.9` | 12,345,678,900,000,000,000 | `NumberFormatException: For input string: "3456789E7"` |
+| `1.5`, `0.1` | 1,500,000,000,000 and 100,000,000,000 | the same |
+| `1.0000000000001` (13 decimals) | 1,000,000,000,000: the 13th decimal is dropped without an error | the same |
+| `0.1 + 0.2` (that is `0.30000000000000004`) | 300,000,000,000: truncated without an error | the same |
+| `0.0033783819253452307` (19 decimals) | 3,378,381,925 | 3,662,849,022, about 8 % too high |
+| `NaN`, `Infinity` | `ZephyrError` "Amount is not a finite number: " and the value | `NumberFormatException` |
+
+In `java.4` a value printed with 19 or more decimals, which happens between 0.001 and 0.01, came
+out too high: the divisor of its algorithm overflowed. A comparison of 2,000,000 random values found
+12 such cases, all in that range; `2.3.0-sec.2-java.5` converts them right.
 
 `ZephyrUtils.fromAtomicUnits(BigInteger)` returns a `double`. One atomic unit gives `1.0E-12`,
-which `toAtomicUnits` then rejects. The round trip is exact only while the amount fits a double's
-precision and prints in plain notation. For example, 123,456,789,012,345,678 atomic units come back
-as 123,456,789,012,345,670. These results follow from `Double.toString`, which is specified Java
-behaviour; they were run on desktop Java 21 on 2026-11-17, not on Android.
+which `toAtomicUnits` converts back to 1 in `java.5` and rejected in `java.4`. The round trip is
+exact only while the amount fits a double's precision. For example, 123,456,789,012,345,678 atomic
+units come back as 123,456,789,012,345,670, in both releases. These results follow from
+`Double.toString`, which is specified Java behaviour. They were run on desktop Java 21, from
+2026-11-17 to 2026-11-19, not on Android. Before JDK 19, and on Android, `Double.toString` does
+not always print the shortest decimal, so a rare value can convert differently there.
 
 `ZephyrTxConfig.setAmount(String)` takes atomic units, not coins: `setAmount("1.5")` throws a
 `NumberFormatException`, and `setAmount("1")` sets one atomic unit.
