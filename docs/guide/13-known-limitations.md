@@ -83,9 +83,10 @@ builds of the sources as they stood on those days:
 
 - **The offline tests of the library**, 72 at the last code change. They call every public method
   of a closed wallet and the calls refused inside a callback. They also cover a failed save at
-  close, `close()` racing calls on another thread, and failures of the core in eight native calls,
-  each in a child process. The amounts table and the library's logging with planted secrets are
-  covered as well.
+  close and `close()` racing calls on another thread. Nine failing cases in eight native calls
+  each run in a child process. Six are failures of the core, one the bridge's own conversion of an
+  amount, one a large conversion. The amounts table and the library's logging with planted secrets
+  are covered as well.
 - **The closing tests in child processes**, each of which fails on a crash, a hang or a thread
   left attached. They cover `close()` during a foreground `sync()` (10 of 10 runs), during busy
   background syncing, right after `startSyncing()` and `stopSyncing()`, and from a callback. Also
@@ -165,11 +166,12 @@ were observed or read. The release notes list every fix:
 - A `null` attribute key or value aborted the process (read in the bridge's code, observed on
   2026-11-18). Now it is refused.
 - Some native calls did not catch the core's failure, which then ended the process: among them
-  the account and subaddress calls, `getAddress` and the key getters. Three cases ended the
-  process, observed on 2026-11-19 with a development build whose bridge was the same in those
-  places. They were `createSubaddress` with an account index out of range, a transaction config
-  with an amount above 2^64, and a binary block that does not parse. Now every native call turns
-  a failure of the core into a `ZephyrError`.
+  the account and subaddress calls, `getAddress` and the key getters. Among the cases that ended
+  the process were `createSubaddress` with an account index out of range and a binary block that
+  does not parse. So did a transaction config with an amount of 2^64 or more. That was observed on
+  2026-11-19 with a development build whose bridge was the same in those places.
+  `getReserveProofAccount` with such an amount ended it in the bridge's own conversion. Now every
+  native call turns these failures into a `ZephyrError`.
 - `ZephyrUtils.mapToBinary` crashed the process for a result of more than about 1 MB (observed on
   2026-11-19 with the same build). Now it returns.
 - `close(true)` saved while the core's sync thread could still be refreshing the wallet (observed
@@ -188,7 +190,9 @@ were observed or read. The release notes list every fix:
   registered with wallet" at its end. It no longer does.
 - At `FINE` and from `setLogLevel(2)` the library logged transaction keys, passwords and
   mnemonics, and `ZephyrRpcError.toString()` printed the request parameters, passwords included.
-  Now the library logs no transaction config or key, and redacts the secret values.
+  Now the library's Java logging logs no transaction config or key, and redacts the secret values.
+  The core's log at trace level still holds the transaction config of `sweepOutput` and
+  `getPaymentUri`, without a secret key ([The native log](09-errors.md#the-native-log)).
 - `ZephyrUtils.toAtomicUnits(double)` threw below 0.001 and from 10^7, and gave about 8 % too much
   for values printed with 19 or more decimals.
 - No call reported whether a background scan still ran, so a safe `close()` was not possible.
