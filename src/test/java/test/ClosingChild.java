@@ -50,8 +50,6 @@ public class ClosingChild {
   private static final long WAIT_MS = 240000;
   /** H1: how long close() may wait right after startSyncing(); a whole catch-up scan of the test wallet takes longer. */
   static final long H1_LIMIT_MS = 3000;
-  /** H2: how long before close(true) returns the wallet file may have been written. */
-  static final long H2_GAP_LIMIT_MS = 500;
   /** W1: threads the JVM may start during a background scan with no listener registered. */
   static final long W1_THREAD_LIMIT = 50;
   /** H3: how long a call from inside a callback may take before the thread counts as stuck. */
@@ -416,9 +414,11 @@ public class ClosingChild {
 
   /**
    * H2: close(true) while the core's sync thread is inside a refresh, held there by a listener that
-   * blocks in onNewBlock for 2 s. The save must come after that thread has stopped: the wallet file
-   * is written at the end of close(true), not while the refresh is paused, and the saved wallet
-   * opens with the scanned blocks.
+   * blocks in onNewBlock for 2 s. The save must come after that thread has stopped: the saved
+   * wallet holds the blocks the refresh processed after the listener let it go (the rest of that
+   * batch), not only those up to the block it was held at. Judged by the reopened wallet's height,
+   * which does not depend on the file system's time stamps (1 or 2 s granularity on some); the
+   * file's time is logged only.
    */
   private static void h2(String path) throws Exception {
     ZephyrWalletFull wallet = open(path);
@@ -426,10 +426,12 @@ public class ClosingChild {
     CountDownLatch blocked = new CountDownLatch(1);
     CountDownLatch release = new CountDownLatch(1);
     AtomicBoolean armed = new AtomicBoolean();
+    AtomicLong heldAt = new AtomicLong(-1);
     Counting listener = new Counting("none") {
       @Override public void onNewBlock(long height) {
         super.onNewBlock(height);
         if (armed.compareAndSet(true, false)) {
+          heldAt.set(height);
           log("listener blocks in onNewBlock at height " + height);
           blocked.countDown();
           try {
@@ -462,14 +464,15 @@ public class ClosingChild {
     log("CLOSE-WAIT-MS " + (end - start));
     if (!cache.isFile()) fail("no wallet file after close(true)");
     long written = cache.lastModified();
-    long gap = end - written;
-    log("H2-GAP-MS " + gap + " (the wallet file was written " + (written - start) + " ms after close(true) started)");
-    if (gap > H2_GAP_LIMIT_MS) fail("close(true) wrote the wallet file " + gap + " ms before it returned: the save ran while the core's sync thread was still inside its refresh");
+    log("H2-GAP-MS " + (end - written) + " (the wallet file's time is " + (written - start) + " ms after close(true) started; logged only)");
     ZephyrWalletFull reopened = ZephyrWalletFull.openWallet(path, password(), ZephyrNetworkType.MAINNET); // offline
     long height = reopened.getHeight();
     reopened.close();
-    log("reopened offline: height " + height + ", restore height " + restoreHeight);
+    // the core calls onNewBlock(h) once block h is in the wallet's chain (height h + 1): a save made
+    // while the listener held the refresh there holds h + 1 blocks at most
+    log("reopened offline: height " + height + ", restore height " + restoreHeight + ", held at block " + heldAt.get());
     if (height <= restoreHeight) fail("the saved wallet holds no scanned block: height " + height);
+    if (height <= heldAt.get() + 1) fail("the saved wallet ends at height " + height + ", where the listener held the refresh (block " + heldAt.get() + "): the save ran while the core's sync thread was still inside its refresh");
     assertCallbackThreadsEnded(listener.threads);
   }
 
