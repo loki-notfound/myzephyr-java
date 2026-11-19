@@ -58,6 +58,15 @@
 # keeps its name through the rule for native methods.)
 -keepnames class zephyr.daemon.ZephyrDaemonRpc
 
+# httpcore5's ChainBuilder keeps one interceptor per class: it drops an earlier element whose
+# getClass() equals the new one's. R8's horizontal class merging put RequestContent,
+# RequestTargetHost and RequestUserAgent into one class, so the HTTP client's chain kept only one
+# of them; requests then went out without Content-Length, and the node answered "Length required"
+# (ZephyrDaemonRpc in a minified app on API 26 and newer, seen with AGP 9.5). Kept classes are not
+# merged; they may still be renamed or removed when unused.
+-keep,allowobfuscation,allowshrinking class * implements org.apache.hc.core5.http.HttpRequestInterceptor
+-keep,allowobfuscation,allowshrinking class * implements org.apache.hc.core5.http.HttpResponseInterceptor
+
 # The Apache HTTP client (httpclient5, used by the RPC classes) and slf4j-api refer to classes that
 # neither the AAR nor Android provides: Brotli decompression (an optional dependency of
 # httpclient5), Kerberos/SPNEGO authentication (org.ietf.jgss, part of the desktop JDK only) and
