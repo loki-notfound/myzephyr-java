@@ -187,20 +187,14 @@ public class ClosingChild {
    * thread left attached stays alive (as a daemon thread it no longer keeps the JVM from exiting,
    * so the JVM's exit does not show it).
    *
-   * <p>A callback can also be delivered on a Java thread, inline in one of that thread's own wallet
-   * calls; such a thread stays alive by design. The threads a scenario names as {@code foreground}
-   * are those it lets make wallet calls while it records callbacks: they are left out of the check.
-   * Any other thread the core did not attach (the main thread, when it is not named) fails it.</p>
+   * <p>The scenarios that use it make no wallet call on their own threads that could deliver a
+   * callback (no sync, scan, relay or pool read there; addListener() and removeListener() never
+   * deliver one themselves), so a callback on the main thread fails it.</p>
    */
-  private static void assertCallbackThreadsEnded(Set<Thread> threads, Thread... foreground) {
-    List<Thread> skipped = Arrays.asList(foreground);
+  private static void assertCallbackThreadsEnded(Set<Thread> threads) {
     List<String> alive = new ArrayList<String>();
     int checked = 0;
     for (Thread thread : threads) {
-      if (skipped.contains(thread)) {
-        log("a callback was delivered on the scenario's own thread '" + thread.getName() + "' (inline in one of its calls); not checked");
-        continue;
-      }
       if (thread == Thread.currentThread()) fail("a background callback ran on the main thread");
       checked++;
       if (thread.isAlive()) alive.add(thread.getName() + (thread.isDaemon() ? "(d)" : "") + " " + thread.getState());
@@ -429,15 +423,20 @@ public class ClosingChild {
 
   /**
    * H2: close(true) while the core's sync thread is inside a refresh, held there by a listener that
-   * blocks in onNewBlock for 2 s. The save must come after that thread has stopped: the saved
-   * wallet holds the blocks the refresh processed after the listener let it go (the rest of that
-   * batch), not only those up to the block it was held at. Judged by the reopened wallet's height,
-   * which does not depend on the file system's time stamps (1 or 2 s granularity on some); the
-   * file's time is logged only.
+   * blocks in onNewBlock for 2 s. The save must come after that thread has stopped. The wallet
+   * starts from its keys file alone, so its cache file is first written by this close(true): the
+   * file must not exist yet when the listener lets the refresh go (a save during the hold would have
+   * written it), which depends neither on the file system's time stamps (1 or 2 s granularity on
+   * some) nor on where the core's batches of blocks end. The reopened wallet must hold the block the
+   * refresh was held at; it holds the rest of that batch too, unless that block ended its batch (the
+   * refresh checks its stop flag between batches only). The file's time is logged only.
    */
   private static void h2(String path) throws Exception {
     ZephyrWalletFull wallet = open(path);
     long restoreHeight = wallet.getRestoreHeight();
+    File cache = new File(path);
+    if (cache.exists()) fail("the wallet's cache file exists before close(true): the check of when it is written cannot work");
+    AtomicReference<Boolean> writtenDuringHold = new AtomicReference<Boolean>();
     CountDownLatch blocked = new CountDownLatch(1);
     CountDownLatch release = new CountDownLatch(1);
     AtomicBoolean armed = new AtomicBoolean();
@@ -468,26 +467,28 @@ public class ClosingChild {
       } catch (InterruptedException e) {
         // release now
       }
-      log("releasing the listener");
+      writtenDuringHold.set(cache.exists());
+      log("releasing the listener; the wallet's cache file " + (writtenDuringHold.get() ? "exists" : "does not exist yet"));
       release.countDown();
     }, "releaser");
     releaser.start();
-    File cache = new File(path);
     long start = System.currentTimeMillis();
     wallet.close(true);
     long end = System.currentTimeMillis();
     log("CLOSE-WAIT-MS " + (end - start));
+    releaser.join();
     if (!cache.isFile()) fail("no wallet file after close(true)");
     long written = cache.lastModified();
     log("H2-GAP-MS " + (end - written) + " (the wallet file's time is " + (written - start) + " ms after close(true) started; logged only)");
+    if (writtenDuringHold.get()) fail("the wallet's cache file was written while the listener held the refresh: the save ran while the core's sync thread was still inside its refresh");
     ZephyrWalletFull reopened = ZephyrWalletFull.openWallet(path, password(), ZephyrNetworkType.MAINNET); // offline
     long height = reopened.getHeight();
     reopened.close();
-    // the core calls onNewBlock(h) once block h is in the wallet's chain (height h + 1): a save made
-    // while the listener held the refresh there holds h + 1 blocks at most
-    log("reopened offline: height " + height + ", restore height " + restoreHeight + ", held at block " + heldAt.get());
+    // the core calls onNewBlock(h) once block h is in the wallet's chain (height h + 1)
+    log("reopened offline: height " + height + ", restore height " + restoreHeight + ", held at block " + heldAt.get()
+        + (height == heldAt.get() + 1 ? " (the held block ended its batch)" : ""));
     if (height <= restoreHeight) fail("the saved wallet holds no scanned block: height " + height);
-    if (height <= heldAt.get() + 1) fail("the saved wallet ends at height " + height + ", where the listener held the refresh (block " + heldAt.get() + "): the save ran while the core's sync thread was still inside its refresh");
+    if (height < heldAt.get() + 1) fail("the saved wallet ends at height " + height + ", below the block the listener held the refresh at (" + heldAt.get() + ")");
     assertCallbackThreadsEnded(listener.threads);
   }
 
@@ -598,8 +599,9 @@ public class ClosingChild {
     timedClose(wallet);
     if (removed.progress.get() + removed.blocks.get() + removed.balances.get() > 0) fail("the removed listener got callbacks: " + removed.counts());
     if (started > W1_THREAD_LIMIT) fail(started + " threads started during a scan of " + scanned + " blocks with no listener: the native listener stayed registered with the core");
-    // main added and removed listeners during the scan: a callback delivered on it inline is not a background callback
-    assertCallbackThreadsEnded(added.threads, Thread.currentThread());
+    // main added and removed the listeners, during the scan too: neither call delivers a callback itself
+    if (added.threads.contains(Thread.currentThread()) || removed.threads.contains(Thread.currentThread())) fail("a callback was delivered on main, inside its own addListener() or removeListener()");
+    assertCallbackThreadsEnded(added.threads);
   }
 
   /**
@@ -681,7 +683,10 @@ public class ClosingChild {
     wallet.stopSyncing();
     timedClose(wallet);
     if (toggled.blocks.get() == 0) fail("the toggled listener never received a callback");
-    assertCallbackThreadsEnded(toggled.threads, churner);
+    // the churner only adds and removes the listener: neither call delivers a callback itself (the
+    // churner has ended by now, so the check of the threads below would not see it)
+    if (toggled.threads.contains(churner)) fail("a callback was delivered on the churner, inside its own addListener() or removeListener()");
+    assertCallbackThreadsEnded(toggled.threads);
   }
 
   /**
