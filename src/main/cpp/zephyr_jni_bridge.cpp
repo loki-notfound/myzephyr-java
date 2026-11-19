@@ -425,23 +425,24 @@ JNIEXPORT jbyteArray JNICALL Java_zephyr_common_ZephyrUtils_jsonToBinaryJni(JNIE
   string json_str = jstring2string(env, json);
   if (env->ExceptionCheck()) return 0;
 
-  // convert json to monero's portable storage binary format
-  string bin_str;
-  monero_utils::json_to_binary(json_str, bin_str);
+  try {
 
-  // convert binary string to jbyteArray
-  jbyteArray result = env->NewByteArray(bin_str.length());
-  if (result == NULL) {
-     return NULL; // out of memory error thrown
-  }
+    // convert json to monero's portable storage binary format
+    string bin_str;
+    monero_utils::json_to_binary(json_str, bin_str);
 
-  // fill a temp structure to use to populate the java byte array
-  jbyte fill[bin_str.length()];
-  for (int i = 0; i < bin_str.length(); i++) {
-     fill[i] = bin_str[i];
+    // copy the binary string into a java byte array, straight from the string (a copy through an
+    // array on the native stack overflowed the stack for a result of more than about 1 MB)
+    jbyteArray result = env->NewByteArray(bin_str.length());
+    if (result == NULL) {
+       return NULL; // out of memory error thrown
+    }
+    env->SetByteArrayRegion(result, 0, bin_str.length(), reinterpret_cast<const jbyte*>(bin_str.data()));
+    return result;
+  } catch (...) {
+    rethrow_cpp_exception_as_java_exception(env);
+    return 0;
   }
-  env->SetByteArrayRegion(result, 0, bin_str.length(), fill);
-  return result;
 }
 
 JNIEXPORT jstring JNICALL Java_zephyr_common_ZephyrUtils_binaryToJsonJni(JNIEnv *env, jclass clazz, jbyteArray bin) {
@@ -454,11 +455,14 @@ JNIEXPORT jstring JNICALL Java_zephyr_common_ZephyrUtils_binaryToJsonJni(JNIEnv 
   if (bin) env->ReleaseByteArrayElements(bin, jbytes, JNI_ABORT);
 
   // convert monero's portable storage binary format to json
-  string json_str;
-  monero_utils::binary_to_json(bin_str, json_str);
-
-  // convert string to jstring
-  return env->NewStringUTF(json_str.c_str());
+  try {
+    string json_str;
+    monero_utils::binary_to_json(bin_str, json_str);
+    return env->NewStringUTF(json_str.c_str());
+  } catch (...) {
+    rethrow_cpp_exception_as_java_exception(env);
+    return 0;
+  }
 }
 
 JNIEXPORT jstring JNICALL Java_zephyr_common_ZephyrUtils_binaryBlocksToJsonJni(JNIEnv *env, jclass clazz, jbyteArray blocks_bin) {
@@ -470,23 +474,34 @@ JNIEXPORT jstring JNICALL Java_zephyr_common_ZephyrUtils_binaryBlocksToJsonJni(J
   string bin_str = string((char*) jbytes, binLength);
   if (blocks_bin) env->ReleaseByteArrayElements(blocks_bin, jbytes, JNI_ABORT);
 
-  // convert monero's portable storage binary format to json
-  string json_str;
-  monero_utils::binary_blocks_to_json(bin_str, json_str);
-
-  // convert string to jstring
-  return env->NewStringUTF(json_str.c_str());
+  // convert the binary blocks response to json
+  try {
+    string json_str;
+    monero_utils::binary_blocks_to_json(bin_str, json_str);
+    return env->NewStringUTF(json_str.c_str());
+  } catch (...) {
+    rethrow_cpp_exception_as_java_exception(env);
+    return 0;
+  }
 }
 
 JNIEXPORT void JNICALL Java_zephyr_common_ZephyrUtils_setLogLevelJni(JNIEnv* env, jclass clazz, jint level) {
-  mlog_set_log_level(level); // zephyr-cpp is at monero-cpp 686fbdc, before ad7be65 added the monero_utils logging wrappers
+  try {
+    mlog_set_log_level(level); // zephyr-cpp is at monero-cpp 686fbdc, before ad7be65 added the monero_utils logging wrappers
+  } catch (...) {
+    rethrow_cpp_exception_as_java_exception(env);
+  }
 }
 
 JNIEXPORT void JNICALL Java_zephyr_common_ZephyrUtils_configureLoggingJni(JNIEnv* env, jclass clazz, jstring jpath, jboolean console) {
   const char* _path = jpath ? env->GetStringUTFChars(jpath, NULL) : nullptr;
   string path = string(_path ? _path : "");
   if (jpath) env->ReleaseStringUTFChars(jpath, _path);
-  mlog_configure(path, console); // zephyr-cpp is at monero-cpp 686fbdc, before ad7be65 added the monero_utils logging wrappers
+  try {
+    mlog_configure(path, console); // zephyr-cpp is at monero-cpp 686fbdc, before ad7be65 added the monero_utils logging wrappers
+  } catch (...) {
+    rethrow_cpp_exception_as_java_exception(env);
+  }
 }
 
 // ------------------------------- TLS (ZephyrTls) --------------------------------
@@ -523,8 +538,13 @@ JNIEXPORT jboolean JNICALL Java_zephyr_wallet_ZephyrWalletFull_walletExistsJni(J
   const char* _path = jpath ? env->GetStringUTFChars(jpath, NULL) : nullptr;
   string path = string(_path ? _path : "");
   if (jpath) env->ReleaseStringUTFChars(jpath, _path);
-  bool wallet_exists = monero_wallet_full::wallet_exists(path);
-  return static_cast<jboolean>(wallet_exists);
+  try {
+    bool wallet_exists = monero_wallet_full::wallet_exists(path);
+    return static_cast<jboolean>(wallet_exists);
+  } catch (...) {
+    rethrow_cpp_exception_as_java_exception(env);
+    return 0;
+  }
 }
 
 JNIEXPORT jlong JNICALL Java_zephyr_wallet_ZephyrWalletFull_openWalletJni(JNIEnv *env, jclass clazz, jstring jpath, jstring jpassword, jint jnetwork_type) {
@@ -585,11 +605,9 @@ JNIEXPORT jlong JNICALL Java_zephyr_wallet_ZephyrWalletFull_createWalletJni(JNIE
   string config_json = string(_config ? _config : "");
   if (jconfig) env->ReleaseStringUTFChars(jconfig, _config);
 
-  // deserialize wallet config
-  shared_ptr<monero_wallet_config> config = monero_wallet_config::deserialize(config_json);
-
-  // construct wallet
+  // deserialize wallet config and construct wallet
   try {
+    shared_ptr<monero_wallet_config> config = monero_wallet_config::deserialize(config_json);
     monero_wallet* wallet = monero_wallet_full::create_wallet(*config);
     return reinterpret_cast<jlong>(wallet);
   } catch (...) {
@@ -623,7 +641,12 @@ JNIEXPORT jobjectArray JNICALL Java_zephyr_wallet_ZephyrWalletFull_getMnemonicLa
 JNIEXPORT jboolean JNICALL Java_zephyr_wallet_ZephyrWalletFull_isViewOnlyJni(JNIEnv *env, jobject instance) {
   MTRACE("Java_zephyr_wallet_ZephyrWalletFull_isViewOnlyJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
-  return wallet->is_view_only();
+  try {
+    return wallet->is_view_only();
+  } catch (...) {
+    rethrow_cpp_exception_as_java_exception(env);
+    return 0;
+  }
 }
 
 JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_setDaemonConnectionJni(JNIEnv *env, jobject instance, jstring juri, jstring jusername, jstring jpassword) {
@@ -716,13 +739,23 @@ JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getVersionJni(JNIE
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getPathJni(JNIEnv *env, jobject instance) {
   MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getPathJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
-  return env->NewStringUTF(wallet->get_path().c_str());
+  try {
+    return env->NewStringUTF(wallet->get_path().c_str());
+  } catch (...) {
+    rethrow_cpp_exception_as_java_exception(env);
+    return 0;
+  }
 }
 
 JNIEXPORT jint JNICALL Java_zephyr_wallet_ZephyrWalletFull_getNetworkTypeJni(JNIEnv *env, jobject instance) {
   MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getNetworkTypeJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
-  return wallet->get_network_type();
+  try {
+    return wallet->get_network_type();
+  } catch (...) {
+    rethrow_cpp_exception_as_java_exception(env);
+    return 0;
+  }
 }
 
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getMnemonicJni(JNIEnv *env, jobject instance) {
@@ -750,32 +783,57 @@ JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getMnemonicLanguag
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getPublicViewKeyJni(JNIEnv *env, jobject instance) {
   MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getPublicViewKeyJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
-  return env->NewStringUTF(wallet->get_public_view_key().c_str());
+  try {
+    return env->NewStringUTF(wallet->get_public_view_key().c_str());
+  } catch (...) {
+    rethrow_cpp_exception_as_java_exception(env);
+    return 0;
+  }
 }
 
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getPrivateViewKeyJni(JNIEnv *env, jobject instance) {
   MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getPrivateViewKeyJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
-  return env->NewStringUTF(wallet->get_private_view_key().c_str());
+  try {
+    return env->NewStringUTF(wallet->get_private_view_key().c_str());
+  } catch (...) {
+    rethrow_cpp_exception_as_java_exception(env);
+    return 0;
+  }
 }
 
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getPublicSpendKeyJni(JNIEnv *env, jobject instance) {
   MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getPublicSpendKeyJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
-  return env->NewStringUTF(wallet->get_public_spend_key().c_str());
+  try {
+    return env->NewStringUTF(wallet->get_public_spend_key().c_str());
+  } catch (...) {
+    rethrow_cpp_exception_as_java_exception(env);
+    return 0;
+  }
 }
 
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getPrivateSpendKeyJni(JNIEnv *env, jobject instance) {
   MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getPrivateSpendKeyJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
-  return env->NewStringUTF(wallet->get_private_spend_key().c_str());
+  try {
+    return env->NewStringUTF(wallet->get_private_spend_key().c_str());
+  } catch (...) {
+    rethrow_cpp_exception_as_java_exception(env);
+    return 0;
+  }
 }
 
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getAddressJni(JNIEnv *env, jobject instance, jint account_idx, jint subaddress_idx) {
   MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getAddressJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
-  string address = wallet->get_address((uint32_t) account_idx, (uint32_t) subaddress_idx);
-  return env->NewStringUTF(address.c_str());
+  try {
+    string address = wallet->get_address((uint32_t) account_idx, (uint32_t) subaddress_idx);
+    return env->NewStringUTF(address.c_str());
+  } catch (...) {
+    rethrow_cpp_exception_as_java_exception(env);
+    return 0;
+  }
 }
 
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getAddressIndexJni(JNIEnv *env, jobject instance, jstring jaddress) {
@@ -881,7 +939,12 @@ JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_decodeIntegratedAd
 JNIEXPORT jlong JNICALL Java_zephyr_wallet_ZephyrWalletFull_getHeightJni(JNIEnv *env, jobject instance) {
   MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getHeightJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
-  return wallet->get_height();
+  try {
+    return wallet->get_height();
+  } catch (...) {
+    rethrow_cpp_exception_as_java_exception(env);
+    return 0;
+  }
 }
 
 JNIEXPORT jlong JNICALL Java_zephyr_wallet_ZephyrWalletFull_getChainHeightJni(JNIEnv *env, jobject instance) {
@@ -898,7 +961,12 @@ JNIEXPORT jlong JNICALL Java_zephyr_wallet_ZephyrWalletFull_getChainHeightJni(JN
 JNIEXPORT jlong JNICALL Java_zephyr_wallet_ZephyrWalletFull_getRestoreHeightJni(JNIEnv *env, jobject instance) {
   MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getRestoreHeightJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
-  return wallet->get_restore_height();
+  try {
+    return wallet->get_restore_height();
+  } catch (...) {
+    rethrow_cpp_exception_as_java_exception(env);
+    return 0;
+  }
 }
 
 JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_setRestoreHeightJni(JNIEnv *env, jobject instance, jlong restore_height) {
@@ -1241,27 +1309,33 @@ JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getAccountsJni(JNI
   string tag = string(_tag ? _tag : "");
   if (jtag) env->ReleaseStringUTFChars(jtag, _tag);
 
-  // get accounts
-  vector<monero_account> accounts = wallet->get_accounts(include_subaddresses, tag);
-
-  // wrap and serialize accounts
-  rapidjson::Document doc;
-  doc.SetObject();
-  doc.AddMember("accounts", monero_utils::to_rapidjson_val(doc.GetAllocator(), accounts), doc.GetAllocator());
-  string accounts_json = monero_utils::serialize(doc);
-  return env->NewStringUTF(accounts_json.c_str());
+  // get, wrap and serialize accounts
+  try {
+    vector<monero_account> accounts = wallet->get_accounts(include_subaddresses, tag);
+    rapidjson::Document doc;
+    doc.SetObject();
+    doc.AddMember("accounts", monero_utils::to_rapidjson_val(doc.GetAllocator(), accounts), doc.GetAllocator());
+    string accounts_json = monero_utils::serialize(doc);
+    return env->NewStringUTF(accounts_json.c_str());
+  } catch (...) {
+    rethrow_cpp_exception_as_java_exception(env);
+    return 0;
+  }
 }
 
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getAccountJni(JNIEnv* env, jobject instance, jint account_idx, jboolean include_subaddresses) {
   MTRACE("Java_zephyr_wallet_ZephyrWalletFull_getAccountJni");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
 
-  // get account
-  monero_account account = wallet->get_account(account_idx, include_subaddresses);
-
-  // serialize and return account
-  string account_json = account.serialize();
-  return env->NewStringUTF(account_json.c_str());
+  // get, serialize and return account
+  try {
+    monero_account account = wallet->get_account(account_idx, include_subaddresses);
+    string account_json = account.serialize();
+    return env->NewStringUTF(account_json.c_str());
+  } catch (...) {
+    rethrow_cpp_exception_as_java_exception(env);
+    return 0;
+  }
 }
 
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_createAccountJni(JNIEnv* env, jobject instance, jstring jlabel) {
@@ -1271,12 +1345,15 @@ JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_createAccountJni(J
   string label = string(_label ? _label : "");
   if (jlabel) env->ReleaseStringUTFChars(jlabel, _label);
 
-  // create account
-  monero_account account = wallet->create_account(label);
-
-  // serialize and return account
-  string account_json = account.serialize();
-  return env->NewStringUTF(account_json.c_str());
+  // create, serialize and return account
+  try {
+    monero_account account = wallet->create_account(label);
+    string account_json = account.serialize();
+    return env->NewStringUTF(account_json.c_str());
+  } catch (...) {
+    rethrow_cpp_exception_as_java_exception(env);
+    return 0;
+  }
 }
 
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getSubaddressesJni(JNIEnv* env, jobject instance, jint account_idx, jintArray jsubaddressIndices) {
@@ -1294,15 +1371,18 @@ JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getSubaddressesJni
     env->ReleaseIntArrayElements(jsubaddressIndices, intArr, JNI_ABORT);
   }
 
-  // get subaddresses
-  vector<monero_subaddress> subaddresses = wallet->get_subaddresses(account_idx, subaddress_indices);
-
-  // wrap and serialize subaddresses
-  rapidjson::Document doc;
-  doc.SetObject();
-  doc.AddMember("subaddresses", monero_utils::to_rapidjson_val(doc.GetAllocator(), subaddresses), doc.GetAllocator());
-  string subaddresses_json = monero_utils::serialize(doc);
-  return env->NewStringUTF(subaddresses_json.c_str());
+  // get, wrap and serialize subaddresses
+  try {
+    vector<monero_subaddress> subaddresses = wallet->get_subaddresses(account_idx, subaddress_indices);
+    rapidjson::Document doc;
+    doc.SetObject();
+    doc.AddMember("subaddresses", monero_utils::to_rapidjson_val(doc.GetAllocator(), subaddresses), doc.GetAllocator());
+    string subaddresses_json = monero_utils::serialize(doc);
+    return env->NewStringUTF(subaddresses_json.c_str());
+  } catch (...) {
+    rethrow_cpp_exception_as_java_exception(env);
+    return 0;
+  }
 }
 
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_createSubaddressJni(JNIEnv* env, jobject instance, jint account_idx, jstring jlabel) {
@@ -1312,12 +1392,15 @@ JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_createSubaddressJn
   string label = string(_label ? _label : "");
   if (jlabel) env->ReleaseStringUTFChars(jlabel, _label);
 
-  // create subaddress
-  monero_subaddress subaddress = wallet->create_subaddress(account_idx, label);
-
-  // serialize and return subaddress
-  string subaddress_json = subaddress.serialize();
-  return env->NewStringUTF(subaddress_json.c_str());
+  // create, serialize and return subaddress
+  try {
+    monero_subaddress subaddress = wallet->create_subaddress(account_idx, label);
+    string subaddress_json = subaddress.serialize();
+    return env->NewStringUTF(subaddress_json.c_str());
+  } catch (...) {
+    rethrow_cpp_exception_as_java_exception(env);
+    return 0;
+  }
 }
 
 JNIEXPORT void JNICALL Java_zephyr_wallet_ZephyrWalletFull_setSubaddressLabelJni(JNIEnv* env, jobject instance, jint account_idx, jint subaddress_idx, jstring jlabel) {
@@ -1526,14 +1609,10 @@ JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_importKeyImagesJni
   string key_images_json = string(_key_images_json ? _key_images_json : "");
   if (jkey_images_json) env->ReleaseStringUTFChars(jkey_images_json, _key_images_json);
 
-  // deserialize key images to import
-  vector<shared_ptr<monero_key_image>> key_images = monero_key_image::deserialize_key_images(key_images_json);
-  //MTRACE("Deserialized " << key_images.size() << " key images from java json");
-
-  // import key images
-  shared_ptr<monero_key_image_import_result> result;
+  // deserialize and import key images
   try {
-    result = wallet->import_key_images(key_images);
+    vector<shared_ptr<monero_key_image>> key_images = monero_key_image::deserialize_key_images(key_images_json);
+    shared_ptr<monero_key_image_import_result> result = wallet->import_key_images(key_images);
     return env->NewStringUTF(result->serialize().c_str());
   } catch (...) {
     rethrow_cpp_exception_as_java_exception(env);
@@ -1594,22 +1673,16 @@ JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_createTxsJni(JNIEn
   string config_json = string(_config ? _config : "");
   if (jconfig) env->ReleaseStringUTFChars(jconfig, _config);
 
-  // deserialize send request
-  shared_ptr<monero_tx_config> config = monero_tx_config::deserialize(config_json);
-  //MTRACE("Deserialized tx config, re-serialized: " << config->serialize());
-
-  // submit send request
-  vector<shared_ptr<monero_tx_wallet>> txs;
+  // deserialize the config (a number beyond the core's range throws), submit it, and serialize and
+  // return the tx set
   try {
-    txs = wallet->create_txs(*config);
-    //MTRACE("Got " << txs.size() << " txs");
+    shared_ptr<monero_tx_config> config = monero_tx_config::deserialize(config_json);
+    vector<shared_ptr<monero_tx_wallet>> txs = wallet->create_txs(*config);
+    return env->NewStringUTF(txs[0]->m_tx_set.get()->serialize().c_str());
   } catch (...) {
     rethrow_cpp_exception_as_java_exception(env);
     return 0;
   }
-
-  // serialize and return tx set
-  return env->NewStringUTF(txs[0]->m_tx_set.get()->serialize().c_str());
 }
 
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_sweepUnlockedJni(JNIEnv* env, jobject instance, jstring jconfig) {
@@ -1619,33 +1692,30 @@ JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_sweepUnlockedJni(J
   string config_json = string(_config ? _config : "");
   if (jconfig) env->ReleaseStringUTFChars(jconfig, _config);
 
-  // deserialize send request
-  shared_ptr<monero_tx_config> config = monero_tx_config::deserialize(config_json);
-  //MTRACE("Deserialized tx config, re-serialized: " << config->serialize());
-
-  // submit request with configuration
-  vector<shared_ptr<monero_tx_wallet>> txs;
   try {
-    txs = wallet->sweep_unlocked(*config);
+
+    // deserialize the config and submit it
+    shared_ptr<monero_tx_config> config = monero_tx_config::deserialize(config_json);
+    vector<shared_ptr<monero_tx_wallet>> txs = wallet->sweep_unlocked(*config);
+
+    // collect tx sets
+    vector<shared_ptr<monero_tx_set>> tx_sets;
+    for (int i = 0; i < txs.size(); i++) {
+      if (std::find(tx_sets.begin(), tx_sets.end(), txs[i]->m_tx_set.get()) == tx_sets.end()) {
+        tx_sets.push_back(txs[i]->m_tx_set.get());
+      }
+    }
+
+    // wrap and serialize tx sets
+    rapidjson::Document doc;
+    doc.SetObject();
+    doc.AddMember("txSets", monero_utils::to_rapidjson_val(doc.GetAllocator(), tx_sets), doc.GetAllocator());
+    string tx_sets_json = monero_utils::serialize(doc);
+    return env->NewStringUTF(tx_sets_json.c_str());
   } catch (...) {
     rethrow_cpp_exception_as_java_exception(env);
     return 0;
   }
-
-  // collect tx sets
-  vector<shared_ptr<monero_tx_set>> tx_sets;
-  for (int i = 0; i < txs.size(); i++) {
-    if (std::find(tx_sets.begin(), tx_sets.end(), txs[i]->m_tx_set.get()) == tx_sets.end()) {
-      tx_sets.push_back(txs[i]->m_tx_set.get());
-    }
-  }
-
-  // wrap and serialize tx sets
-  rapidjson::Document doc;
-  doc.SetObject();
-  doc.AddMember("txSets", monero_utils::to_rapidjson_val(doc.GetAllocator(), tx_sets), doc.GetAllocator());
-  string tx_sets_json = monero_utils::serialize(doc);
-  return env->NewStringUTF(tx_sets_json.c_str());
 }
 
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_sweepOutputJni(JNIEnv* env, jobject instance, jstring jconfig) {
@@ -1657,38 +1727,30 @@ JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_sweepOutputJni(JNI
 
   MTRACE("Send request json: " << config_json);
 
-  // deserialize send request
-  shared_ptr<monero_tx_config> config = monero_tx_config::deserialize(config_json);
-  MTRACE("Deserialized send request, re-serialized: " << config->serialize());
-
-  // submit request with configuration
-  shared_ptr<monero_tx_wallet> tx;
+  // deserialize the config, submit it, and serialize and return the tx set
   try {
-    tx = wallet->sweep_output(*config);
+    shared_ptr<monero_tx_config> config = monero_tx_config::deserialize(config_json);
+    MTRACE("Deserialized send request, re-serialized: " << config->serialize());
+    shared_ptr<monero_tx_wallet> tx = wallet->sweep_output(*config);
+    return env->NewStringUTF(tx->m_tx_set.get()->serialize().c_str());
   } catch (...) {
     rethrow_cpp_exception_as_java_exception(env);
     return 0;
   }
-
-  // serialize and return tx set
-  return env->NewStringUTF(tx->m_tx_set.get()->serialize().c_str());
 }
 
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_sweepDustJni(JNIEnv* env, jobject instance, jboolean relay) {
   MTRACE("Java_zephyr_wallet_ZephyrWalletFull_sweepDustJni(request)");
   monero_wallet* wallet = get_handle<monero_wallet>(env, instance, JNI_WALLET_HANDLE);
 
-  // sweep dust
-  vector<shared_ptr<monero_tx_wallet>> txs;
+  // sweep dust, serialize and return tx set
   try {
-    txs = wallet->sweep_dust(relay);
+    vector<shared_ptr<monero_tx_wallet>> txs = wallet->sweep_dust(relay);
+    return env->NewStringUTF(txs.empty() ? std::string("{}").c_str() : txs[0]->m_tx_set.get()->serialize().c_str());
   } catch (...) {
     rethrow_cpp_exception_as_java_exception(env);
     return 0;
   }
-
-  // serialize and return tx set
-  return env->NewStringUTF(txs.empty() ? std::string("{}").c_str() : txs[0]->m_tx_set.get()->serialize().c_str());
 }
 
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_describeTxSetJni(JNIEnv* env, jobject instance, jstring jtx_set_json) {
@@ -2158,21 +2220,16 @@ JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getPaymentUriJni(J
   string config_json = string(_config ? _config : "");
   if (jconfig) env->ReleaseStringUTFChars(jconfig, _config);
 
-  // deserialize send request
-  shared_ptr<monero_tx_config> config = monero_tx_config::deserialize(config_json);
-  MTRACE("Fetching payment uri with : " << config->serialize());
-
-  // get payment uri
-  string payment_uri;
+  // deserialize the config and get the payment uri
   try {
-    payment_uri = wallet->get_payment_uri(*config.get());
+    shared_ptr<monero_tx_config> config = monero_tx_config::deserialize(config_json);
+    MTRACE("Fetching payment uri with : " << config->serialize());
+    string payment_uri = wallet->get_payment_uri(*config.get());
+    return env->NewStringUTF(payment_uri.c_str());
   } catch (...) {
     rethrow_cpp_exception_as_java_exception(env);
     return 0;
   }
-
-  // release and return
-  return env->NewStringUTF(payment_uri.c_str());
 }
 
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_parsePaymentUriJni(JNIEnv* env, jobject instance, jstring juri) {
@@ -2182,17 +2239,14 @@ JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_parsePaymentUriJni
   string uri = string(_uri ? _uri : "");
   if (juri) env->ReleaseStringUTFChars(juri, _uri);
 
-  // parse uri to send request
-  shared_ptr<monero_tx_config> config;
+  // parse uri to send request and return it serialized
   try {
-    config = wallet->parse_payment_uri(uri);
+    shared_ptr<monero_tx_config> config = wallet->parse_payment_uri(uri);
+    return env->NewStringUTF(config->serialize().c_str());
   } catch (...) {
     rethrow_cpp_exception_as_java_exception(env);
     return 0;
   }
-
-  // return serialized request
-  return env->NewStringUTF(config->serialize().c_str());
 }
 
 JNIEXPORT jstring JNICALL Java_zephyr_wallet_ZephyrWalletFull_getAttributeJni(JNIEnv* env, jobject instance, jstring jkey) {

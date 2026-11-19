@@ -45,7 +45,8 @@ import zephyr.wallet.model.ZephyrWalletListener;
  * sees something wrong prints a line starting with "FAIL" and exits with status 2.
  *
  * <p>Arguments: the scenario, then the wallet path (the keys file of a wallet without a cache,
- * so it scans from its restore height), except for "silent". The node's uri comes from the system
+ * so it scans from its restore height), except for "silent", "freedclose" and "corefailure" (which
+ * takes the name of its case and needs no node). The node's uri comes from the system
  * property {@code zephyr.daemon.uri}, the wallet's password from the environment variable
  * {@code ZEPHYR_CHILD_PASSWORD}; neither is printed, and neither are addresses, keys or hashes.</p>
  */
@@ -109,6 +110,7 @@ public class ClosingChild {
       case "fgtoggle": foregroundToggle(args[1]); break;
       case "h1held": h1Held(args[1], args[2]); break;
       case "freedclose": freedClose(); break;
+      case "corefailure": coreFailure(args[1]); break;
       default: fail("unknown scenario " + args[0]);
     }
     log("RESULT ok");
@@ -893,6 +895,68 @@ public class ClosingChild {
       fail("getHeight() on the freed wallet returned");
     } catch (ZephyrError e) {
       log("getHeight() threw ZephyrError: " + e.getMessage());
+    }
+  }
+
+  /** 2^64: one more than the largest value the core's unsigned 64-bit fields hold. */
+  private static final BigInteger TWO_TO_THE_64 = BigInteger.ONE.shiftLeft(64);
+
+  /**
+   * One call whose core function throws, offline (an in-memory wallet, no node, relay off, nothing
+   * built): the call must throw ZephyrError with the core's message. Up to the bridge change these
+   * exceptions left the native call outside a try block, which ended the process (SIGABRT). The
+   * case "largebinary" must return: the bridge copied the converted bytes through an array on the
+   * native stack, which overflowed (SIGSEGV) for a result of more than about 1 MB.
+   */
+  private static void coreFailure(String which) throws Exception {
+    if (which.equals("largebinary")) {
+      char[] text = new char[4000000];
+      Arrays.fill(text, 'a');
+      java.util.Map<String, Object> map = new java.util.HashMap<String, Object>();
+      map.put("text", new String(text));
+      byte[] binary = zephyr.common.ZephyrUtils.mapToBinary(map);
+      if (binary.length <= text.length) fail("mapToBinary() returned " + binary.length + " bytes");
+      log("mapToBinary() of a 4,000,000-character string returned " + binary.length + " bytes");
+      return;
+    }
+    if (which.equals("blocks")) {
+      // a binary blocks response whose block blob does not parse
+      java.util.Map<String, Object> block = new java.util.HashMap<String, Object>();
+      block.put("block", "00");
+      java.util.Map<String, Object> response = new java.util.HashMap<String, Object>();
+      response.put("blocks", Arrays.asList(block));
+      byte[] binary = zephyr.common.ZephyrUtils.mapToBinary(response);
+      expectCoreFailure(which, () -> zephyr.common.ZephyrUtils.binaryBlocksToMap(binary), "failed to parse block blob at index 0");
+      return;
+    }
+    ZephyrWalletFull wallet = ZephyrWalletFull.createWallet(new ZephyrWalletConfig().setPassword("core-failure").setNetworkType(ZephyrNetworkType.MAINNET));
+    try {
+      String address = wallet.getPrimaryAddress();
+      // a destination amount the core's config parser cannot hold; its message names the C++ type
+      ZephyrTxConfig tooLarge = new ZephyrTxConfig().setAddress(address).setAmount(TWO_TO_THE_64);
+      String unconvertible = "conversion of data to type";
+      switch (which) {
+        case "createsubaddress": expectCoreFailure(which, () -> wallet.createSubaddress(1000, "label"), "account index is out of bound"); break;
+        case "createtx": expectCoreFailure(which, () -> wallet.createTx(tooLarge), unconvertible); break;
+        case "createtxfee": expectCoreFailure(which, () -> wallet.createTx(new ZephyrTxConfig().setAddress(address).setAmount(BigInteger.ONE).setFee(TWO_TO_THE_64)), unconvertible); break;
+        case "sweepunlocked": expectCoreFailure(which, () -> wallet.sweepUnlocked(tooLarge), unconvertible); break;
+        case "sweepoutput": expectCoreFailure(which, () -> wallet.sweepOutput(tooLarge.copy().setKeyImage("00")), unconvertible); break;
+        case "paymenturi": expectCoreFailure(which, () -> wallet.getPaymentUri(tooLarge), unconvertible); break;
+        default: fail("unknown case " + which);
+      }
+    } finally {
+      wallet.close();
+    }
+  }
+
+  /** Runs the call; it must throw ZephyrError whose message starts with the expected text. */
+  private static void expectCoreFailure(String which, Runnable call, String expected) {
+    try {
+      call.run();
+      fail(which + ": returned normally");
+    } catch (ZephyrError e) {
+      if (e.getMessage() == null || !e.getMessage().startsWith(expected)) fail(which + ": ZephyrError(\"" + e.getMessage() + "\"), expected a message starting with \"" + expected + "\"");
+      log(which + ": ZephyrError(\"" + e.getMessage() + "\")");
     }
   }
 

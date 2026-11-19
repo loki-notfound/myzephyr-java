@@ -37,7 +37,8 @@ import zephyr.wallet.model.ZephyrWalletListenerI;
  * Every failure of a call of {@link ZephyrWalletFull} and of {@link ZephyrUtils} is a
  * {@link ZephyrError}: on a closed wallet, for every public method by reflection, and for the
  * library's own checks, which threw {@code AssertionError}, {@code Error} or a plain
- * {@code RuntimeException} up to java.4. No node: in-memory wallets only.
+ * {@code RuntimeException} up to java.4, and for failures of the core in native calls (in child
+ * JVMs). No node: in-memory wallets only.
  */
 public class TestWalletExceptions {
 
@@ -200,6 +201,34 @@ public class TestWalletExceptions {
     check(failures, "Must provide attribute key", () -> wallet.getAttribute(null));
     check(failures, "Must provide attribute key", () -> wallet.setAttribute(null, "value"));
     check(failures, "Must provide attribute value", () -> wallet.setAttribute("key", null));
+    assertEquals(Collections.emptyList(), failures);
+  }
+
+  /**
+   * The cases of {@link ClosingChild}'s scenario "corefailure", each a call whose core function
+   * throws offline. In releases up to 2.3.0-sec.2-java.4 the exception left the native call outside
+   * a try block and ended the process.
+   */
+  private static final List<String> CORE_FAILURES = Collections.unmodifiableList(Arrays.asList(
+      "createsubaddress", "createtx", "createtxfee", "sweepunlocked", "sweepoutput", "paymenturi", "blocks", "largebinary"));
+
+  /**
+   * A core failure in a native call is a ZephyrError with the core's message, never the end of the
+   * process: an account index out of range, a config number above the core's 64-bit range, a block
+   * blob that does not parse; and a large conversion returns. Each case runs in a JVM of its own
+   * ({@link ClosingChild}, scenario "corefailure"), since on the code before the change each one
+   * ended its process; no node needed. Every case runs; the failures are reported together.
+   */
+  @Test
+  public void coreFailuresInNativeCallsThrowZephyrError() throws Exception {
+    List<String> failures = new ArrayList<String>();
+    for (String which : CORE_FAILURES) {
+      try {
+        TestWalletClosingChildren.run("corefailure-" + which, false, "corefailure", which).check();
+      } catch (AssertionError e) {
+        failures.add(e.getMessage());
+      }
+    }
     assertEquals(Collections.emptyList(), failures);
   }
 
