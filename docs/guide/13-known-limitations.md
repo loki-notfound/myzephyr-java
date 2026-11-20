@@ -43,7 +43,7 @@ The defects that `2.3.0-sec.2-java.5` fixed are listed at the end
 | once a listener was added, the core does its per-block listener work for the rest of the wallet's life | core; about 11 % per scan, measured on 2026-11-18 | [Add the first listener before startSyncing()](04-threads-and-listeners.md#add-the-first-listener-before-startsyncing) |
 | `save()`, `moveTo()`, `changePassword()` and `getData()` are not exclusive with background syncing, and no call reports when the core's sync thread has finished after `stopSyncing()` | core, read in the code; `close(true)` is exclusive | [Calls from several threads](04-threads-and-listeners.md#calls-from-several-threads) |
 | `setDaemonConnection` while a refresh runs on another thread resets fields the refresh uses without a lock | core, read in the code | [Calls from several threads](04-threads-and-listeners.md#calls-from-several-threads) |
-| the process can hang in its exit while background syncing refreshes | observed on 2026-11-18, 20 of 20 runs, with a development build from before the later closing fixes; not repeated on the final code; open; close every wallet first | [Close every wallet before the process ends](04-threads-and-listeners.md#close-every-wallet-before-the-process-ends) |
+| the process can hang in its exit while background syncing refreshes | observed on Linux on 2026-11-18, 20 of 20 runs, with a development build from before the later closing fixes; not repeated on the final code; open; close every wallet first | [Close every wallet before the process ends](04-threads-and-listeners.md#close-every-wallet-before-the-process-ends) |
 | `close()` can wait up to the core's timeout of 3 min 30 s for a node request; read in the code, also up to a sync period, or for a relay that hangs when it meets the end of a sync on another thread | the timeout observed on 2026-11-19; the other two read in the code, not seen | [Closing a wallet that syncs](04-threads-and-listeners.md#closing-a-wallet-that-syncs) |
 
 ## zephyr-java
@@ -99,11 +99,13 @@ builds of the sources as they stood on those days:
 - On 2026-11-18 the offline and closing tests of the code as it stood then also ran on the
   Linux `x86_64` library built in the release container, without Trezor and protobuf. That was
   before the last closing fixes: 65 offline tests and 35 closing tests.
-- A JVM program with Gradle resolved the JAR from a local copy of the Maven Central bundle and ran
-  it.
+- A JVM program with Gradle resolved the JAR from a local copy of the Maven Central bundle of an
+  earlier state of these sources and ran it. That state was still versioned `2.3.0-sec.2-java.4`,
+  and the program resolved it under those coordinates.
 
-**On the Android emulator**, on 2026-11-19: the `x86_64` library, against the same node,
-read-only, on four images.
+**On the Android emulator**, on 2026-11-19 and 2026-11-20: the `x86_64` library, against the
+same node, read-only, on five images. The API 36 image with 16 KB pages was used on 2026-11-20
+only.
 
 | Image | Pages | Build |
 |---|---|---|
@@ -111,40 +113,60 @@ read-only, on four images.
 | API 35, Google APIs | 16 KB | `AE3A.240806.043` |
 | API 35 | 4 KB | `AE3A.240806.019` |
 | API 36 | 4 KB | `BE2A.250530.026.D1` |
+| API 36, Google APIs | 16 KB | `BE2A.250530.026.F3` |
 
-- **The AAR of a release build of the final code** ran on all four images, in a minified app
-  (AGP 9.5, R8's full mode) and in the same app built without R8, neither debuggable. Two closing
-  scenarios ran 20 times per build and image, each in its own process. One is `close()` 1.5 s into
-  busy background syncing, with no callback after it. In the other, a listener throws from its
-  first `onSyncProgress` and `onNewBlock`. A second listener receives the same callbacks until the
-  scan reaches the node's height. All 320 runs passed without a crash. Each process had one
-  callback thread of the core, which had ended after `close()`, and `close()` waited 3 to 999 ms.
-  These runs covered those two scenarios only, without CheckJNI.
+- **The AAR of a release build of these sources**, with the release's native libraries and
+  classes, ran on all five images. It ran in a minified app (AGP 9.5, R8's full mode) and in the
+  same app built without R8, neither debuggable. Two closing scenarios ran 20 times per build and
+  image, each in its own process. One is `close()` 1.5 s into busy background syncing, with no
+  callback after it. In the other, a listener throws from its first `onSyncProgress` and
+  `onNewBlock`. A second listener receives the same callbacks until the scan reaches the node's
+  height. All 400 runs passed without a crash: 320 on 2026-11-19 and 80 on the API 36 16 KB image
+  on 2026-11-20. Each process had one callback thread of the core, which had ended after
+  `close()`, and `close()` waited 3 to 999 ms.
+- **The exit and refusal scenarios with that AAR**, on 2026-11-20, in the minified app, on API 24,
+  API 35 and API 36 with 4 KB pages and API 36 with 16 KB pages. Three times per image a process
+  was left with a wallet syncing in the background; it stayed alive until `am force-stop` ended
+  it. Three times per image `System.exit(0)` with a wallet syncing ended the process with exit
+  code 0. Once per image ran each of these: `close()` from a callback, which was refused;
+  `stopSyncing()` directly followed by `close()`; and `save()`, `getData()`, `sync()`,
+  `startSyncing()` and `close()` from a callback, each refused. All 36 runs went as expected,
+  without a crash or a tombstone. In the three scenarios run once, `close()` waited 5 to
+  1,100 ms, and each process had one callback thread of the core. Nothing else ran with this AAR,
+  and nothing under CheckJNI.
 - **AARs of these sources before the last change to the JNI bridge**, which attached the core's
   thread for each callback. Debug apps under ART's CheckJNI ran the closing tests as instrumented
-  tests on API 24 and on the 16 KB image. All 19 passed on each image. They cover `close()` during a
-  foreground `sync()` (5 of 5 runs per image), during busy background syncing and right after
-  `stopSyncing()`. Also a throwing listener, `close()` and the refused calls from a callback, and
-  a process ended with a wallet syncing. Every callback thread of the core had ended after
-  `close()`. They also ran an offline wallet, a sync and a reopen from bytes, `ZephyrDaemonRpc`
-  and TLS to a node with a publicly signed certificate.
+  tests on API 24 and on the API 35 16 KB image. All 19 passed on each image. They cover `close()`
+  during a foreground `sync()` (5 of 5 runs per image), during busy background syncing and right
+  after `stopSyncing()`. Also a throwing listener, `close()` and the refused calls from a
+  callback, and a process ended with a wallet syncing. Every callback thread of the core had ended
+  after `close()`. They also ran an offline wallet, a sync and a reopen from bytes,
+  `ZephyrDaemonRpc` and TLS to a node with a publicly signed certificate.
 - **The minified app with these earlier AARs.** With the consumer rules of the release it ran on
-  API 24 and on the 16 KB image. It read an offline wallet's accounts, subaddresses, address book,
-  outputs and balance. It synced with a listener and read the node with `ZephyrDaemonRpc` (on API
-  24 it got the documented `java.time` error). With rules from before the interceptor rule, it ran
-  the closing scenarios from its own code under CheckJNI. They passed 19 of 19 on API 24 and 17 of
-  19 on the 16 KB image. The two-scenario matrix above also ran with an earlier AAR on all four
-  images.
+  API 24 and on the API 35 16 KB image. It read an offline wallet's accounts, subaddresses,
+  address book, outputs and balance. It synced with a listener and read the node with
+  `ZephyrDaemonRpc` (on API 24 it got the documented `java.time` error). With rules from before
+  the interceptor rule, it ran the closing scenarios from its own code under CheckJNI. They passed
+  19 of 19 on API 24 and 17 of 19 on the API 35 16 KB image.
+- **The two-scenario matrix with an earlier AAR**, in the minified app and in the app without R8.
+  It ran on the first four images on 2026-11-19 and on the API 36 16 KB image on 2026-11-20.
 
-**The crashes on the 16 KB image.** With the earlier AARs, apps that are not debuggable crashed
-with `SIGSEGV` on this image, during background syncing. That happened in 2 of 19 runs of the
-closing scenarios, 3 of 24 repeated runs and 5 of 80 runs of the matrix. Each crash was on
-a callback thread of the core or in ART's garbage collector. Debug apps on this image did not
-crash, in 27 runs. Processes of this image without zephyr-java code crashed the same way: at boot
-before the app was installed, during the runs and while idle. During the matrix no process
-crashed on the three 4 KB images, with either AAR, ours or the image's own. With the AAR of the
-final code this image had no crash of zephyr-java in 80 runs, and its own processes still
-crashed.
+**The crashes on the API 35 16 KB image.** With the earlier AARs, apps that are not debuggable
+crashed with `SIGSEGV` on this image, during background syncing. That happened in 2 of 19 runs of
+the closing scenarios, 3 of 24 repeated runs and 5 of 80 runs of the matrix. Each crash was on a
+callback thread of the core or in ART's garbage collector. Debug apps on this image did not crash,
+in 27 runs. Processes of this image without zephyr-java code also crashed with `SIGSEGV`, at boot
+before the app was installed and during the runs. In an idle window as long as the runs, with
+nothing of zephyr-java running, one of its processes crashed with `SIGILL` in browser code.
+During the matrix no process crashed on the three 4 KB images, with either AAR, ours or the
+image's own. With the AAR that has the release's native libraries this image had no crash of
+zephyr-java in 80 runs, and its own processes still crashed.
+
+**The API 36 16 KB image.** With the earlier AAR the matrix had no crash there, in 80 runs, with
+600 to 10,000 callback threads per process. With the AAR that has the release's native libraries
+it had none in 80 runs either.
+None of the image's own processes crashed during the runs or in an idle window as long as them.
+At one of its four boots its Bluetooth process ended with `SIGABRT`, before the idle window began.
 
 No run under CheckJNI showed a JNI error in a process of zephyr-java.
 
