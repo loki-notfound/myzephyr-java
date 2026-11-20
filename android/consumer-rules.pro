@@ -61,9 +61,11 @@
 # httpcore5's ChainBuilder keeps one interceptor per class: it drops an earlier element whose
 # getClass() equals the new one's. R8's horizontal class merging put RequestContent,
 # RequestTargetHost and RequestUserAgent into one class, so the HTTP client's chain kept only one
-# of them; requests then went out without Content-Length, and the node answered "Length required"
-# (ZephyrDaemonRpc in a minified app on API 26 and newer, seen with AGP 9.5). Kept classes are not
-# merged; they may still be renamed or removed when unused.
+# of them, and no request got a Content-Length. The client itself then refused to send a request
+# body without its length: its own LengthRequiredException ("Length required"), thrown in
+# DefaultBHttpClientConnection.sendRequestEntity, not an answer of the node (ZephyrDaemonRpc in a
+# minified app on API 26 and newer, seen with AGP 9.5). Kept classes are not merged; they may still
+# be renamed or removed when unused.
 -keep,allowobfuscation,allowshrinking class * implements org.apache.hc.core5.http.HttpRequestInterceptor
 -keep,allowobfuscation,allowshrinking class * implements org.apache.hc.core5.http.HttpResponseInterceptor
 
