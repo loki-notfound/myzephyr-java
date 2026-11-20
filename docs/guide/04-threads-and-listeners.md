@@ -261,8 +261,8 @@ second thread at the first progress of a foreground `sync()` ended that sync wit
 closed". The process exited normally.
 
 **How long `close()` waits.** A refresh normally ends within its current batch of blocks. In the
-runs of 2026-11-19 against a mainnet node every `close()` returned within 203 ms. Only the tests
-that held a refresh or a node request on purpose took longer. Longer waits:
+runs of 2026-11-19 on Linux against a mainnet node every `close()` returned within 203 ms. Only
+the tests that held a refresh or a node request on purpose took longer. Longer waits:
 
 - a request to the node that is under way is waited for. Against a node that does not answer,
   that is up to the core's timeout of 3 min 30 s. Observed on 2026-11-19: 208 s, with another
@@ -278,7 +278,10 @@ that held a refresh or a node request on purpose took longer. Longer waits:
   sync runs on another thread does not meet it.
 
 On Android, never call `close()` on the main thread: a wait of seconds is an "Application Not
-Responding" dialog there.
+Responding" dialog there. The Android emulator ran closing scenarios against the same node on
+2026-11-19 and 2026-11-20. There `close()` waited 3 ms to 1.1 s with the bridge of
+`2.3.0-sec.2-java.5`, and up to 3.5 s with earlier bridges
+([What was tested](13-known-limitations.md#what-was-tested)).
 
 **`close(true)`** saves after the core's background sync thread has ended and while no other call
 runs, so the save never meets a refresh. When the save fails, the wallet is closed and freed all
@@ -337,12 +340,17 @@ whose `main` returned with a wallet open and background syncing inside a refresh
 happened in 20 of 20 runs with a listener, and in a probe without one. It did not crash; it hung in
 the JVM's exit. When `main` returned while the core's sync thread waited between two syncs, the
 program exited normally. This was not repeated on the final code of `2.3.0-sec.2-java.5`. Whether
-`System.exit()` hangs the same way was not run.
-On Android an app's process is normally killed rather than exited. On the Android emulator on
-2026-11-19, on API 24 and on API 35 with 16 KB pages, this ran with AARs from before the last
-change to the JNI bridge. A process with a wallet syncing in the background ended at once when the
-system or `am force-stop` killed it. `System.exit(0)` ended such a process within 0.2 s. None of
-these runs left a crash or a tombstone.
+`System.exit()` hangs the same way on the JVM was not run.
+
+On Android an app's process is normally killed rather than exited. On the Android emulator,
+killing and exiting an app's process with a wallet syncing in the background ran with two kinds of
+AAR. On 2026-11-19 it ran with AARs from before the last change to the JNI bridge, on API 24 and on
+API 35 with 16 KB pages. On 2026-11-20 it ran with the bridge of `2.3.0-sec.2-java.5`, in a
+minified app, three times each on every image. The images were API 24, API 35 and API 36 with
+4 KB pages, and API 36 with 16 KB pages. Such a process ended when the system or `am force-stop`
+killed it. `System.exit(0)` ended it with exit code 0, within 0.2 s with the earlier AARs and
+within 0.5 s with the bridge of `2.3.0-sec.2-java.5`. None of these runs left a crash or a
+tombstone.
 
 ## What is not known
 
