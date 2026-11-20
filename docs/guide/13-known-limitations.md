@@ -148,8 +148,7 @@ only.
   the callbacks did not advance. On API 24 and on the API 36 16 KB image a debug app ran under
   CheckJNI without a JNI error. It ran an offline wallet, a read-only sync and a reopen from bytes,
   `ZephyrDaemonRpc` (on API 24 the `java.time` error) and TLS. On the API 36 16 KB image the
-  system logged one input-dispatch ANR for the test app during a run that passed, on a loaded
-  host; its cause was not established.
+  system logged one ANR for the test app during a run that passed; its cause was not established.
 - **AARs of these sources before the last change to the JNI bridge**, which attached the core's
   thread for each callback. Debug apps under ART's CheckJNI ran the closing tests as instrumented
   tests on API 24 and on the API 35 16 KB image. All 19 passed on each image. They cover `close()`
@@ -175,12 +174,12 @@ in 27 runs. Processes of this image without zephyr-java code also crashed with `
 before the app was installed and during the runs. In an idle window as long as the runs, with
 nothing of zephyr-java running, one of its processes crashed with `SIGILL` in browser code.
 During the matrix no process crashed on the three 4 KB images, with either AAR, ours or the
-image's own. With the AAR that has the release's native libraries this image had no crash of
-zephyr-java in 80 runs, and its own processes still crashed.
+image's own. In the matrix with the AAR that has the release's native libraries this image had
+no crash of zephyr-java in 80 runs, and its own processes still crashed.
 
 **The API 36 16 KB image.** With the earlier AAR the matrix had no crash there, in 80 runs, with
 600 to 10,000 callback threads per process. With the AAR that has the release's native libraries
-it had none in 80 runs either.
+the matrix had none in 80 runs either.
 None of the image's own processes crashed during the runs or in an idle window as long as them.
 At one of its four boots its Bluetooth process ended with `SIGABRT`, before the idle window began.
 

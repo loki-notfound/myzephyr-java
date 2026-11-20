@@ -24,7 +24,8 @@ return record.getReserve();  // the price of one ZRS in ZPH, times 10^12
 
 `new ZephyrDaemonRpc(uri, username, password)` is for a node with RPC login. Block headers with
 their pricing record were read from a mainnet node on the desktop, and `ZephyrDaemonRpc` read a
-mainnet node on the Android emulator with earlier releases. The calls of `ZephyrDaemonRpc` other
+mainnet node on the Android emulator with earlier releases. With builds of `2.3.0-sec.2-java.5` it
+did so on API 35 and API 36 as well. The calls of `ZephyrDaemonRpc` other
 than the node's information and block headers are inherited from monero-java; not tested against
 Zephyr.
 

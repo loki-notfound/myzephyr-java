@@ -348,11 +348,11 @@ On Android an app's process is normally killed rather than exited. On the Androi
 killing and exiting an app's process with a wallet syncing in the background ran with two kinds of
 AAR. On 2026-11-19 it ran with AARs from before the last change to the JNI bridge, on API 24 and on
 API 35 with 16 KB pages. On 2026-11-20 it ran with the bridge of `2.3.0-sec.2-java.5`, in a
-minified app, three times each on every image. The images were API 24, API 35 and API 36 with
-4 KB pages, and API 36 with 16 KB pages. Such a process ended when the system or `am force-stop`
-killed it. `System.exit(0)` ended it with exit code 0, within 0.2 s with the earlier AARs and
-within 0.5 s with the bridge of `2.3.0-sec.2-java.5`. None of these runs left a crash or a
-tombstone.
+minified app, four times each on four images and once each on a fifth. The four were API 24,
+API 35 and API 36 with 4 KB pages, and API 36 with 16 KB pages. The fifth was API 35 with 16 KB
+pages. Such a process ended when the system or `am force-stop` killed it. `System.exit(0)` ended
+it with exit code 0, within 0.2 s with the earlier AARs and within 0.5 s with the bridge of
+`2.3.0-sec.2-java.5`. None of these runs left a crash or a tombstone.
 
 ## What is not known
 
