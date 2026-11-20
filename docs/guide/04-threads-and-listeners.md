@@ -9,7 +9,8 @@ The blocks marked "Java, compiled" in this chapter come from
 `src/test/java/examples/GuideThreads.java`. Statements marked "observed on 2026-11-18" or
 "2026-11-19", and measurements of those days, come from runs on Linux `x86_64`. They used
 development builds of the `2.3.0-sec.2-java.5` sources as they stood on those days. None of those
-runs was made on Android. Statements about `2.3.0-sec.2-java.4` name that release
+runs was made on Android; the statements that name the Android emulator say so. Statements about
+`2.3.0-sec.2-java.4` name that release
 ([Where the statements come from](README.md#where-the-statements-come-from)).
 
 ## Calls block
@@ -41,9 +42,10 @@ another of these threads than the one whose work caused it.
 holds no lock while your listener runs. Background syncing and a relaying call on another thread
 can therefore deliver callbacks at once. A listener must be thread-safe.
 
-The core's background thread is attached to the JVM for each callback, as a daemon thread, and
-detached when the callback returns. Do not rely on a thread's identity or name. Hand the event
-over to your own thread (an executor, Android's main looper) and return quickly.
+The core's background thread is attached to the JVM once, as a daemon thread, on its first
+callback. It is detached when it ends, before `close()` returns. A thread of yours that delivers
+callbacks inside a call stays attached as it was. Do not rely on a thread's identity or name.
+Hand the event over to your own thread (an executor, Android's main looper) and return quickly.
 
 `addListener()` and `removeListener()` never deliver a callback themselves. A listener that is
 added receives the notifications from the next one on. A listener that is removed receives none
@@ -336,7 +338,11 @@ happened in 20 of 20 runs with a listener, and in a probe without one. It did no
 the JVM's exit. When `main` returned while the core's sync thread waited between two syncs, the
 program exited normally. This was not repeated on the final code of `2.3.0-sec.2-java.5`. Whether
 `System.exit()` hangs the same way was not run.
-On Android an app's process is normally killed rather than exited; this was not run on Android.
+On Android an app's process is normally killed rather than exited. On the Android emulator on
+2026-11-19, on API 24 and on API 35 with 16 KB pages, this ran with AARs from before the last
+change to the JNI bridge. A process with a wallet syncing in the background ended at once when the
+system or `am force-stop` killed it. `System.exit(0)` ended such a process within 0.2 s. None of
+these runs left a crash or a tombstone.
 
 ## What is not known
 
@@ -348,8 +354,11 @@ For `2.3.0-sec.2-java.5`, none of these was established:
 - whether a read from a callback that refreshes the pool can make the paused refresh miss a pool
   transaction;
 - the two longer waits of `close()` that were read in the core's code;
-- how any of this behaves on Android: ART, CheckJNI in debuggable apps, the attach per callback,
-  and `close()` while the app's process is being ended.
+- how this behaves on Android hardware: the closing tests ran on the Android emulator only
+  ([What was tested](13-known-limitations.md#what-was-tested));
+- the bridge of `2.3.0-sec.2-java.5` under ART's CheckJNI: the apps that ran it on the emulator
+  were not debuggable, and the debug apps ran an earlier bridge;
+- `close()` while the app's process is being ended.
 
 [Known limitations](13-known-limitations.md) lists what remains, and what `2.3.0-sec.2-java.5`
 fixed.
