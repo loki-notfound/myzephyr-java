@@ -99,8 +99,8 @@ other library that stays on Jackson 2.13. On Android zephyr-java has run with 2.
 **Size.** The libraries are stored uncompressed, so each ABI adds its library's full size to the
 APK. From `2.3.0-sec.2-java.5` on, the natives carry no Trezor code and no protobuf, which makes
 them 19 to 20 % smaller ([Build-layer patches](14-building-and-verifying.md#build-layer-patches)).
-The libraries of a release build of the final `2.3.0-sec.2-java.5` code on 2026-11-19, against
-those of the `2.3.0-sec.2-java.4` AAR:
+The libraries of a release build of the `2.3.0-sec.2-java.5` sources on 2026-11-19, with the
+release's native libraries, against those of the `2.3.0-sec.2-java.4` AAR:
 
 | ABI | Bytes | MB | MiB | Compressed inside the AAR | `java.4`: bytes | `java.4`: compressed |
 |---|---|---|---|---|---|---|
@@ -123,9 +123,10 @@ android {
 }
 ```
 
-The `x86_64` library of `2.3.0-sec.2-java.5` ran on the Android emulator on 2026-11-19, on API
-24, API 35 and API 36, also in a minified app. The ARM libraries have not run on hardware
-([What was tested](13-known-limitations.md#what-was-tested)).
+The `x86_64` library of `2.3.0-sec.2-java.5` ran on the Android emulator on 2026-11-19 and
+2026-11-20, on API 24, API 35 and API 36, with 4 KB and 16 KB pages. In a minified app it ran
+seven scenarios of closing and process exit, two of them also in an app without R8. The ARM
+libraries have not run on hardware ([What was tested](13-known-limitations.md#what-was-tested)).
 
 ## The RPC classes below API 26
 
@@ -243,7 +244,8 @@ need it there. A save is not exclusive with background syncing, and `close(true)
 ([Closing a wallet that syncs](04-threads-and-listeners.md#closing-a-wallet-that-syncs)). Call it
 on a worker thread, never on the main thread. In releases up to `2.3.0-sec.2-java.4`, a `close()`
 while a sync ran could crash the process; let the sync end first there. The observations of that
-section were made on Linux. The closing tests also ran on the Android emulator on 2026-11-19
+section were made on Linux, apart from the waits it gives for the Android emulator. The closing
+tests also ran on the Android emulator on 2026-11-19 and 2026-11-20
 ([What was tested](13-known-limitations.md#what-was-tested)).
 
 ## Logs
@@ -311,8 +313,10 @@ in R8's full mode, each before the rule that fixed it. With the rules of the rel
 app ran there. With an AAR from before the last change to the JNI bridge, on API 24 and API 35,
 it created a wallet offline and read its accounts, subaddresses, address book, outputs and balance.
 It synced against a node with a listener and read the node with `ZephyrDaemonRpc` (on API 24 it
-got the documented `java.time` error). With the AAR of the final code it passed two closing
-scenarios in 160 runs on four images
+got the documented `java.time` error). With an AAR from a release build of these sources, with
+the release's native libraries and classes, it passed two closing scenarios in 200 runs on five
+images, on 2026-11-19 and 2026-11-20. On 2026-11-20 it also ran five scenarios of closing and
+process exit on four images, as expected
 ([What was tested](13-known-limitations.md#what-was-tested)).
 
 The AAR's Android namespace is `dev.lateo.zephyrjava`. It names only the package of the AAR's
