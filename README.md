@@ -25,10 +25,12 @@ wallet RPC client. The [release notes](RELEASE-NOTES.md) list the breaking chang
   Its `x86_64` library ran on the Android emulator on 2026-11-19 and 2026-11-20, on API 24, 35 and
   36, with 4 KB and 16 KB pages. In a minified app it ran eight scenarios of closing and process
   exit, two of them also in an app without R8. Under CheckJNI a debug app ran an offline wallet, a
-  sync, `ZephyrDaemonRpc` and TLS with it. With an earlier bridge, apps crashed during
+  sync, `ZephyrDaemonRpc` (which read a mainnet node on API 36 with 16 KB pages) and TLS with it.
+  With an earlier bridge, apps crashed during
   background syncing on one of these images (API 35 with 16 KB pages), whose own processes crashed
   the same way. They did not crash on the other image with 16 KB pages (API 36). With the bridge of
-  `java.5` none crashed on either, in 80 runs on each. The ARM libraries have not run on hardware.
+  `java.5` none crashed on either, in 80 runs of two closing scenarios on each. The ARM libraries
+  have not run on hardware.
 - The natives carry no Trezor code and no protobuf: the Java API cannot reach a hardware device.
 
 The guide's [What was tested](docs/guide/13-known-limitations.md#what-was-tested) has the details,

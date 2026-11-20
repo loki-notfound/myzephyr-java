@@ -234,8 +234,9 @@ leaves out protobuf (below, Changed).
 
 ### Tested
 
-On Linux `x86_64` (Debian 13, OpenJDK 21), from 2026-11-18 to 2026-11-19, with development builds
-of these sources, against a mainnet node, read-only; nothing was sent or relayed:
+On Linux `x86_64` (Debian 13, OpenJDK 21), from 2026-11-18 to 2026-11-20, with development and,
+where a bullet says so, release builds of these sources, against a mainnet node, read-only; nothing
+was sent or relayed:
 
 - the offline tests, 72 on the final code. Among them are every public method of a closed
   wallet, the refusals inside a callback, a failed save at close and `close()` racing calls on
@@ -260,9 +261,10 @@ of these sources, against a mainnet node, read-only; nothing was sent or relayed
   A Gradle JVM program resolved the JAR of the first state, under its `java.4` coordinates, from a
   local copy of that bundle and ran it. One more release build on 2026-11-19 gave the AAR that ran
   on the Android emulator (below);
-- two release builds of these sources in the containers on 2026-11-20, with identical
-  `SHA256SUMS` and identical Maven Central bundles. The AAR of that bundle ran on the Android
-  emulator as well (below).
+- release builds in the containers on 2026-11-20 of two states of these sources from before the
+  last corrections of this text: two of each. The code, the consumer rules and the
+  natives have not changed since. Each pair had identical `SHA256SUMS` and identical Maven Central
+  bundles, and all four gave the same AAR. That AAR ran on the Android emulator as well (below).
 
 On the Android emulator on 2026-11-19 and 2026-11-20, the `x86_64` library, against the same
 node, read-only. The images were API 24, API 35 and API 36 with 4 KB pages, and two Google APIs
@@ -289,7 +291,9 @@ images with 16 KB pages: API 35 (build `AE3A.240806.043`) and, on 2026-11-20 onl
   `close()` and the other calls refused in a callback, and the two exit scenarios above. All 50
   went as expected, without a crash of the app. That includes the API 35 16 KB image, whose own
   processes crashed at boot again. On API 24 and on the API 36 16 KB image a debug app ran an
-  offline wallet, a read-only sync, `ZephyrDaemonRpc` and TLS under CheckJNI, without a JNI error;
+  offline wallet, a read-only sync, `ZephyrDaemonRpc` and TLS under CheckJNI, without a JNI error.
+  `ZephyrDaemonRpc` read the node on the API 36 16 KB image; on API 24 it got the documented
+  `java.time` error;
 - AARs of these sources before the last change to the JNI bridge, on API 24 and on the API 35
   16 KB image. In debug apps under ART's CheckJNI the closing tests ran as instrumented tests,
   19 of 19 per image. They cover `close()` during a foreground `sync()`, during busy background
