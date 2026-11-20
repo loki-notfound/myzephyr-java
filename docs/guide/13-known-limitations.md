@@ -94,16 +94,59 @@ builds of the sources as they stood on those days:
   and removed in a loop during background syncing.
 - **The read-only integration tests** against the node, and the TLS tests against a node with a
   publicly signed certificate.
-- All of these again under `-Xcheck:jni`, without a warning or fatal error from the JNI checks.
+- All of these again under `-Xcheck:jni` on the final code, without a warning or fatal error from
+  the JNI checks.
 - On 2026-11-18 the offline and closing tests of the code as it stood then also ran on the
   Linux `x86_64` library built in the release container, without Trezor and protobuf. That was
   before the last closing fixes: 65 offline tests and 35 closing tests.
-- **A minified Android app** (AGP 9.5, R8's full mode) was built against an AAR of these sources
-  on 2026-11-19; it was not run. A JVM program with Gradle resolved the JAR from a local copy of
-  the Maven Central bundle and ran it.
+- A JVM program with Gradle resolved the JAR from a local copy of the Maven Central bundle and ran
+  it.
 
-**Not on Android.** For `2.3.0-sec.2-java.5` nothing had run on Android or on the emulator when
-this section was written (2026-11-19).
+**On the Android emulator**, on 2026-11-19: the `x86_64` library, against the same node,
+read-only, on four images.
+
+| Image | Pages | Build |
+|---|---|---|
+| API 24 | 4 KB | `NYC` |
+| API 35, Google APIs | 16 KB | `AE3A.240806.043` |
+| API 35 | 4 KB | `AE3A.240806.019` |
+| API 36 | 4 KB | `BE2A.250530.026.D1` |
+
+- **The AAR of a release build of the final code** ran on all four images, in a minified app
+  (AGP 9.5, R8's full mode) and in the same app built without R8, neither debuggable. Two closing
+  scenarios ran 20 times per build and image, each in its own process. One is `close()` 1.5 s into
+  busy background syncing, with no callback after it. In the other, a listener throws from its
+  first `onSyncProgress` and `onNewBlock`. A second listener receives the same callbacks until the
+  scan reaches the node's height. All 320 runs passed without a crash. Each process had one
+  callback thread of the core, which had ended after `close()`, and `close()` waited 3 to 999 ms.
+  These runs covered those two scenarios only, without CheckJNI.
+- **AARs of these sources before the last change to the JNI bridge**, which attached the core's
+  thread for each callback. Debug apps under ART's CheckJNI ran the closing tests as instrumented
+  tests on API 24 and on the 16 KB image. All 19 passed on each image. They cover `close()` during a
+  foreground `sync()` (5 of 5 runs per image), during busy background syncing and right after
+  `stopSyncing()`. Also a throwing listener, `close()` and the refused calls from a callback, and
+  a process ended with a wallet syncing. Every callback thread of the core had ended after
+  `close()`. They also ran an offline wallet, a sync and a reopen from bytes, `ZephyrDaemonRpc`
+  and TLS to a node with a publicly signed certificate.
+- **The minified app with these earlier AARs.** With the consumer rules of the release it ran on
+  API 24 and on the 16 KB image. It read an offline wallet's accounts, subaddresses, address book,
+  outputs and balance. It synced with a listener and read the node with `ZephyrDaemonRpc` (on API
+  24 it got the documented `java.time` error). With rules from before the interceptor rule, it ran
+  the closing scenarios from its own code under CheckJNI. They passed 19 of 19 on API 24 and 17 of
+  19 on the 16 KB image. The two-scenario matrix above also ran with an earlier AAR on all four
+  images.
+
+**The crashes on the 16 KB image.** With the earlier AARs, apps that are not debuggable crashed
+with `SIGSEGV` on this image, during background syncing. That happened in 2 of 19 runs of the
+closing scenarios, 3 of 24 repeated runs and 5 of 80 runs of the matrix. Each crash was on
+a callback thread of the core or in ART's garbage collector. Debug apps on this image did not
+crash, in 27 runs. Processes of this image without zephyr-java code crashed the same way: at boot
+before the app was installed, during the runs and while idle. During the matrix no process
+crashed on the three 4 KB images, with either AAR, ours or the image's own. With the AAR of the
+final code this image had no crash of zephyr-java in 80 runs, and its own processes still
+crashed.
+
+No run under CheckJNI showed a JNI error in a process of zephyr-java.
 
 ### Runs of earlier releases
 
@@ -132,8 +175,9 @@ alignment, packaging). They have not run on hardware.
 
 ## What was not tested
 
-- anything of `2.3.0-sec.2-java.5` on Android, among it the closing and listener changes on ART
-  with CheckJNI, and the minified app on a device;
+- the bridge of `2.3.0-sec.2-java.5` under ART's CheckJNI: the apps that ran it on the emulator
+  were not debuggable;
+- a minified app with a transaction history, or with R8 settings other than AGP 9.5's full mode;
 - the conversions other than ZPH → ZRS on mainnet;
 - the ARM libraries for Android on hardware;
 - the Linux `arm64` library, which is built and checked but has not been run;
@@ -198,6 +242,9 @@ were observed or read. The release notes list every fix:
 - No call reported whether a background scan still ran, so a safe `close()` was not possible.
   Now `close()` waits for the core's sync thread by itself.
 - A minified Android app failed to build in R8 unless it added its own `-dontwarn` rules
-  (observed with the `java.4` AAR on 2026-11-19). The AAR now brings them.
+  (observed with the `java.4` AAR on 2026-11-19). With earlier states of `2.3.0-sec.2-java.5`, a
+  minified app built with them then failed at run time. R8 dropped what Jackson reads by
+  reflection and merged the HTTP client's interceptors (observed on the emulator on 2026-11-19).
+  The AAR's rules now cover all of these.
 - The RPC classes were a first pass in which `ZephyrWalletRpc` served the base coin only. The class
   was removed ([The wallet RPC client was removed](11-the-rpc-classes.md#the-wallet-rpc-client-was-removed)).
