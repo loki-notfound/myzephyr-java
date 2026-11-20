@@ -22,10 +22,12 @@ wallet RPC client. The [release notes](RELEASE-NOTES.md) list the breaking chang
 - **The JAR** carries the native libraries for Linux `x86_64` and `arm64` and needs glibc 2.36 or
   newer. The `arm64` library is built and checked but has not been run.
 - **The AAR**, minSdk 24, carries the native library for `arm64-v8a`, `armeabi-v7a` and `x86_64`.
-  Its `x86_64` library ran on the Android emulator on 2026-11-19, on API 24, 35 and 36, also in a
-  minified app. With an earlier bridge, apps crashed during background syncing on one of these
-  images (API 35 with 16 KB pages), whose own processes crashed the same way. With the bridge of
-  `java.5` none did, in 80 runs there. The ARM libraries have not run on hardware.
+  Its `x86_64` library ran on the Android emulator on 2026-11-19 and 2026-11-20, on API 24, 35 and
+  36, with 4 KB and 16 KB pages. In a minified app it ran seven scenarios of closing and process
+  exit, two of them also in an app without R8. With an earlier bridge, apps crashed during
+  background syncing on one of these images (API 35 with 16 KB pages), whose own processes crashed
+  the same way. They did not crash on the other image with 16 KB pages (API 36). With the bridge of
+  `java.5` none crashed on either, in 80 runs on each. The ARM libraries have not run on hardware.
 - The natives carry no Trezor code and no protobuf: the Java API cannot reach a hardware device.
 
 The guide's [What was tested](docs/guide/13-known-limitations.md#what-was-tested) has the details,
