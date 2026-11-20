@@ -134,6 +134,22 @@ only.
   without a crash or a tombstone. In the three scenarios run once, `close()` waited 5 to
   1,100 ms, and each process had one callback thread of the core. Nothing else ran with this AAR,
   and nothing under CheckJNI.
+- **A short check of an AAR of a later release build**, on 2026-11-20, on all five images. That
+  AAR has the release's consumer rules, native libraries and classes. In the minified app it
+  passed the app's own checks: an offline wallet, a sync with a listener and `ZephyrDaemonRpc` (on
+  API 24 the documented `java.time` error). Then ten runs per image, each in its own process.
+  `close()` during a foreground `sync()` ran three times. Once each ran `close()` during busy
+  background syncing, a throwing listener, `stopSyncing()` directly followed by `close()`,
+  `close()` from a callback and the other refused calls from a callback. Once each, too, a process
+  was left with a wallet syncing until `am force-stop` ended it, and `System.exit(0)` with a
+  wallet syncing ended its process. All 50 runs went as expected, without a crash of the app. That
+  includes the API 35 16 KB image, whose own processes crashed at boot again. `close()` waited 4
+  to 1,195 ms, and once 9,747 ms: during busy background syncing on the API 36 16 KB image, while
+  the callbacks did not advance. On API 24 and on the API 36 16 KB image a debug app ran under
+  CheckJNI without a JNI error. It ran an offline wallet, a read-only sync and a reopen from bytes,
+  `ZephyrDaemonRpc` (on API 24 the `java.time` error) and TLS. On the API 36 16 KB image the
+  system logged one input-dispatch ANR for the test app during a run that passed, on a loaded
+  host; its cause was not established.
 - **AARs of these sources before the last change to the JNI bridge**, which attached the core's
   thread for each callback. Debug apps under ART's CheckJNI ran the closing tests as instrumented
   tests on API 24 and on the API 35 16 KB image. All 19 passed on each image. They cover `close()`
@@ -197,8 +213,8 @@ alignment, packaging). They have not run on hardware.
 
 ## What was not tested
 
-- the bridge of `2.3.0-sec.2-java.5` under ART's CheckJNI: the apps that ran it on the emulator
-  were not debuggable;
+- listener callbacks and the closing tests with the bridge of `2.3.0-sec.2-java.5` under ART's
+  CheckJNI: the debug app's tests that ran this bridge add no listener;
 - a minified app with a transaction history, or with R8 settings other than AGP 9.5's full mode;
 - the conversions other than ZPH → ZRS on mainnet;
 - the ARM libraries for Android on hardware;

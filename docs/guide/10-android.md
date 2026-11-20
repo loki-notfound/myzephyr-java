@@ -125,7 +125,8 @@ android {
 
 The `x86_64` library of `2.3.0-sec.2-java.5` ran on the Android emulator on 2026-11-19 and
 2026-11-20, on API 24, API 35 and API 36, with 4 KB and 16 KB pages. In a minified app it ran
-seven scenarios of closing and process exit, two of them also in an app without R8. The ARM
+eight scenarios of closing and process exit, two of them also in an app without R8. Under CheckJNI
+a debug app ran an offline wallet, a sync, `ZephyrDaemonRpc` and TLS with it. The ARM
 libraries have not run on hardware ([What was tested](13-known-limitations.md#what-was-tested)).
 
 ## The RPC classes below API 26
@@ -316,7 +317,9 @@ It synced against a node with a listener and read the node with `ZephyrDaemonRpc
 got the documented `java.time` error). With an AAR from a release build of these sources, with
 the release's native libraries and classes, it passed two closing scenarios in 200 runs on five
 images, on 2026-11-19 and 2026-11-20. On 2026-11-20 it also ran five scenarios of closing and
-process exit on four images, as expected
+process exit on four images, as expected. On the same day an AAR with the release's consumer
+rules, native libraries and classes ran on all five images. It passed the app's own checks and
+eight scenarios of closing and process exit
 ([What was tested](13-known-limitations.md#what-was-tested)).
 
 The AAR's Android namespace is `dev.lateo.zephyrjava`. It names only the package of the AAR's

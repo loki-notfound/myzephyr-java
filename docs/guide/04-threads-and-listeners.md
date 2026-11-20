@@ -279,8 +279,10 @@ the tests that held a refresh or a node request on purpose took longer. Longer w
 
 On Android, never call `close()` on the main thread: a wait of seconds is an "Application Not
 Responding" dialog there. The Android emulator ran closing scenarios against the same node on
-2026-11-19 and 2026-11-20. There `close()` waited 3 ms to 1.1 s with the bridge of
-`2.3.0-sec.2-java.5`, and up to 3.5 s with earlier bridges
+2026-11-19 and 2026-11-20. There `close()` waited 3 ms to 1.2 s with the bridge of
+`2.3.0-sec.2-java.5`, and once 9.7 s. That wait, on 2026-11-20, was a `close()` during busy
+background syncing, and the callbacks did not advance while it lasted. With earlier bridges
+`close()` waited up to 3.5 s. So a `close()` on Android can take seconds
 ([What was tested](13-known-limitations.md#what-was-tested)).
 
 **`close(true)`** saves after the core's background sync thread has ended and while no other call
@@ -364,8 +366,8 @@ For `2.3.0-sec.2-java.5`, none of these was established:
 - the two longer waits of `close()` that were read in the core's code;
 - how this behaves on Android hardware: the closing tests ran on the Android emulator only
   ([What was tested](13-known-limitations.md#what-was-tested));
-- the bridge of `2.3.0-sec.2-java.5` under ART's CheckJNI: the apps that ran it on the emulator
-  were not debuggable, and the debug apps ran an earlier bridge;
+- listener callbacks and the closing tests with the bridge of `2.3.0-sec.2-java.5` under ART's
+  CheckJNI: the debug app's tests that ran this bridge add no listener;
 - `close()` while the app's process is being ended.
 
 [Known limitations](13-known-limitations.md) lists what remains, and what `2.3.0-sec.2-java.5`
