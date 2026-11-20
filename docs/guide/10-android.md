@@ -99,19 +99,17 @@ other library that stays on Jackson 2.13. On Android zephyr-java has run with 2.
 **Size.** The libraries are stored uncompressed, so each ABI adds its library's full size to the
 APK. From `2.3.0-sec.2-java.5` on, the natives carry no Trezor code and no protobuf, which makes
 them 19 to 20 % smaller ([Build-layer patches](14-building-and-verifying.md#build-layer-patches)).
-The libraries of a release build of the `2.3.0-sec.2-java.5` sources on 2026-11-19, against those
-of the `2.3.0-sec.2-java.4` AAR:
+The libraries of a release build of the final `2.3.0-sec.2-java.5` code on 2026-11-19, against
+those of the `2.3.0-sec.2-java.4` AAR:
 
 | ABI | Bytes | MB | MiB | Compressed inside the AAR | `java.4`: bytes | `java.4`: compressed |
 |---|---|---|---|---|---|---|
-| `arm64-v8a` | 16,058,024 | 16.06 | 15.31 | 6,013,648 bytes | 20,141,000 | 7,484,104 bytes |
-| `armeabi-v7a` | 14,559,540 | 14.56 | 13.89 | 5,949,224 bytes | 18,019,980 | 7,165,617 bytes |
-| `x86_64` | 19,013,608 | 19.01 | 18.13 | 7,096,048 bytes | 23,897,880 | 8,590,609 bytes |
+| `arm64-v8a` | 16,041,640 | 16.04 | 15.30 | 6,014,906 bytes | 20,141,000 | 7,484,104 bytes |
+| `armeabi-v7a` | 14,559,540 | 14.56 | 13.89 | 5,951,529 bytes | 18,019,980 | 7,165,617 bytes |
+| `x86_64` | 19,013,608 | 19.01 | 18.13 | 7,097,656 bytes | 23,897,880 | 8,590,609 bytes |
 
-That build came before the last changes to the JNI bridge, so the release's own libraries can
-differ slightly; its AAR shows them. So each ABI adds about 16 MB for `arm64-v8a`, 15 MB for
-`armeabi-v7a` and 19 MB for `x86_64`. The size of a finished APK or of a Play delivery was not
-measured.
+So each ABI adds about 16 MB for `arm64-v8a`, 15 MB for `armeabi-v7a` and 19 MB for `x86_64`.
+The size of a finished APK or of a Play delivery was not measured.
 
 An app built as an Android App Bundle reaches each device from Google Play with the library of that
 device's ABI only. The Android documentation, "About Android App Bundles", describes it. An APK you distribute
@@ -125,9 +123,9 @@ android {
 }
 ```
 
-The `x86_64` library of earlier releases ran on the Android emulator; the ARM libraries have not
-run on hardware. For `2.3.0-sec.2-java.5` nothing had run on Android when this section was
-written, on 2026-11-19 ([What was tested](13-known-limitations.md#what-was-tested)).
+The `x86_64` library of `2.3.0-sec.2-java.5` ran on the Android emulator on 2026-11-19, on API
+24, API 35 and API 36, also in a minified app. The ARM libraries have not run on hardware
+([What was tested](13-known-limitations.md#what-was-tested)).
 
 ## The RPC classes below API 26
 
@@ -244,8 +242,9 @@ need it there. A save is not exclusive with background syncing, and `close(true)
 `close()` waits for the calls in flight and for the core's sync thread, without a time limit
 ([Closing a wallet that syncs](04-threads-and-listeners.md#closing-a-wallet-that-syncs)). Call it
 on a worker thread, never on the main thread. In releases up to `2.3.0-sec.2-java.4`, a `close()`
-while a sync ran could crash the process; let the sync end first there. None of the observations
-of that section were made on Android.
+while a sync ran could crash the process; let the sync end first there. The observations of that
+section were made on Linux. The closing tests also ran on the Android emulator on 2026-11-19
+([What was tested](13-known-limitations.md#what-was-tested)).
 
 ## Logs
 
@@ -287,14 +286,34 @@ The AAR's `proguard.txt` is applied to every app that uses it. It keeps:
 - the model packages `zephyr.wallet.model`, `zephyr.daemon.model` and `zephyr.common`, because
   Jackson maps the native JSON onto them by reflection, and the native side throws
   `zephyr.common.ZephyrError` by name;
-- annotations and generic signatures, which Jackson reads at run time.
+- annotations and generic signatures, which Jackson reads at run time;
+- from `2.3.0-sec.2-java.5` on, the library's inline subclasses of Jackson's `TypeReference` with
+  their generic signatures. R8's full mode keeps a signature only on a class that a rule keeps.
+  Without them the first `createWallet()` threw "TypeReference constructed without actual type
+  information";
+- from `2.3.0-sec.2-java.5` on, the private nested classes of `ZephyrWalletFull` into which
+  Jackson maps accounts, subaddresses, the address book, key images, transaction sets and blocks.
+  Without them `getAccounts` and `getTxs` failed with "Error deserializing json to class";
+- from `2.3.0-sec.2-java.5` on, the request and response interceptors of the HTTP client, which
+  R8 may rename but not merge. The client keeps one interceptor per class. R8 had merged three of
+  them into one, and `ZephyrDaemonRpc` then failed with "Length required" on API 35;
+- from `2.3.0-sec.2-java.5` on, the name of `ZephyrDaemonRpc`, which names its `java.util.logging`
+  logger.
 
 From `2.3.0-sec.2-java.5` on it also carries three `-dontwarn` rules: `org.brotli.dec.**`,
 `org.ietf.jgss.**` and `org.slf4j.impl.StaticLoggerBinder`. The Apache HTTP client and its logging
 interface refer to these classes, and neither the AAR nor Android provides them. Without the rules
 an app built with R8 minification stopped with "Missing class" errors, with `2.3.0-sec.2-java.4`
-as well. Observed on 2026-11-19 with AGP 9.5 in R8's full mode: a minified app built against an
-AAR of the `java.5` sources, and the fields and callbacks above kept their names.
+as well.
+
+The three run-time failures above were observed on the Android emulator on 2026-11-19 with AGP 9.5
+in R8's full mode, each before the rule that fixed it. With the rules of the release a minified
+app ran there. With an AAR from before the last change to the JNI bridge, on API 24 and API 35,
+it created a wallet offline and read its accounts, subaddresses, address book, outputs and balance.
+It synced against a node with a listener and read the node with `ZephyrDaemonRpc` (on API 24 it
+got the documented `java.time` error). With the AAR of the final code it passed two closing
+scenarios in 160 runs on four images
+([What was tested](13-known-limitations.md#what-was-tested)).
 
 The AAR's Android namespace is `dev.lateo.zephyrjava`. It names only the package of the AAR's
 manifest; the Java packages are `zephyr.*`.
