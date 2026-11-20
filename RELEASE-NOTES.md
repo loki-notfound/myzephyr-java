@@ -259,7 +259,10 @@ of these sources, against a mainnet node, read-only; nothing was sent or relayed
   `2.3.0-sec.2-java.5`. Each set had identical `SHA256SUMS` and identical Maven Central bundles.
   A Gradle JVM program resolved the JAR of the first state, under its `java.4` coordinates, from a
   local copy of that bundle and ran it. One more release build on 2026-11-19 gave the AAR that ran
-  on the Android emulator (below).
+  on the Android emulator (below);
+- two release builds of these sources in the containers on 2026-11-20, with identical
+  `SHA256SUMS` and identical Maven Central bundles. The AAR of that bundle ran on the Android
+  emulator as well (below).
 
 On the Android emulator on 2026-11-19 and 2026-11-20, the `x86_64` library, against the same
 node, read-only. The images were API 24, API 35 and API 36 with 4 KB pages, and two Google APIs
@@ -279,6 +282,14 @@ images with 16 KB pages: API 35 (build `AE3A.240806.043`) and, on 2026-11-20 onl
   each of these: `close()` from a callback, which was refused; `stopSyncing()` directly followed
   by `close()`; and calls from a callback that are refused there, `sync()` among them. All 36 runs
   went as expected, without a crash. Nothing else ran with this AAR, and nothing under CheckJNI;
+- the AAR of the release builds of 2026-11-20, with the release's consumer rules, native
+  libraries and classes, on all five images that day. In the minified app it passed the app's
+  own checks. Ten runs per image followed: `close()` during a foreground `sync()` three times,
+  the two closing scenarios above, and `stopSyncing()` directly followed by `close()`. Then
+  `close()` and the other calls refused in a callback, and the two exit scenarios above. All 50
+  went as expected, without a crash of the app. That includes the API 35 16 KB image, whose own
+  processes crashed at boot again. On API 24 and on the API 36 16 KB image a debug app ran an
+  offline wallet, a read-only sync, `ZephyrDaemonRpc` and TLS under CheckJNI, without a JNI error;
 - AARs of these sources before the last change to the JNI bridge, on API 24 and on the API 35
   16 KB image. In debug apps under ART's CheckJNI the closing tests ran as instrumented tests,
   19 of 19 per image. They cover `close()` during a foreground `sync()`, during busy background
