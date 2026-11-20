@@ -51,8 +51,8 @@ Statements marked "observed on 2026-11-18" or "observed on 2026-11-19" come from
 mainnet node on Linux `x86_64` (Debian 13, OpenJDK 21), read-only, or offline. They used
 development builds of the `2.3.0-sec.2-java.5` sources as they stood on those days; some used the
 Linux library built in the release container. None of those runs was made on Android.
-Statements about the Android emulator name it, and come from runs on 2026-11-19
-([What was tested](13-known-limitations.md#what-was-tested)).
+Statements about the Android emulator name it. Those about `2.3.0-sec.2-java.5` come from runs on
+2026-11-19 ([What was tested](13-known-limitations.md#what-was-tested)).
 
 Statements marked "observed on 2026-11-17" come from runs of the same kind with
 `2.3.0-sec.2-java.4`. Most used a developer build of its sources. Those marked "with the released
