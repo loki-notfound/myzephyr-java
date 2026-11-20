@@ -118,8 +118,9 @@ leaves out protobuf (below, Changed).
 - **An exception from a listener during background syncing left a native thread attached**, and
   the JVM never exited (3 of 3 runs with the released JAR, 2026-11-17). Now every listener runs in
   its own protection: its `Throwable` is logged at `WARNING` without the callback's data, and the
-  other listeners are still called. The bridge never leaves a callback thread attached: threads
-  are attached as daemon threads and detached after each callback.
+  other listeners are still called. The bridge never leaves a callback thread attached: a native
+  thread of the core is attached once, as a daemon thread, on its first callback, and detached
+  when it ends, before `close()` returns (below, Changed).
 - **Adding and removing listeners while background syncing ran could crash the process.** The
   change raced the core's sync thread in the core's unsynchronised listener set. A test that did
   so in a loop crashed a development build with `java.4`'s pattern in 8 of 8 runs (2026-11-18);
@@ -158,11 +159,19 @@ leaves out protobuf (below, Changed).
 - **A `null` attribute key or value aborted the process** in `getAttribute` and `setAttribute`
   (the bridge built a string from a null pointer). Now it is refused with "Must provide attribute
   key" or "Must provide attribute value".
-- **A minified app could not be built against the AAR.** R8 stopped on classes that the Apache
-  HTTP client and its logging interface refer to (`org.brotli.dec.BrotliInputStream`,
+- **A minified app could not be built against the AAR, nor use it.** R8 stopped on classes that
+  the Apache HTTP client and its logging interface refer to (`org.brotli.dec.BrotliInputStream`,
   `org.ietf.jgss.*`, `org.slf4j.impl.StaticLoggerBinder`) unless the app added its own rules;
-  `java.4` failed the same way (2026-11-19, AGP 9.5, R8 full mode). The AAR's consumer rules now
-  carry the three `-dontwarn` lines.
+  `java.4` failed the same way (2026-11-19, AGP 9.5, R8 full mode). Built with those rules, a
+  minified app failed at run time in three ways, observed on the Android emulator on 2026-11-19.
+  Its first `createWallet()` threw "Internal error: TypeReference constructed without actual type
+  information": R8's full mode had dropped the generic signatures that Jackson reads. With those
+  kept, `getAccounts` and `getTxs` failed with "Error deserializing json to class", since R8 had
+  renamed or removed the library's private JSON classes. With those kept as well,
+  `ZephyrDaemonRpc` failed on API 35 with "Length required". R8 had merged three request
+  interceptors of the HTTP client into one class, the client keeps one interceptor per class, and
+  it then refused to send a request body without its length. The AAR's consumer rules now cover
+  all of this (below, Changed), and a minified app ran on the emulator (below, Tested).
 - A wallet whose node connection failed right after it was opened or created was never freed;
   it is now closed before the exception is thrown.
 - A listener given to `sync(listener)` that removed itself made the sync throw "Listener is not
@@ -174,13 +183,16 @@ leaves out protobuf (below, Changed).
   `USE_DEVICE_TREZOR=OFF` (its `device_trezor` library becomes the stub with an empty
   registration), depends builds no protobuf, and the JNI library no longer links protobuf or
   libusb directly. On Linux hidapi with libusb and eudev stays, for zephyr's Ledger code. Exports
-  and the needed libraries are unchanged. The natives are 17 to 20 % smaller: in a build of
-  2026-11-18, `linux-x86_64` 19,076,344 bytes (`java.4`: 23,206,736), `linux-arm64` 16,702,608
-  (20,053,160), `arm64-v8a` 16,025,256 (20,141,000), `armeabi-v7a` 14,559,540 (18,019,980) and
-  `x86_64` 19,013,608 (23,897,880). The guide's "Android" gives a later build of 2026-11-19, and
-  the release's own libraries can differ slightly from both.
+  and the needed libraries are unchanged. The natives are 17 to 20 % smaller. In a release build
+  of the final code on 2026-11-19: `linux-x86_64` 19,076,344 bytes (`java.4`: 23,206,736),
+  `linux-arm64` 16,702,608 (20,053,160), `arm64-v8a` 16,041,640 (20,141,000), `armeabi-v7a`
+  14,559,540 (18,019,980) and `x86_64` 19,013,608 (23,897,880).
 - The consumer R8 rules keep the two native handle fields of `ZephyrWalletFull` under their names,
-  which the bridge reads by name and Java no longer reads; and the three `-dontwarn` lines above.
+  which the bridge reads by name and Java no longer reads. They keep the library's `TypeReference`
+  subclasses with their generic signatures, and the private JSON classes of `ZephyrWalletFull`,
+  which Jackson reads by reflection. They keep the HTTP client's request and response
+  interceptors from being merged into one class, and the name of `ZephyrDaemonRpc`, which names
+  its logger. And they carry the three `-dontwarn` lines above.
 - The AAR's Android namespace is `dev.lateo.zephyrjava` (was `io.github.lokinotfound.zephyrjava`);
   it names only the package of the AAR's manifest.
 - Both POMs carry what Maven Central requires (name, description with the not-affiliated
@@ -197,6 +209,12 @@ leaves out protobuf (below, Changed).
   listener costs what it cost in `java.4`. A wallet whose listener was added and removed pays the
   core's per-block listener work, about 11 % per scan in a measurement of 2026-11-18. Add the first
   listener before `startSyncing()`.
+- **The JNI bridge attaches each native thread of the core to the JVM once**, as a daemon thread,
+  on its first callback, and detaches it when the thread ends. Before, as in `java.4`, it attached
+  the thread for each callback and detached it afterwards. In a scan of about 18,000 callbacks on
+  Linux on 2026-11-19, a thread was attached 18,093 times before the change and once after it.
+  On one Android emulator image, apps crashed during background syncing before the change, in 5
+  of 80 runs, and in none of 80 after it (below, Tested).
 - The JNI bridge throws `ZephyrError` for every core exception, in every native call, and
   `OutOfMemoryError` for a failed allocation, also while it copies a call's arguments. It deletes
   the local references of each callback and checks each class lookup in `JNI_OnLoad`.
@@ -226,19 +244,45 @@ of these sources, against a mainnet node, read-only; nothing was sent or relayed
   on the final code: 45 passed, 20 opt-in runs skipped. Among them `close()` during a foreground
   `sync()` in 10 of 10 runs, right after `startSyncing()` and `stopSyncing()`, and listeners added
   and removed in a loop during background syncing. Against the node `close()` returned within
-  197 ms, apart from the tests that held a refresh or a node request on purpose. Against a
+  199 ms, apart from the tests that held a refresh or a node request on purpose. Against a
   socket that never answered it waited 208 s, the core's timeout;
 - the read-only integration tests and the TLS tests;
-- all of these again under `-Xcheck:jni`, without a warning or fatal error from the JNI checks;
+- all of these again under `-Xcheck:jni` on the final code, without a warning or fatal error from
+  the JNI checks;
 - on 2026-11-18, the offline and closing tests of the code as it stood then (65 and 35 tests,
   before the last closing fixes) also on the Linux `x86_64` library built in the release
   container;
-- three release builds with identical `SHA256SUMS` and identical Maven Central bundles
-  (2026-11-19); a Gradle JVM program that resolved and ran the JAR from a local copy of the bundle;
-  a minified Android app built against the AAR, not run.
+- release builds in the containers on 2026-11-19 of two earlier states of these sources, three
+  and two builds, each set with identical `SHA256SUMS` and identical Maven Central bundles. A
+  Gradle JVM program resolved and ran the JAR from a local copy of the bundle.
 
-Android: nothing of this release had run on Android or the emulator when these notes were
-written (2026-11-19).
+On the Android emulator on 2026-11-19, the `x86_64` library, against the same node, read-only.
+The images were API 24, API 35 with 16 KB pages (a Google APIs image, build `AE3A.240806.043`),
+and API 35 and API 36 with 4 KB pages:
+
+- the AAR of a release build of the final code, in a minified app (AGP 9.5, R8 full mode) and in
+  the same app built without R8, neither debuggable, on all four images. Two closing scenarios
+  ran 20 times per build and image, each in its own process: `close()` during busy background
+  syncing, and a throwing listener during background syncing. All 320 runs passed without a
+  crash, each with one callback thread of the core. These runs covered those two scenarios only;
+- AARs of these sources before the last change to the JNI bridge, on API 24 and on the 16 KB
+  image. In debug apps under ART's CheckJNI the closing tests ran as instrumented tests, 19 of 19
+  per image. They cover `close()` during a foreground `sync()`, during busy background syncing and
+  right after `stopSyncing()`, a throwing listener, the refusals in a callback and a process ended
+  with a wallet syncing. The debug apps also ran an offline wallet, a sync and a reopen from
+  bytes, `ZephyrDaemonRpc` and TLS to a node with a publicly signed certificate. The minified app,
+  with the consumer rules of this release, read an offline wallet's accounts, subaddresses,
+  address book, outputs and balance. It synced with a listener and read the node with
+  `ZephyrDaemonRpc` on API 35. With rules from before the interceptor rule, it ran the same
+  closing scenarios from its own code under CheckJNI, 19 of 19 on API 24.
+
+With those earlier AARs, which attached the core's thread for each callback, apps that are not
+debuggable crashed with `SIGSEGV` on the 16 KB image during background syncing. That happened in
+2 of 19 runs of the closing scenarios, in 3 of 24 repeated runs, and in 5 of 80 runs of the same
+matrix as above. On this image, processes without zephyr-java code crashed the same way, also at
+boot before the app was installed. During the matrix, with either AAR, no process crashed on the
+three 4 KB images. The runs under CheckJNI showed no JNI error in a process of zephyr-java. The
+ARM libraries have not run on hardware.
 
 ### The dependency
 
