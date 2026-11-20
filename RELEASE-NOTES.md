@@ -118,9 +118,9 @@ leaves out protobuf (below, Changed).
 - **An exception from a listener during background syncing left a native thread attached**, and
   the JVM never exited (3 of 3 runs with the released JAR, 2026-11-17). Now every listener runs in
   its own protection: its `Throwable` is logged at `WARNING` without the callback's data, and the
-  other listeners are still called. The bridge never leaves a callback thread attached: a native
-  thread of the core is attached once, as a daemon thread, on its first callback, and detached
-  when it ends, before `close()` returns (below, Changed).
+  other listeners are still called. No thread that has ended stays attached: a native thread of
+  the core is attached once, as a daemon thread, on its first callback, and detached when it ends.
+  The core's sync thread ends and is detached before `close()` returns (below, Changed).
 - **Adding and removing listeners while background syncing ran could crash the process.** The
   change raced the core's sync thread in the core's unsynchronised listener set. A test that did
   so in a loop crashed a development build with `java.4`'s pattern in 8 of 8 runs (2026-11-18);
@@ -184,9 +184,9 @@ leaves out protobuf (below, Changed).
   registration), depends builds no protobuf, and the JNI library no longer links protobuf or
   libusb directly. On Linux hidapi with libusb and eudev stays, for zephyr's Ledger code. Exports
   and the needed libraries are unchanged. The natives are 17 to 20 % smaller. In a release build
-  of the final code on 2026-11-19: `linux-x86_64` 19,076,344 bytes (`java.4`: 23,206,736),
-  `linux-arm64` 16,702,608 (20,053,160), `arm64-v8a` 16,041,640 (20,141,000), `armeabi-v7a`
-  14,559,540 (18,019,980) and `x86_64` 19,013,608 (23,897,880).
+  of these sources on 2026-11-19, with the release's native libraries: `linux-x86_64` 19,076,344
+  bytes (`java.4`: 23,206,736), `linux-arm64` 16,702,608 (20,053,160), `arm64-v8a` 16,041,640
+  (20,141,000), `armeabi-v7a` 14,559,540 (18,019,980) and `x86_64` 19,013,608 (23,897,880).
 - The consumer R8 rules keep the two native handle fields of `ZephyrWalletFull` under their names,
   which the bridge reads by name and Java no longer reads. They keep the library's `TypeReference`
   subclasses with their generic signatures, and the private JSON classes of `ZephyrWalletFull`,
@@ -211,10 +211,12 @@ leaves out protobuf (below, Changed).
   listener before `startSyncing()`.
 - **The JNI bridge attaches each native thread of the core to the JVM once**, as a daemon thread,
   on its first callback, and detaches it when the thread ends. Before, as in `java.4`, it attached
-  the thread for each callback and detached it afterwards. In a scan of about 18,000 callbacks on
-  Linux on 2026-11-19, a thread was attached 18,093 times before the change and once after it.
-  On one Android emulator image, apps crashed during background syncing before the change, in 5
-  of 80 runs, and in none of 80 after it (below, Tested).
+  the thread for each callback and detached it afterwards. On Linux on 2026-11-19, a scan of
+  18,093 callbacks attached a thread 18,093 times before the change; after it, a scan of 18,161
+  callbacks attached a thread once. On the Android emulator image of API 35 with 16 KB pages,
+  apps crashed during background syncing before the change, in 5 of 80 runs, and in none of 80
+  after it. On the image of API 36 with 16 KB pages no app crashed, in 80 runs with each bridge
+  (below, Tested).
 - The JNI bridge throws `ZephyrError` for every core exception, in every native call, and
   `OutOfMemoryError` for a failed allocation, also while it copies a call's arguments. It deletes
   the local references of each callback and checks each class lookup in `JNI_OnLoad`.
@@ -252,37 +254,51 @@ of these sources, against a mainnet node, read-only; nothing was sent or relayed
 - on 2026-11-18, the offline and closing tests of the code as it stood then (65 and 35 tests,
   before the last closing fixes) also on the Linux `x86_64` library built in the release
   container;
-- release builds in the containers on 2026-11-19 of two earlier states of these sources, three
-  and two builds, each set with identical `SHA256SUMS` and identical Maven Central bundles. A
-  Gradle JVM program resolved and ran the JAR from a local copy of the bundle.
+- release builds in the containers on 2026-11-19 of two earlier states of these sources: three
+  of a state still versioned `2.3.0-sec.2-java.4`, and two of a later state versioned
+  `2.3.0-sec.2-java.5`. Each set had identical `SHA256SUMS` and identical Maven Central bundles.
+  A Gradle JVM program resolved the JAR of the first state, under its `java.4` coordinates, from a
+  local copy of that bundle and ran it. One more release build on 2026-11-19 gave the AAR that ran
+  on the Android emulator (below).
 
-On the Android emulator on 2026-11-19, the `x86_64` library, against the same node, read-only.
-The images were API 24, API 35 with 16 KB pages (a Google APIs image, build `AE3A.240806.043`),
-and API 35 and API 36 with 4 KB pages:
+On the Android emulator on 2026-11-19 and 2026-11-20, the `x86_64` library, against the same
+node, read-only. The images were API 24, API 35 and API 36 with 4 KB pages, and two Google APIs
+images with 16 KB pages: API 35 (build `AE3A.240806.043`) and, on 2026-11-20 only, API 36 (build
+`BE2A.250530.026.F3`).
 
-- the AAR of a release build of the final code, in a minified app (AGP 9.5, R8 full mode) and in
-  the same app built without R8, neither debuggable, on all four images. Two closing scenarios
-  ran 20 times per build and image, each in its own process: `close()` during busy background
-  syncing, and a throwing listener during background syncing. All 320 runs passed without a
-  crash, each with one callback thread of the core. These runs covered those two scenarios only;
-- AARs of these sources before the last change to the JNI bridge, on API 24 and on the 16 KB
-  image. In debug apps under ART's CheckJNI the closing tests ran as instrumented tests, 19 of 19
-  per image. They cover `close()` during a foreground `sync()`, during busy background syncing and
-  right after `stopSyncing()`, a throwing listener, the refusals in a callback and a process ended
-  with a wallet syncing. The debug apps also ran an offline wallet, a sync and a reopen from
-  bytes, `ZephyrDaemonRpc` and TLS to a node with a publicly signed certificate. The minified app,
-  with the consumer rules of this release, read an offline wallet's accounts, subaddresses,
-  address book, outputs and balance. It synced with a listener and read the node with
-  `ZephyrDaemonRpc` on API 35. With rules from before the interceptor rule, it ran the same
+- the AAR of a release build of these sources, with the release's native libraries and classes.
+  It ran in a minified app (AGP 9.5, R8 full mode) and in the same app built without R8, neither
+  debuggable, on all five images. Two closing scenarios ran 20 times per build and image, each in
+  its own process: `close()` during busy background syncing, and a throwing listener during
+  background syncing. All 400 runs passed without a crash, each with one callback thread of the
+  core;
+- the same AAR in the minified app on 2026-11-20, on API 24, API 35 and API 36 with 4 KB pages
+  and API 36 with 16 KB pages. Three times per image a process was left with a wallet syncing in
+  the background; it stayed alive until `am force-stop` ended it. Three times per image
+  `System.exit(0)` with a wallet syncing ended the process with exit code 0. Once per image ran
+  each of these: `close()` from a callback, which was refused; `stopSyncing()` directly followed
+  by `close()`; and calls from a callback that are refused there, `sync()` among them. All 36 runs
+  went as expected, without a crash. Nothing else ran with this AAR, and nothing under CheckJNI;
+- AARs of these sources before the last change to the JNI bridge, on API 24 and on the API 35
+  16 KB image. In debug apps under ART's CheckJNI the closing tests ran as instrumented tests,
+  19 of 19 per image. They cover `close()` during a foreground `sync()`, during busy background
+  syncing and right after `stopSyncing()`, a throwing listener, the refusals in a callback and a
+  process ended with a wallet syncing. The debug apps also ran an offline wallet, a sync and a
+  reopen from bytes, `ZephyrDaemonRpc` and TLS to a node with a publicly signed certificate. The
+  minified app, with the consumer rules of this release, read an offline wallet's accounts,
+  subaddresses, address book, outputs and balance. It synced with a listener and read the node
+  with `ZephyrDaemonRpc` on API 35. With rules from before the interceptor rule, it ran the same
   closing scenarios from its own code under CheckJNI, 19 of 19 on API 24.
 
 With those earlier AARs, which attached the core's thread for each callback, apps that are not
-debuggable crashed with `SIGSEGV` on the 16 KB image during background syncing. That happened in
-2 of 19 runs of the closing scenarios, in 3 of 24 repeated runs, and in 5 of 80 runs of the same
-matrix as above. On this image, processes without zephyr-java code crashed the same way, also at
-boot before the app was installed. During the matrix, with either AAR, no process crashed on the
-three 4 KB images. The runs under CheckJNI showed no JNI error in a process of zephyr-java. The
-ARM libraries have not run on hardware.
+debuggable crashed with `SIGSEGV` on the API 35 16 KB image during background syncing. That
+happened in 2 of 19 runs of the closing scenarios, in 3 of 24 repeated runs, and in 5 of 80 runs
+of the same matrix as above. On this image, processes without zephyr-java code crashed the same
+way, also at boot before the app was installed. On the API 36 16 KB image the earlier AAR of that
+matrix ran it on 2026-11-20 without a crash, in 80 of 80 runs, with 600 to 10,000 callback
+threads per process. During the matrix, with either AAR, no process crashed on the three 4 KB
+images or on the API 36 16 KB image. The runs under CheckJNI showed no JNI error in a process of
+zephyr-java. The ARM libraries have not run on hardware.
 
 ### The dependency
 
