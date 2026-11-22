@@ -80,6 +80,7 @@
 boolean connected = wallet.isConnectedToDaemon();</code></pre>
 </div>
 <p>Replace <code>node.example.invalid</code> with your node's host name. The user name and password are only for nodes that require RPC login. <code>17767</code> is the default RPC port of a mainnet node. <code>getDaemonConnection()</code> returns the connection in use.</p>
+<p>Change the node while no sync runs. <code>setDaemonConnection</code> resets fields of the core that a refresh on another thread reads and writes without a lock (read in the core's code). The request under way is waited for, not replaced (<a href="04-threads-and-listeners.html#calls-from-several-threads">Calls from several threads</a>).</p>
 <p>A wallet without a connection still opens: it shows the state of its last sync, but cannot sync or send. <code>setProxyUri</code> routes the core's connection through a proxy (inherited from monero-java, meant for Tor); it has not been tested with Zephyr.</p>
 <p><strong>The port.</strong> A URI without a port gets the scheme's default: 443 for <code>https://</code>, 80 for <code>http://</code>. <code>getDaemonConnection()</code> then reports the URI with the port. A scheme written in another case (<code>HTTPS://</code>) reaches the core in lower case; the core switches TLS on only for a lowercase <code>https</code>. Releases <code>java.1</code> to <code>java.3</code> behaved differently. For a URI without a port the core connected to port 0 and blocked for minutes, and an <code>HTTPS://</code> URI was spoken in clear text.</p>
 <h2 id="http-and-https">http and https<a class="heading-anchor" href="#http-and-https" aria-label="Link to this section">#</a></h2>
@@ -148,6 +149,7 @@ long fetched = result.getNumBlocksFetched();</code></pre>
 <p>The first sync of a restored wallet scans from its restore height to the tip (<a href="02-wallets.html#restoring-from-a-mnemonic">Restoring from a mnemonic</a>). How long that takes over the internet from an old restore height has not been measured for zephyr-java. Save after the first sync (<a href="02-wallets.html#when-to-save">When to save</a>).</p>
 <h2 id="background-sync">Background sync<a class="heading-anchor" href="#background-sync" aria-label="Link to this section">#</a></h2>
 <p><code>startSyncing()</code> keeps the wallet in sync in the background, every 10 s by default. <code>startSyncing(periodInMs)</code> sets another period; <code>stopSyncing()</code> ends it. Listeners added with <code>addListener</code> receive the events of background syncs too.</p>
+<p><code>stopSyncing()</code> returns at once and only asks the core to stop (read in the core's code). The batch of blocks in progress still runs. A stop that comes right before a refresh begins is lost, and that sync then runs to the node's height before the background thread ends. No call reports when it has ended; <code>close()</code> waits for it by itself (<a href="04-threads-and-listeners.html#closing-a-wallet-that-syncs">Closing a wallet that syncs</a>).</p>
 <div class="lt-code-block">
 <div class="lt-code-head"><span>Java, compiled</span></div>
 <pre><code>wallet.startSyncing(30000L);</code></pre>
@@ -177,12 +179,12 @@ long fetched = result.getNumBlocksFetched();</code></pre>
 <h2 id="when-the-node-cannot-be-reached">When the node cannot be reached<a class="heading-anchor" href="#when-the-node-cannot-be-reached" aria-label="Link to this section">#</a></h2>
 <p><code>isConnectedToDaemon()</code> returns false, and a call that needs the node (<code>sync()</code>, <code>getDaemonHeight()</code> and the like) throws a <code>ZephyrError</code> &quot;Wallet is not connected to daemon&quot;. The balance methods still work: they read the wallet's local state.</p>
 <p>That message comes from the result of the last connection check (read in the core's code). The core makes that check when the connection is set and on each <code>isConnectedToDaemon()</code>. A node that goes away after that check gives other messages, such as &quot;Failed to connect to daemon&quot; from <code>getDaemonHeight()</code>. Call <code>isConnectedToDaemon()</code> to refresh the state.</p>
-<p><strong>For an <code>https://</code> node</strong> the message gets a hint at TLS. The library adds it to every &quot;Wallet is not connected to daemon&quot; of an <code>https://</code> URI, whatever the cause. The cause can be an untrusted certificate, but also a node that is down or a wrong port:</p>
+<p><strong>For an <code>https://</code> node</strong> the message gets a hint at TLS. The calls about the node and the syncing calls add it to &quot;Wallet is not connected to daemon&quot; for an <code>https://</code> URI, whatever the cause: <code>getDaemonHeight</code>, <code>getDaemonMaxPeerHeight</code>, <code>isDaemonSynced</code>, <code>sync</code>, <code>startSyncing</code>, <code>scanTxs</code>, <code>rescanSpent</code> and <code>rescanBlockchain</code>. Other calls pass the core's message unchanged. The cause can be an untrusted certificate, but also a node that is down or a wrong port:</p>
 <div class="lt-code-block">
 <div class="lt-code-head"><span>Text</span></div>
-<pre><code>Wallet is not connected to daemon: the node is an https node; its certificate may not be trusted (see ZephyrTls and the user guide, chapter 6)</code></pre>
+<pre><code>Wallet is not connected to daemon: the node is an https node; its certificate may not be trusted (see ZephyrTls and the user guide, &quot;TLS to a node&quot;)</code></pre>
 </div>
-<p>Releases up to <code>2.3.0-sec.2-java.4</code> print &quot;chapter 6&quot; in that message. The section it means is <a href="#tls-to-a-node">TLS to a node</a> in this chapter, and later releases name that section instead. When the certificate is the cause, the native log says &quot;SSL certificate is not in the allowed list, connection dropped&quot; (<a href="09-errors.html#the-native-log">The native log</a>).</p>
+<p>The section it names is <a href="#tls-to-a-node">TLS to a node</a> in this chapter. Releases up to <code>2.3.0-sec.2-java.4</code> print &quot;chapter 6&quot; in its place; they mean the same section. When the certificate is the cause, the native log says &quot;SSL certificate is not in the allowed list, connection dropped&quot; (<a href="09-errors.html#the-native-log">The native log</a>).</p>
 <nav class="site-pager" aria-label="Previous and next page">
 <a class="site-prev" rel="prev" href="02-wallets.html">Previous: 2. Wallets</a>
 <a class="site-next" rel="next" href="04-threads-and-listeners.html">Next: 4. Threads and listeners</a>
@@ -192,7 +194,7 @@ long fetched = result.getNumBlocksFetched();</code></pre>
 </main>
 <footer class="lt-footer">
 <div class="lt-wrap lt-wrap-wide">
-<p>Guide for zephyr-java 2.3.0-sec.2-java.4, built from commit <code>7b926ce9</code> (2026-11-18 UTC).</p>
+<p>Guide for zephyr-java 2.3.0-sec.2-java.5, built from commit <code>cb78099a</code> (2026-11-20 UTC).</p>
 <p>zephyr-java and this site are a <a href="https://lateo.dev/">lateo</a> project by an independent operator, not affiliated with or endorsed by ZephyrProtocol. Source: <a href="https://github.com/loki-notfound/myzephyr-java">github.com/loki-notfound/myzephyr-java</a>.</p>
 <p>The library and the guide are under the MIT licence of the repository; the stylesheet is BSD 3-Clause; the lateo name, mark and favicons are not covered by either and all rights in them are reserved by their owner (<a href="../assets/NOTICE.txt">notice</a>).</p>
 </div>

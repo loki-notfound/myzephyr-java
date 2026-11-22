@@ -107,7 +107,7 @@
 </div>
 <p>The two messages differ in their wording (&quot;Spot reserve ratio not satisfied&quot; against &quot;Reserve ratio not satisfied&quot;). Both arrive as the same <code>ZephyrError</code> with a <code>null</code> code, like &quot;not enough money&quot;. Only the text tells them apart, and it can change with the core (<a href="09-errors.html#the-messages-a-wallet-meets">The messages a wallet meets</a>). For a conversion the core checked the decimal places first, then the ratio, then the funds. An amount of one atomic unit gave the decimal-places message for every conversion pair (<a href="#building-a-conversion">Building a conversion</a>).</p>
 <h2 id="reserve-info">Reserve info<a class="heading-anchor" href="#reserve-info" aria-label="Link to this section">#</a></h2>
-<p>Zephyr's stable asset has a reserve of ZPH behind it. Whether a conversion is allowed depends on the state of that reserve (<a href="#the-ten-pairs">The ten pairs</a>), and a wallet app usually shows it. Two wallet calls report it: <code>getReserveInfo()</code> and <code>getCirculatingSupply()</code>. Both ask the node; they are not computed from the wallet's own outputs. Both need a connected full wallet; <code>ZephyrWalletRpc</code> does not support them (<a href="11-the-rpc-classes.html#zephyrwalletrpc">ZephyrWalletRpc</a>).</p>
+<p>Zephyr's stable asset has a reserve of ZPH behind it. Whether a conversion is allowed depends on the state of that reserve (<a href="#the-ten-pairs">The ten pairs</a>), and a wallet app usually shows it. Two wallet calls report it: <code>getReserveInfo()</code> and <code>getCirculatingSupply()</code>. Both ask the node; they are not computed from the wallet's own outputs. Both need a full wallet connected to a node.</p>
 <h2 id="getreserveinfo">getReserveInfo()<a class="heading-anchor" href="#getreserveinfo" aria-label="Link to this section">#</a></h2>
 <div class="lt-code-block">
 <div class="lt-code-head"><span>Java, compiled</span></div>
@@ -254,7 +254,7 @@ return wallet.relayTxs(txs);              // only after the user has agreed to f
 </main>
 <footer class="lt-footer">
 <div class="lt-wrap lt-wrap-wide">
-<p>Guide for zephyr-java 2.3.0-sec.2-java.4, built from commit <code>7b926ce9</code> (2026-11-18 UTC).</p>
+<p>Guide for zephyr-java 2.3.0-sec.2-java.5, built from commit <code>cb78099a</code> (2026-11-20 UTC).</p>
 <p>zephyr-java and this site are a <a href="https://lateo.dev/">lateo</a> project by an independent operator, not affiliated with or endorsed by ZephyrProtocol. Source: <a href="https://github.com/loki-notfound/myzephyr-java">github.com/loki-notfound/myzephyr-java</a>.</p>
 <p>The library and the guide are under the MIT licence of the repository; the stylesheet is BSD 3-Clause; the lateo name, mark and favicons are not covered by either and all rights in them are reserved by their owner (<a href="../assets/NOTICE.txt">notice</a>).</p>
 </div>

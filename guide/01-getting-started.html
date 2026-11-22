@@ -71,9 +71,9 @@
 <p>zephyr-java is a Java library around a native wallet core. The Java classes are plain Java 8 bytecode. The work is done by <code>libzephyr-java</code>, a native library that contains <code>zephyr-cpp</code> and Zephyr's <code>wallet2</code>, linked statically, and exports nothing but its JNI entry points.</p>
 <p>A wallet created with <code>ZephyrWalletFull</code> runs entirely inside your process. It talks to a Zephyr node over the node's RPC interface. It keeps its keys and its cache in files, or in byte arrays you store yourself.</p>
 <h2 id="what-zephyr-java-does-and-does-not-do">What zephyr-java does and does not do<a class="heading-anchor" href="#what-zephyr-java-does-and-does-not-do" aria-label="Link to this section">#</a></h2>
-<p>The full wallet, <code>ZephyrWalletFull</code>, is the complete API. With real funds on mainnet it has created, opened and synced wallets, shown balances per asset, sent transfers, converted ZPH to ZRS and swept accounts. It also reports the state of the reserve (<a href="08-conversions-and-the-reserve.html">Conversions and the reserve</a>).</p>
+<p>The full wallet, <code>ZephyrWalletFull</code>, is the complete API. During the work on the releases up to <code>2.3.0-sec.2-java.4</code> (2026-11-06 to 2026-11-10), zephyr-java ran on mainnet with real funds. It created, opened and synced wallets, showed balances per asset, sent transfers, converted ZPH to ZRS and swept accounts. <code>2.3.0-sec.2-java.5</code> was tested read-only: it has not sent, converted or swept (<a href="13-known-limitations.html#what-was-tested">What was tested</a>). The wallet also reports the state of the reserve (<a href="08-conversions-and-the-reserve.html">Conversions and the reserve</a>).</p>
 <p>Outside its scope, or not ready:</p>
-<ul><li><strong>macOS and Windows.</strong> Their native libraries are not packaged; on those systems you build the library yourself (<a href="#the-native-library">The native library</a>).</li><li><strong>The RPC classes.</strong> <code>ZephyrWalletRpc</code> and <code>ZephyrDaemonRpc</code> are a first pass; <code>ZephyrWalletRpc</code> serves the base coin only (<a href="11-the-rpc-classes.html">The RPC classes</a>).</li><li><strong>Testnet and stagenet.</strong> They never reach the rules of the current assets (<a href="02-wallets.html#network-types">Network types</a>).</li><li><strong>Conversions other than ZPH → ZRS.</strong> They use the same code path but have not been run on mainnet (<a href="08-conversions-and-the-reserve.html#what-was-tested">What was tested</a>).</li></ul>
+<ul><li><strong>macOS and Windows.</strong> Their native libraries are not packaged; on those systems you build the library yourself (<a href="#the-native-library">The native library</a>).</li><li><strong>The RPC classes.</strong> <code>ZephyrDaemonRpc</code> reads a node; beyond the node's information and block headers it is not tested. The wallet RPC client, <code>ZephyrWalletRpc</code>, was removed in <code>2.3.0-sec.2-java.5</code> (<a href="11-the-rpc-classes.html">The RPC classes</a>).</li><li><strong>Testnet and stagenet.</strong> They never reach the rules of the current assets (<a href="02-wallets.html#network-types">Network types</a>).</li><li><strong>Conversions other than ZPH → ZRS.</strong> They use the same code path but have not been run on mainnet (<a href="08-conversions-and-the-reserve.html#what-was-tested">What was tested</a>).</li></ul>
 <p>The API inherited from monero-java is larger than the part that was run against Zephyr. Each of these areas is inherited from monero-java; not tested against Zephyr:</p>
 <ul><li>multisig wallets (<code>prepareMultisig</code> and the calls after it);</li><li>mining (<code>startMining</code> on the wallet and on <code>ZephyrDaemonRpc</code>);</li><li>the export and import of key images;</li><li>the address book;</li><li><code>ZephyrConnectionManager</code>;</li><li>the proxy of <code>setProxyUri</code>;</li><li>seed offsets and mnemonic languages (<code>setSeedOffset</code>, <code>setLanguage</code>);</li><li>creating accounts and subaddresses and setting their labels;</li><li>several destinations in one transaction, and the priority, fee, unlock height, payment ID and split settings of <code>ZephyrTxConfig</code>;</li><li>transaction proofs, spend proofs, reserve proofs and message signatures;</li><li>the calls of <code>ZephyrDaemonRpc</code> other than the node's information and block headers.</li></ul>
 <p><a href="13-known-limitations.html">Known limitations</a> lists them again with the limits that were found.</p>
@@ -93,25 +93,24 @@
 <p>The <code>arm64</code> library for Linux is built and checked but has not been run (<a href="13-known-limitations.html#what-was-tested">What was tested</a>).</p>
 <h2 id="adding-the-dependency">Adding the dependency<a class="heading-anchor" href="#adding-the-dependency" aria-label="Link to this section">#</a></h2>
 <p>There are two artifacts with the same Java classes:</p>
-<ul><li><strong>The JAR</strong>, <code>io.github.loki-notfound:zephyr-java</code>, for desktop and server JVMs on Linux. It carries the native library for Linux <code>x86_64</code> and <code>arm64</code> as resources, so nothing else has to be installed.</li><li><strong>The AAR</strong>, <code>io.github.loki-notfound:zephyr-java-android</code>, for Android apps. It carries the native library for <code>arm64-v8a</code>, <code>armeabi-v7a</code> and <code>x86_64</code> under <code>jni/&lt;abi&gt;/</code>, and the R8 rules every app needs. <a href="10-android.html">Android</a> has its Gradle lines.</li></ul>
-<p>Both come from a Maven repository on the project's GitHub Pages. For a JVM project with Gradle (Kotlin DSL):</p>
+<ul><li><strong>The JAR</strong>, <code>dev.lateo:zephyr-java</code>, for desktop and server JVMs on Linux. It carries the native library for Linux <code>x86_64</code> and <code>arm64</code> as resources, so nothing else has to be installed.</li><li><strong>The AAR</strong>, <code>dev.lateo:zephyr-java-android</code>, for Android apps. It carries the native library for <code>arm64-v8a</code>, <code>armeabi-v7a</code> and <code>x86_64</code> under <code>jni/&lt;abi&gt;/</code>, and the R8 rules every app needs. <a href="10-android.html">Android</a> has its Gradle lines.</li></ul>
+<p>Both are on Maven Central, so the build needs <code>mavenCentral()</code> among its repositories and no other repository line. For a JVM project with Gradle (Kotlin DSL):</p>
 <div class="lt-code-block">
 <div class="lt-code-head"><span>Kotlin</span></div>
 <pre><code>repositories {
     mavenCentral()
-    maven { url = uri(&quot;https://loki-notfound.github.io/myzephyr-java/maven&quot;) }
 }
 
 dependencies {
-    implementation(&quot;io.github.loki-notfound:zephyr-java:2.3.0-sec.2-java.4&quot;)
+    implementation(&quot;dev.lateo:zephyr-java:2.3.0-sec.2-java.5&quot;)
 }</code></pre>
 </div>
-<p>The Maven form and the repository are in the <a href="https://github.com/loki-notfound/myzephyr-java/blob/main/README.md#coordinates">README's coordinates</a>.</p>
+<p>The Maven form is in the <a href="https://github.com/loki-notfound/myzephyr-java/blob/main/README.md#coordinates">README's coordinates</a>; Maven uses Maven Central by default.</p>
 <h2 id="the-native-library">The native library<a class="heading-anchor" href="#the-native-library" aria-label="Link to this section">#</a></h2>
 <p><code>ZephyrUtils</code> loads the native library in a static initialiser, the first time any class touches it. <code>ZephyrUtils.loadNativeLibrary()</code> does the same explicitly. It tries two places, in this order:</p>
 <ol><li><code>System.loadLibrary(&quot;zephyr-java&quot;)</code>, which searches <code>java.library.path</code>. On Android this is how the library is found: the AAR's <code>jni/&lt;abi&gt;/libzephyr-java.so</code> becomes part of the app's APK, and the app's class loader finds it there.</li><li>The JAR's resources: <code>/linux-x86_64/libzephyr-java.so</code> or <code>/linux-arm64/libzephyr-java.so</code>, chosen by <code>os.name</code> and <code>os.arch</code>. The library is copied to a temporary file, loaded with <code>System.load</code> and the temporary file is deleted again (a loaded library stays mapped).</li></ol>
 <p>If both fail, <code>loadNativeLibrary()</code> throws a <code>ZephyrError</code>. It carries the first failure as a suppressed exception, so you see both reasons. <code>ZephyrUtils.isNativeLibraryLoaded()</code> tells you whether the library is there, and <code>ZephyrUtils.getVersion()</code> returns the library's version.</p>
-<p>macOS and Windows libraries are not packaged in <code>2.3.0-sec.2-java.4</code>. On those systems the library has to be on <code>java.library.path</code>, which means building it yourself.</p>
+<p>macOS and Windows libraries are not packaged in <code>2.3.0-sec.2-java.5</code>. On those systems the library has to be on <code>java.library.path</code>, which means building it yourself.</p>
 <p>A developer build from a checkout puts the library in <code>build/</code>. The Maven test runs point <code>java.library.path</code> there (the property <code>native.library.path</code>). Your own program can do the same with <code>-Djava.library.path=...</code>, which takes precedence over the copy in the JAR.</p>
 <h3 id="linux-the-glibc-floor">Linux: the glibc floor<a class="heading-anchor" href="#linux-the-glibc-floor" aria-label="Link to this section">#</a></h3>
 <p>The release natives for Linux are built in a Debian 12 container. Everything is linked statically except the C library, so the JAR needs glibc 2.36 or newer: Debian 12, Ubuntu 23.04 and later, RHEL 10. On an older system the library fails to load with a message about a missing <code>GLIBC_2.xx</code> version. A developer build made on a newer host has that host's glibc as its floor (on Debian 13, 2.38).</p>
@@ -127,13 +126,13 @@ dependencies {
 <tr><td><code>ZephyrWalletListener</code></td><td><code>zephyr.wallet.model</code></td><td>the callbacks for sync progress, blocks, balances and outputs</td></tr>
 <tr><td><code>ZephyrAssets</code>, <code>ZephyrBalance</code></td><td><code>zephyr.wallet.model</code></td><td>the asset names and a balance per asset</td></tr>
 <tr><td><code>ZephyrTxConfig</code>, <code>ZephyrTxWallet</code></td><td><code>zephyr.wallet.model</code></td><td>what to send, and the transaction that comes back</td></tr>
-<tr><td><code>ZephyrError</code></td><td><code>zephyr.common</code></td><td>the library's exception; some calls let the core's <code>java.lang.Exception</code> through instead</td></tr>
+<tr><td><code>ZephyrError</code></td><td><code>zephyr.common</code></td><td>the library's exception, which every call of <code>ZephyrWalletFull</code> and <code>ZephyrUtils</code> throws</td></tr>
 <tr><td><code>ZephyrUtils</code></td><td><code>zephyr.common</code></td><td>the native library, address checks, amount helpers</td></tr>
 <tr><td><code>ZephyrTls</code></td><td><code>zephyr.common</code></td><td>the root certificates the native wallet trusts</td></tr>
 </tbody>
 </table>
 </div>
-<p>Wallet calls block the calling thread, and listener callbacks arrive on threads you did not create; <a href="04-threads-and-listeners.html">Threads and listeners</a> has the rules. Amounts are <code>BigInteger</code> atomic units, 10^12 per coin (<a href="05-assets-and-balances.html#amounts">Amounts</a>).</p>
+<p>Wallet calls block the calling thread. Listener callbacks arrive on the core's thread, or on a thread inside a call that syncs, scans, imports, relays or reads the pool; <a href="04-threads-and-listeners.html">Threads and listeners</a> has the rules. Amounts are <code>BigInteger</code> atomic units, 10^12 per coin (<a href="05-assets-and-balances.html#amounts">Amounts</a>).</p>
 <h2 id="a-first-program">A first program<a class="heading-anchor" href="#a-first-program" aria-label="Link to this section">#</a></h2>
 <p>The <a href="https://github.com/loki-notfound/myzephyr-java/blob/main/README.md#quick-start">README's quick start</a> is a complete program. It opens or creates a wallet, syncs it with a progress listener, prints the balance of every asset and, on request, builds a transfer without relaying it. It is compiled with the test sources of this repository (<code>src/test/java/examples/QuickStart.java</code>), so it always matches the API.</p>
 <p>Before you build the wallet into an app, check that the library loads and works on your machines and devices. <code>src/test/java/examples/GuideFirstProgram.java</code> is plain Java, compiled with this project's tests, and needs neither a node nor storage:</p>
@@ -170,7 +169,7 @@ public static String smokeTest() {
 </main>
 <footer class="lt-footer">
 <div class="lt-wrap lt-wrap-wide">
-<p>Guide for zephyr-java 2.3.0-sec.2-java.4, built from commit <code>7b926ce9</code> (2026-11-18 UTC).</p>
+<p>Guide for zephyr-java 2.3.0-sec.2-java.5, built from commit <code>cb78099a</code> (2026-11-20 UTC).</p>
 <p>zephyr-java and this site are a <a href="https://lateo.dev/">lateo</a> project by an independent operator, not affiliated with or endorsed by ZephyrProtocol. Source: <a href="https://github.com/loki-notfound/myzephyr-java">github.com/loki-notfound/myzephyr-java</a>.</p>
 <p>The library and the guide are under the MIT licence of the repository; the stylesheet is BSD 3-Clause; the lateo name, mark and favicons are not covered by either and all rights in them are reserved by their owner (<a href="../assets/NOTICE.txt">notice</a>).</p>
 </div>

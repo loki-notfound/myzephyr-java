@@ -58,7 +58,6 @@
 <ol>
 <li><a href="#android-gradle-kotlin-dsl">Android (Gradle, Kotlin DSL)</a></li>
 <li><a href="#desktop-and-server-maven">Desktop and server (Maven)</a></li>
-<li><a href="#older-releases">Older releases</a></li>
 <li><a href="#documentation">Documentation</a></li>
 <li><a href="#verifying">Verifying</a></li>
 <li><a href="#donations">Donations</a></li>
@@ -67,58 +66,42 @@
 </aside>
 <article class="lt-docs-main lt-stack">
 <h1 id="zephyr-java">zephyr-java</h1>
-<p class="lead">Java bindings for the Zephyr Protocol wallet core, for Android (AAR) and for desktop and server JVMs (JAR), built from the forks of zephyr-backports: ZephyrProtocol's Zephyr 2.3.0 plus Monero security fixes. Version 2.3.0-sec.2-java.4.</p>
+<p class="lead">Java bindings for the Zephyr Protocol wallet core, for Android (AAR) and for desktop and server JVMs (JAR), built from the forks of zephyr-backports: ZephyrProtocol's Zephyr 2.3.0 plus Monero security fixes. Version 2.3.0-sec.2-java.5.</p>
 <div class="lt-callout lt-callout-info" role="note">
 <p class="lt-callout-title">Not affiliated with ZephyrProtocol.</p>
 <p>An independent project. Report Zephyr vulnerabilities to the ZephyrProtocol team, not here.</p>
 </div>
+<p>Published on Maven Central under the groupId <code>dev.lateo</code>. Maven uses Maven Central by default and an Android Studio project lists <code>mavenCentral()</code> among its repositories, so a project adds the dependency and no repository line.</p>
 <h2 id="android-gradle-kotlin-dsl">Android (Gradle, Kotlin DSL)<a class="heading-anchor" href="#android-gradle-kotlin-dsl" aria-label="Link to this section">#</a></h2>
+<p>In the app module's <code>build.gradle.kts</code>; the packaging line is required (<a href="guide/10-android.html#the-dependency">why</a>):</p>
 <div class="lt-code-block">
 <div class="lt-code-head"><span>Kotlin</span></div>
-<pre><code>repositories {
-    maven { url = uri(&quot;https://loki-notfound.github.io/myzephyr-java/maven&quot;) }
-}
-
-android {
+<pre><code>android {
     packaging { resources.excludes += &quot;/META-INF/DEPENDENCIES&quot; }
 }
 
 dependencies {
-    implementation(&quot;io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.4&quot;)
+    implementation(&quot;dev.lateo:zephyr-java-android:2.3.0-sec.2-java.5&quot;)
 }</code></pre>
 </div>
 <h2 id="desktop-and-server-maven">Desktop and server (Maven)<a class="heading-anchor" href="#desktop-and-server-maven" aria-label="Link to this section">#</a></h2>
 <div class="lt-code-block">
 <div class="lt-code-head"><span>XML</span></div>
-<pre><code>&lt;repositories&gt;
-  &lt;repository&gt;
-    &lt;id&gt;zephyr-java&lt;/id&gt;
-    &lt;url&gt;https://loki-notfound.github.io/myzephyr-java/maven&lt;/url&gt;
-  &lt;/repository&gt;
-&lt;/repositories&gt;
-
-&lt;dependency&gt;
-  &lt;groupId&gt;io.github.loki-notfound&lt;/groupId&gt;
+<pre><code>&lt;dependency&gt;
+  &lt;groupId&gt;dev.lateo&lt;/groupId&gt;
   &lt;artifactId&gt;zephyr-java&lt;/artifactId&gt;
-  &lt;version&gt;2.3.0-sec.2-java.4&lt;/version&gt;
+  &lt;version&gt;2.3.0-sec.2-java.5&lt;/version&gt;
 &lt;/dependency&gt;</code></pre>
 </div>
-<h2 id="older-releases">Older releases<a class="heading-anchor" href="#older-releases" aria-label="Link to this section">#</a></h2>
-<p>The Maven repository keeps every release, so a build can stay on an older version with the same repository line. The <a href="javadoc/index.html">Javadoc</a> on this site is that of version 2.3.0-sec.2-java.4 only; an older version's Javadoc is its <code>zephyr-java-&lt;version&gt;-javadoc.jar</code>, in the repository and among the files of its release.</p>
-<ul>
-<li>2.3.0-sec.2-java.3 (<a href="https://github.com/loki-notfound/myzephyr-java/releases/tag/v2.3.0-sec.2-java.3">release</a>): <code>io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.3</code>, <code>io.github.loki-notfound:zephyr-java:2.3.0-sec.2-java.3</code></li>
-<li>2.3.0-sec.2-java.2 (<a href="https://github.com/loki-notfound/myzephyr-java/releases/tag/v2.3.0-sec.2-java.2">release</a>): <code>io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.2</code>, <code>io.github.loki-notfound:zephyr-java:2.3.0-sec.2-java.2</code></li>
-<li>2.3.0-sec.2-java.1 (<a href="https://github.com/loki-notfound/myzephyr-java/releases/tag/v2.3.0-sec.2-java.1">release</a>): <code>io.github.loki-notfound:zephyr-java-android:2.3.0-sec.2-java.1</code>, <code>io.github.loki-notfound:zephyr-java:2.3.0-sec.2-java.1</code></li>
-</ul>
 <h2 id="documentation">Documentation<a class="heading-anchor" href="#documentation" aria-label="Link to this section">#</a></h2>
 <ul>
 <li><a href="guide/index.html">User guide</a>, also as Markdown in the repository (<a href="https://github.com/loki-notfound/myzephyr-java/blob/main/docs/guide/README.md">docs/guide</a> on GitHub)</li>
-<li><a href="javadoc/index.html">Javadoc</a> of version 2.3.0-sec.2-java.4</li>
-<li><a href="https://github.com/loki-notfound/myzephyr-java/releases">Releases</a> with the build manifest and the signed SHA256SUMS</li>
+<li><a href="javadoc/index.html">Javadoc</a> of version 2.3.0-sec.2-java.5</li>
+<li><a href="https://github.com/loki-notfound/myzephyr-java/releases">Releases</a> with the build manifest and the signed SHA256SUMS, older versions included; up to 2.3.0-sec.2-java.4 they were published under <code>io.github.loki-notfound</code> in a Maven repository on this site, which is no longer served.</li>
 <li><a href="https://github.com/loki-notfound/myzephyr-java">Source</a></li>
 </ul>
 <h2 id="verifying">Verifying<a class="heading-anchor" href="#verifying" aria-label="Link to this section">#</a></h2>
-<p>Release tags and SHA256SUMS are signed with the maintainer key</p>
+<p>Release tags, SHA256SUMS and every file on Maven Central are signed with the maintainer key</p>
 <p class="lt-fingerprint"><code>31DA 39AB 43E0 CA67 F1F3  A661 BA2A FF22 DF8A 4A13</code></p>
 <p>whose public key is <a href="https://github.com/loki-notfound/myzephyr-java/blob/main/KEYS.asc">KEYS.asc</a> in the repository.</p>
 <h2 id="donations">Donations<a class="heading-anchor" href="#donations" aria-label="Link to this section">#</a></h2>
@@ -129,7 +112,7 @@ dependencies {
 </main>
 <footer class="lt-footer">
 <div class="lt-wrap lt-wrap-wide">
-<p>Guide for zephyr-java 2.3.0-sec.2-java.4, built from commit <code>7b926ce9</code> (2026-11-18 UTC).</p>
+<p>Guide for zephyr-java 2.3.0-sec.2-java.5, built from commit <code>cb78099a</code> (2026-11-20 UTC).</p>
 <p>zephyr-java and this site are a <a href="https://lateo.dev/">lateo</a> project by an independent operator, not affiliated with or endorsed by ZephyrProtocol. Source: <a href="https://github.com/loki-notfound/myzephyr-java">github.com/loki-notfound/myzephyr-java</a>.</p>
 <p>The library and the guide are under the MIT licence of the repository; the stylesheet is BSD 3-Clause; the lateo name, mark and favicons are not covered by either and all rights in them are reserved by their owner (<a href="assets/NOTICE.txt">notice</a>).</p>
 </div>

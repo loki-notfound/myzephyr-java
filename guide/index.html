@@ -66,7 +66,7 @@
 <h1 id="zephyr-java-user-guide">zephyr-java user guide</h1>
 <p>This guide explains how to use zephyr-java in an application. It covers desktop and server JVMs with the JAR, and Android apps with the AAR. It assumes you know Java; it does not assume you know monero-java. The <a href="https://github.com/loki-notfound/myzephyr-java/blob/main/README.md">README</a> has the coordinates and a complete quick-start program. The API reference is the <a href="../javadoc/index.html">Javadoc of the current release</a>.</p>
 <p><strong>Not affiliated with ZephyrProtocol.</strong> An independent project.</p>
-<p>This guide describes version <code>2.3.0-sec.2-java.4</code>.</p>
+<p>This guide describes version <code>2.3.0-sec.2-java.5</code>.</p>
 <div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="zephyr-java-user-guide">
 <table>
 <thead><tr><th scope="col">Chapter</th><th scope="col">What it covers</th></tr></thead>
@@ -74,16 +74,16 @@
 <tr><td><a href="01-getting-started.html">1. Getting started</a></td><td>what zephyr-java is and is not, requirements, the JAR and the AAR, the native library on the desktop, a first program</td></tr>
 <tr><td><a href="02-wallets.html">2. Wallets</a></td><td>network types, create, restore, view-only, open from files, bytes or a config, the password, when to save, close, addresses and keys</td></tr>
 <tr><td><a href="03-connecting-to-a-node.html">3. Connecting to a node</a></td><td>the connection and its URI, http and https, TLS and <code>ZephyrTls</code>, the remote-node trade-off, syncing, heights, an unreachable node</td></tr>
-<tr><td><a href="04-threads-and-listeners.html">4. Threads and listeners</a></td><td>blocking calls, the threads callbacks run on, the five callbacks, exceptions in callbacks, closing during a sync, several threads, what is not known</td></tr>
+<tr><td><a href="04-threads-and-listeners.html">4. Threads and listeners</a></td><td>blocking calls, the threads callbacks run on, the first listener, the five callbacks, what a callback may call, exceptions in callbacks, closing, several threads, the end of the process, what is not known, releases up to <code>java.4</code></td></tr>
 <tr><td><a href="05-assets-and-balances.html">5. Assets, accounts and balances</a></td><td>ZPH, ZSD, ZRS, ZYS and the V1 names, amounts and their conversion, <code>ZephyrBalance</code>, the four balance shapes, accounts, subaddresses and labels, locked and unlocked</td></tr>
 <tr><td><a href="06-history.html">6. History</a></td><td>transactions and transfers per asset, queries, the pool, conversions in the history, notes and keys, outputs and their asset, payment checks</td></tr>
 <tr><td><a href="07-sending.html">7. Sending</a></td><td>the currency pair, create then relay, what to show, fees and priorities, several destinations, sweeps, failures, saving after a send</td></tr>
 <tr><td><a href="08-conversions-and-the-reserve.html">8. Conversions and the reserve</a></td><td>the ten pairs, the reserve-ratio rules, every field of <code>ZephyrReserveInfo</code>, the six supply keys, building a conversion, the mint formula, converting everything, what was tested</td></tr>
-<tr><td><a href="09-errors.html">9. Errors and exceptions</a></td><td><code>ZephyrError</code>, where messages come from, the other exception types, the messages a wallet meets, logging safely, the native log</td></tr>
+<tr><td><a href="09-errors.html">9. Errors and exceptions</a></td><td><code>ZephyrError</code>, where messages come from, what is not a <code>ZephyrError</code>, the messages a wallet meets, logging safely, the native log</td></tr>
 <tr><td><a href="10-android.html">10. Android</a></td><td>the dependency and the packaging line, devices, ABIs and sizes, the RPC classes below API 26, the network, storage, backup, lifecycle, logs, a first test on a device, R8 rules</td></tr>
-<tr><td><a href="11-the-rpc-classes.html">11. The RPC classes</a></td><td><code>ZephyrDaemonRpc</code> and the pricing record, <code>ZephyrWalletRpc</code> as a first pass, <code>ZephyrRpcError</code>, dependencies</td></tr>
+<tr><td><a href="11-the-rpc-classes.html">11. The RPC classes</a></td><td><code>ZephyrDaemonRpc</code> and the pricing record, the removed wallet RPC client, <code>ZephyrRpcError</code>, dependencies</td></tr>
 <tr><td><a href="12-coming-from-monero-java.html">12. Coming from monero-java</a></td><td>the renaming rules, what is different, both libraries in one program</td></tr>
-<tr><td><a href="13-known-limitations.html">13. Known limitations</a></td><td>every limitation with its status and a link, what was tested and what was not</td></tr>
+<tr><td><a href="13-known-limitations.html">13. Known limitations</a></td><td>every limitation with its status and a link, what was tested and what was not, what <code>2.3.0-sec.2-java.5</code> fixed</td></tr>
 <tr><td><a href="14-building-and-verifying.html">14. Building and verifying</a></td><td>the pins, the root certificates, the patches, the builds, reproducibility, the manifest, signatures, reproducing a release, the guide's site</td></tr>
 </tbody>
 </table>
@@ -92,7 +92,9 @@
 <ul><li><strong>Fragments.</strong> A short Java block that uses <code>wallet</code> means an open <code>ZephyrWalletFull</code>; the block does not show how it was opened.</li><li><strong>Compiled examples.</strong> A block whose label is &quot;Java, compiled&quot; on the site (info string <code>java examples/&lt;Class&gt;.java</code> in the Markdown) is copied from that class in <code>src/test/java/examples/</code>. The class is compiled with every <code>mvn test</code>, and the test <code>TestExamples</code> fails when the block and the class differ. Other blocks are fragments and are not compiled.</li><li><strong>Placeholders.</strong> Values you supply are written in angle brackets, such as <code>&lt;version&gt;</code>, and explained below the block. Example hosts end in <code>.example.invalid</code>.</li><li><strong>Amounts.</strong> Every amount in the API is a <code>BigInteger</code> in atomic units, 10^12 per coin for every asset. Prose names amounts in coins with the asset's ticker after the number.</li><li><strong>Dates.</strong> Dates are absolute and in UTC. A statement about a release names that release.</li></ul>
 <h2 id="where-the-statements-come-from">Where the statements come from<a class="heading-anchor" href="#where-the-statements-come-from" aria-label="Link to this section">#</a></h2>
 <p>Statements about the Zephyr core come from the pinned sources and from test runs against mainnet. Those runs took place from 2026-11-06 to 2026-11-10, during the work on the releases up to <code>2.3.0-sec.2-java.4</code>. Each such statement names its date where it matters.</p>
-<p>Statements marked &quot;observed on 2026-11-17&quot; come from runs against a mainnet node on Linux <code>x86_64</code> (Debian 13, OpenJDK 21). Most used a developer build of the <code>2.3.0-sec.2-java.4</code> sources. Those marked &quot;with the released JAR&quot; used <code>zephyr-java-2.3.0-sec.2-java.4.jar</code> and its own native library. None of those runs was made on Android. One run is an observation, not a guarantee: a run that found no failure proves no safety.</p>
+<p>Statements marked &quot;observed on 2026-11-18&quot; or &quot;observed on 2026-11-19&quot; come from runs against a mainnet node on Linux <code>x86_64</code> (Debian 13, OpenJDK 21), read-only, or offline. They used development builds of the <code>2.3.0-sec.2-java.5</code> sources as they stood on those days; some used the Linux library built in the release container. None of those runs was made on Android. Statements about the Android emulator name it. Those about <code>2.3.0-sec.2-java.5</code> come from runs on 2026-11-19 and 2026-11-20 (<a href="13-known-limitations.html#what-was-tested">What was tested</a>).</p>
+<p>Statements marked &quot;observed on 2026-11-17&quot; come from runs of the same kind with <code>2.3.0-sec.2-java.4</code>. Most used a developer build of its sources. Those marked &quot;with the released JAR&quot; used <code>zephyr-java-2.3.0-sec.2-java.4.jar</code> and its own native library. Where <code>java.5</code> changed the behaviour, the guide names <code>java.4</code> with them.</p>
+<p>One run is an observation, not a guarantee: a run that found no failure proves no safety.</p>
 <p>Statements marked &quot;read in the code&quot; come from the source of this library or of the pinned core, not from a run. Where a fact is not known, the guide says so.</p>
 <nav class="site-pager" aria-label="Previous and next page">
 <a class="site-next" rel="next" href="01-getting-started.html">Next: 1. Getting started</a>
@@ -102,7 +104,7 @@
 </main>
 <footer class="lt-footer">
 <div class="lt-wrap lt-wrap-wide">
-<p>Guide for zephyr-java 2.3.0-sec.2-java.4, built from commit <code>7b926ce9</code> (2026-11-18 UTC).</p>
+<p>Guide for zephyr-java 2.3.0-sec.2-java.5, built from commit <code>cb78099a</code> (2026-11-20 UTC).</p>
 <p>zephyr-java and this site are a <a href="https://lateo.dev/">lateo</a> project by an independent operator, not affiliated with or endorsed by ZephyrProtocol. Source: <a href="https://github.com/loki-notfound/myzephyr-java">github.com/loki-notfound/myzephyr-java</a>.</p>
 <p>The library and the guide are under the MIT licence of the repository; the stylesheet is BSD 3-Clause; the lateo name, mark and favicons are not covered by either and all rights in them are reserved by their owner (<a href="../assets/NOTICE.txt">notice</a>).</p>
 </div>

@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <title>11. The RPC classes - zephyr-java guide</title>
-<meta name="description" content="ZephyrDaemonRpc talks to a node's RPC interface, and ZephyrWalletRpc to a zephyr-wallet-rpc process instead of running the wallet in your own process. This chapter covers what each one does in 2.3.0-s">
+<meta name="description" content="ZephyrDaemonRpc talks to a node's RPC interface, through ZephyrRpcConnection. This chapter covers what it does in 2.3.0-sec.2-java.5, its errors, its TLS and its dependencies, and the wallet RPC clien">
 <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="../assets/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="../assets/apple-touch-icon-180.png">
@@ -57,7 +57,7 @@
 <nav aria-labelledby="site-nav-page">
 <ol>
 <li><a href="#zephyrdaemonrpc-and-the-pricing-record">ZephyrDaemonRpc and the pricing record</a></li>
-<li><a href="#zephyrwalletrpc">ZephyrWalletRpc</a></li>
+<li><a href="#the-wallet-rpc-client-was-removed">The wallet RPC client was removed</a></li>
 <li><a href="#zephyrrpcerror">ZephyrRpcError</a></li>
 <li><a href="#tls-and-android">TLS and Android</a></li>
 <li><a href="#dependencies">Dependencies</a></li>
@@ -67,7 +67,7 @@
 <article class="lt-docs-main lt-stack">
 <nav class="lt-breadcrumbs" aria-label="Breadcrumb"><ol><li><a href="../index.html">zephyr-java</a></li><li><a href="index.html">Guide</a></li><li><a href="11-the-rpc-classes.html" aria-current="page">11. The RPC classes</a></li></ol></nav>
 <h1 id="11-the-rpc-classes">11. The RPC classes</h1>
-<p><code>ZephyrDaemonRpc</code> talks to a node's RPC interface, and <code>ZephyrWalletRpc</code> to a <code>zephyr-wallet-rpc</code> process instead of running the wallet in your own process. This chapter covers what each one does in <code>2.3.0-sec.2-java.4</code>, their errors, their TLS and their dependencies. The full wallet, <code>ZephyrWalletFull</code>, is the complete API.</p>
+<p><code>ZephyrDaemonRpc</code> talks to a node's RPC interface, through <code>ZephyrRpcConnection</code>. This chapter covers what it does in <code>2.3.0-sec.2-java.5</code>, its errors, its TLS and its dependencies, and the wallet RPC client that releases up to <code>2.3.0-sec.2-java.4</code> had. The full wallet, <code>ZephyrWalletFull</code>, is the complete API.</p>
 <p>The blocks marked &quot;Java, compiled&quot; in this chapter come from <code>src/test/java/examples/GuideRpc.java</code>.</p>
 <h2 id="zephyrdaemonrpc-and-the-pricing-record">ZephyrDaemonRpc and the pricing record<a class="heading-anchor" href="#zephyrdaemonrpc-and-the-pricing-record" aria-label="Link to this section">#</a></h2>
 <p>The reserve figures derive from the oracle's pricing record, which every Zephyr block header carries. <code>ZephyrDaemonRpc</code> reads it into <code>ZephyrBlockHeader.getPricingRecord()</code>, a <code>ZephyrPricingRecord</code> with <code>spot</code>, <code>movingAverage</code>, <code>stable</code>, <code>stableMa</code>, <code>reserve</code>, <code>reserveMa</code>, <code>reserveRatio</code>, <code>reserveRatioMa</code>, <code>yieldPrice</code> (each times 10^12), <code>timestamp</code> and <code>signature</code>. An app that talks to a node's RPC directly can use it, for example to show the ZRS price (<code>reserve</code>, <code>reserveMa</code>) that a mint would use:</p>
@@ -77,32 +77,25 @@
 ZephyrPricingRecord record = daemon.getLastBlockHeader().getPricingRecord();
 return record.getReserve();  // the price of one ZRS in ZPH, times 10^12</code></pre>
 </div>
-<p><code>new ZephyrDaemonRpc(uri, username, password)</code> is for a node with RPC login. Block headers with their pricing record were read from a mainnet node on the desktop, and <code>ZephyrDaemonRpc</code> read a mainnet node on the Android emulator. The calls of <code>ZephyrDaemonRpc</code> other than the node's information and block headers are inherited from monero-java; not tested against Zephyr.</p>
-<h2 id="zephyrwalletrpc">ZephyrWalletRpc<a class="heading-anchor" href="#zephyrwalletrpc" aria-label="Link to this section">#</a></h2>
-<p><strong>The RPC classes are a first pass.</strong> <code>ZephyrWalletRpc</code> serves the base coin. Its per-asset balance calls, the per-subaddress balance map, <code>getReserveInfo</code> and <code>getCirculatingSupply</code> throw a <code>ZephyrError</code> until the port to <code>zephyr-wallet-rpc</code> is done, for example:</p>
-<div class="lt-code-block">
-<div class="lt-code-head"><span>Text</span></div>
-<pre><code>Not supported by ZephyrWalletRpc until the RPC port: reserve info</code></pre>
-</div>
-<p>The other messages end in &quot;per-asset balances&quot;, &quot;the per-subaddress balance map&quot; and &quot;circulating supply&quot;. <em>Status:</em> planned work (the port to <code>zephyr-wallet-rpc</code>).</p>
-<p>Through the RPC classes the two core quirks of the history look different (<a href="06-history.html#checktxkey-returns-amount-0">checkTxKey returns amount 0</a>, <a href="06-history.html#getoutputs-reports-no-asset">getOutputs() reports no asset</a>). <code>zephyr-wallet-rpc</code> returns the <code>checkTxKey</code> amount per asset and the asset of every output, which this first pass does not read. So <code>getReceivedAmount()</code> comes back <code>null</code> and the outputs carry no asset.</p>
-<p><strong><code>isClosed()</code> and error code -13.</strong> monero-java recognises a closed RPC wallet by error code -8 with &quot;No wallet file&quot;; <code>zephyr-wallet-rpc</code> v2.3.0 answers -13. <code>isClosed()</code> returned <code>false</code> for a closed wallet until the fix of 2026-11-07; it now accepts both codes.</p>
+<p><code>new ZephyrDaemonRpc(uri, username, password)</code> is for a node with RPC login. Block headers with their pricing record were read from a mainnet node on the desktop, and <code>ZephyrDaemonRpc</code> read a mainnet node on the Android emulator with earlier releases. With builds of <code>2.3.0-sec.2-java.5</code> it did so on API 35 and API 36 as well. The calls of <code>ZephyrDaemonRpc</code> other than the node's information and block headers are inherited from monero-java; not tested against Zephyr.</p>
+<h2 id="the-wallet-rpc-client-was-removed">The wallet RPC client was removed<a class="heading-anchor" href="#the-wallet-rpc-client-was-removed" aria-label="Link to this section">#</a></h2>
+<p>Releases up to <code>2.3.0-sec.2-java.4</code> had <code>ZephyrWalletRpc</code>, a client for a <code>zephyr-wallet-rpc</code> process. It was a first pass that served the base coin only. <code>2.3.0-sec.2-java.5</code> removes it, with <code>zephyr.common.SslOptions</code> and the jeromq dependency that only its ZMQ listener used.</p>
+<p>Use <code>ZephyrWalletFull</code>, which runs the wallet in your process and has the whole API. An app that must talk to a <code>zephyr-wallet-rpc</code> process can send its JSON-RPC requests with <code>ZephyrRpcConnection.sendJsonRequest</code>, which stays. <code>ZephyrDaemonRpc</code>, <code>ZephyrRpcConnection</code> and <code>ZephyrRpcError</code> stay, with the redaction described under <a href="#zephyrrpcerror">ZephyrRpcError</a> and in <a href="09-errors.html#logging-safely">Logging safely</a>.</p>
 <h2 id="zephyrrpcerror">ZephyrRpcError<a class="heading-anchor" href="#zephyrrpcerror" aria-label="Link to this section">#</a></h2>
 <p>For an RPC error or an HTTP error, the RPC classes throw <code>zephyr.common.ZephyrRpcError</code>, a <code>ZephyrError</code> with three more facts:</p>
 <ul><li><code>getCode()</code> is the RPC error code, or the HTTP status for an HTTP error;</li><li><code>getRpcMethod()</code> is the RPC method, <code>null</code> for an HTTP error;</li><li><code>getRpcParams()</code> is the request's parameters, <code>null</code> for an HTTP error.</li></ul>
 <p>A failure to connect is not a <code>ZephyrRpcError</code>: it arrives as a plain <code>ZephyrError</code> whose message is the cause's text (read in the source). An HTTP error's message holds the HTTP status and the body of the answer, which is text from the server.</p>
-<p>Its <code>toString()</code> appends the method and the parameters as JSON, and the parameters can hold the wallet's password or the node's login password (<a href="09-errors.html#logging-safely">Logging safely</a>). Catch <code>ZephyrError</code> and log the method, the code and the message:</p>
+<p>Its <code>toString()</code> appends the method and the parameters as JSON. From <code>2.3.0-sec.2-java.5</code> on, the values of secret parameters such as passwords print as <code>&lt;redacted&gt;</code>; <code>getRpcParams()</code> still holds them (<a href="09-errors.html#logging-safely">Logging safely</a>). Catch <code>ZephyrError</code> and log the method, the code and the message:</p>
 <div class="lt-code-block">
 <div class="lt-code-head"><span>Java, compiled</span></div>
 <pre><code>if (e instanceof ZephyrRpcError) return &quot;RPC &quot; + ((ZephyrRpcError) e).getRpcMethod() + &quot; failed: &quot; + e.getCode() + &quot; &quot; + e.getMessage();
 return &quot;no RPC answer: &quot; + e.getMessage();  // for example no connection: a plain ZephyrError</code></pre>
 </div>
 <h2 id="tls-and-android">TLS and Android<a class="heading-anchor" href="#tls-and-android" aria-label="Link to this section">#</a></h2>
-<p>The RPC classes use the trust store of the Java runtime. <code>ZephyrTls</code> does not affect them; it is for the native wallet (<a href="03-connecting-to-a-node.html#tls-to-a-node">TLS to a node</a>).</p>
-<p>They send their requests through the Apache HTTP client, which needs <code>java.time</code>. On Android below API 26 an app needs core library desugaring for them (<a href="10-android.html#the-rpc-classes-below-api-26">The RPC classes below API 26</a>).</p>
+<p><code>ZephyrDaemonRpc</code> uses the trust store of the Java runtime. <code>ZephyrTls</code> does not affect them; it is for the native wallet (<a href="03-connecting-to-a-node.html#tls-to-a-node">TLS to a node</a>).</p>
+<p>It sends its requests through the Apache HTTP client, which needs <code>java.time</code>. On Android below API 26 an app needs core library desugaring for it (<a href="10-android.html#the-rpc-classes-below-api-26">The RPC classes below API 26</a>).</p>
 <h2 id="dependencies">Dependencies<a class="heading-anchor" href="#dependencies" aria-label="Link to this section">#</a></h2>
-<p>The RPC classes use the Apache HTTP client 5 (<code>httpclient5</code> 5.2.1) and Jackson 2.13.5, which both artifacts bring.</p>
-<p><strong>jeromq</strong> is a compile-only dependency. Only <code>ZephyrWalletRpc</code>'s ZMQ listener uses it; an app that uses that listener adds <code>org.zeromq:jeromq</code> itself. The shipped R8 rules carry a <code>-dontwarn</code> for it, so an app without jeromq builds cleanly.</p>
+<p>The RPC classes use the Apache HTTP client 5 (<code>httpclient5</code> 5.2.1) and Jackson 2.13.5, which both artifacts bring. The jeromq dependency is gone: up to <code>2.3.0-sec.2-java.4</code> it was compile-only, for the wallet RPC client's ZMQ listener.</p>
 <nav class="site-pager" aria-label="Previous and next page">
 <a class="site-prev" rel="prev" href="10-android.html">Previous: 10. Android</a>
 <a class="site-next" rel="next" href="12-coming-from-monero-java.html">Next: 12. Coming from monero-java</a>
@@ -112,7 +105,7 @@ return &quot;no RPC answer: &quot; + e.getMessage();  // for example no connecti
 </main>
 <footer class="lt-footer">
 <div class="lt-wrap lt-wrap-wide">
-<p>Guide for zephyr-java 2.3.0-sec.2-java.4, built from commit <code>7b926ce9</code> (2026-11-18 UTC).</p>
+<p>Guide for zephyr-java 2.3.0-sec.2-java.5, built from commit <code>cb78099a</code> (2026-11-20 UTC).</p>
 <p>zephyr-java and this site are a <a href="https://lateo.dev/">lateo</a> project by an independent operator, not affiliated with or endorsed by ZephyrProtocol. Source: <a href="https://github.com/loki-notfound/myzephyr-java">github.com/loki-notfound/myzephyr-java</a>.</p>
 <p>The library and the guide are under the MIT licence of the repository; the stylesheet is BSD 3-Clause; the lateo name, mark and favicons are not covered by either and all rights in them are reserved by their owner (<a href="../assets/NOTICE.txt">notice</a>).</p>
 </div>

@@ -79,7 +79,7 @@
 <tr><td><code>MoneroUtils.xmrToAtomicUnits(double)</code></td><td><code>ZephyrUtils.toAtomicUnits(double)</code></td></tr>
 <tr><td><code>MoneroUtils.atomicUnitsToXmr(BigInteger)</code></td><td><code>ZephyrUtils.fromAtomicUnits(BigInteger)</code></td></tr>
 <tr><td>native library <code>monero-java</code></td><td>native library <code>zephyr-java</code></td></tr>
-<tr><td>Maven <code>io.github.monero-ecosystem:monero-java</code> (now <code>io.github.woodser:monero-java</code>)</td><td>Maven <code>io.github.loki-notfound:zephyr-java</code></td></tr>
+<tr><td>Maven <code>io.github.monero-ecosystem:monero-java</code> (now <code>io.github.woodser:monero-java</code>)</td><td>Maven <code>dev.lateo:zephyr-java</code></td></tr>
 </tbody>
 </table>
 </div>
@@ -91,7 +91,7 @@
 <tbody>
 <tr><td><code>monero.wallet.MoneroWalletFull</code></td><td><code>zephyr.wallet.ZephyrWalletFull</code></td></tr>
 <tr><td><code>monero.wallet.MoneroWallet</code></td><td><code>zephyr.wallet.ZephyrWallet</code></td></tr>
-<tr><td><code>monero.wallet.MoneroWalletRpc</code></td><td><code>zephyr.wallet.ZephyrWalletRpc</code></td></tr>
+<tr><td><code>monero.wallet.MoneroWalletRpc</code></td><td>none: <code>zephyr.wallet.ZephyrWalletRpc</code> was removed in <code>2.3.0-sec.2-java.5</code></td></tr>
 <tr><td><code>monero.daemon.MoneroDaemonRpc</code></td><td><code>zephyr.daemon.ZephyrDaemonRpc</code></td></tr>
 <tr><td><code>monero.common.MoneroUtils</code></td><td><code>zephyr.common.ZephyrUtils</code></td></tr>
 <tr><td><code>monero.common.MoneroRpcConnection</code></td><td><code>zephyr.common.ZephyrRpcConnection</code></td></tr>
@@ -134,8 +134,9 @@
 <p><strong>Two results differ without a compile error.</strong> Code that works in monero-java compiles and runs, but reads something the Zephyr core does not deliver:</p>
 <ul><li><code>checkTxKey</code> (and <code>checkTxProof</code>): monero-java returns the received amount. In zephyr-java's full wallet the amount is 0 and <code>checkTxKey</code> reports <code>good</code> for any key of valid form, so it cannot confirm a payment. What was received comes from the transaction in <code>getTxs(hash)</code> (<a href="06-history.html#checktxkey-returns-amount-0">checkTxKey returns amount 0</a>).</li><li><code>getOutputs()</code>: monero-java's outputs have no asset concept. zephyr-java's outputs have an <code>assetType</code> field, but <code>getOutputs()</code> leaves it <code>null</code>. The asset comes from the output's transaction, through <code>getOutputAssetType(output)</code> (<a href="06-history.html#getoutputs-reports-no-asset">getOutputs() reports no asset</a>).</li></ul>
 <p><strong>Addresses and constants.</strong> Address decoding stays pure Java (no native library needed) but knows Zephyr's prefixes, which are multi-byte varints: on mainnet, primary addresses start with <code>ZEPHYR</code>, subaddresses with <code>ZEPHs</code> and integrated addresses with <code>ZEPHii</code>. <code>ZephyrNetworkType</code> carries Zephyr's codes. <code>ZephyrUtils.RING_SIZE</code> is 16, the network rule of the Zephyr core, not Monero's 12. Keccak-256 and hex are the library's own code (<code>Keccak256</code>, <code>GenUtils</code>), so there is no dependency on Bouncy Castle or Apache commons-codec.</p>
-<p><strong>Amounts.</strong> <code>ZephyrUtils.toAtomicUnits(double)</code> converts through a <code>double</code> and fails or truncates for some values; use <code>BigDecimal</code> (<a href="05-assets-and-balances.html#amounts">Amounts</a>).</p>
-<p><strong>The RPC classes are a first pass</strong>, for the base coin only (<a href="11-the-rpc-classes.html">The RPC classes</a>).</p>
+<p><strong>Amounts.</strong> <code>ZephyrUtils.toAtomicUnits(double)</code> converts through a <code>double</code> and drops decimals beyond the twelfth; up to <code>2.3.0-sec.2-java.4</code> it also failed for some values. Use <code>BigDecimal</code> (<a href="05-assets-and-balances.html#amounts">Amounts</a>).</p>
+<p><strong>Exceptions.</strong> From <code>2.3.0-sec.2-java.5</code> on, every call of <code>ZephyrWalletFull</code> and <code>ZephyrUtils</code> throws <code>ZephyrError</code>. Releases up to <code>2.3.0-sec.2-java.4</code> let some core failures through as <code>java.lang.Exception</code> (<a href="09-errors.html">Errors and exceptions</a>).</p>
+<p><strong>No wallet RPC client.</strong> <code>ZephyrWalletRpc</code> was removed in <code>2.3.0-sec.2-java.5</code>; <code>ZephyrDaemonRpc</code> stays (<a href="11-the-rpc-classes.html">The RPC classes</a>).</p>
 <h2 id="both-libraries-in-one-program">Both libraries in one program<a class="heading-anchor" href="#both-libraries-in-one-program" aria-label="Link to this section">#</a></h2>
 <p>zephyr-java was built so that it can sit next to monero-java in one JVM or one app: a wallet that supports both coins needs both.</p>
 <ul><li><strong>No class clashes.</strong> The packages differ (<code>zephyr.*</code> against <code>monero.*</code> and <code>common.*</code>).</li><li><strong>No native clashes.</strong> Each library is its own shared object (<code>libzephyr-java.so</code>, <code>libmonero-java.so</code>), and zephyr-java's exports only JNI symbols. The one name both libraries export is <code>JNI_OnLoad</code>, which the JVM looks up per library, so it is no conflict.</li><li><strong>Tested.</strong> The coexistence test loads monero-java 0.8.65 from Maven Central and zephyr-java in one JVM. It validates a Zephyr address in Java and natively and a Monero address with monero-java. It checks that the two dynamic symbol sets share exactly <code>{JNI_OnLoad}</code> and no <code>Java_*</code> name.</li></ul>
@@ -150,7 +151,7 @@
 </main>
 <footer class="lt-footer">
 <div class="lt-wrap lt-wrap-wide">
-<p>Guide for zephyr-java 2.3.0-sec.2-java.4, built from commit <code>7b926ce9</code> (2026-11-18 UTC).</p>
+<p>Guide for zephyr-java 2.3.0-sec.2-java.5, built from commit <code>cb78099a</code> (2026-11-20 UTC).</p>
 <p>zephyr-java and this site are a <a href="https://lateo.dev/">lateo</a> project by an independent operator, not affiliated with or endorsed by ZephyrProtocol. Source: <a href="https://github.com/loki-notfound/myzephyr-java">github.com/loki-notfound/myzephyr-java</a>.</p>
 <p>The library and the guide are under the MIT licence of the repository; the stylesheet is BSD 3-Clause; the lateo name, mark and favicons are not covered by either and all rights in them are reserved by their owner (<a href="../assets/NOTICE.txt">notice</a>).</p>
 </div>

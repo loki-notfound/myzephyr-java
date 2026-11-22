@@ -115,23 +115,27 @@ static String formatShort(BigInteger atomicUnits) {
 }</code></pre>
 </div>
 <p>Write the asset's ticker after the number (<code>1.50 ZPH</code>). Before a send, show the amount and the fee with all 12 decimals (<a href="07-sending.html#what-to-show-before-you-relay">What to show before you relay</a>).</p>
-<p><strong>Do not use <code>ZephyrUtils.toAtomicUnits(double)</code> for user input.</strong> It is the only conversion from coins that <code>ZephyrUtils</code> has, and it builds the amount from the <code>double</code>'s text (<code>&quot;&quot; + amount</code>). It fails for values that <code>Double.toString</code> prints in scientific notation: below 0.001, and from 10^7. It also drops or truncates decimals silently. Its results in <code>2.3.0-sec.2-java.4</code>:</p>
+<p><strong>Do not use <code>ZephyrUtils.toAtomicUnits(double)</code> for user input.</strong> It is the only conversion from coins that <code>ZephyrUtils</code> has, and it goes through a <code>double</code>. A <code>double</code> holds about 17 significant digits, so an amount with many coins and all 12 decimals does not fit it.</p>
+<p>In <code>2.3.0-sec.2-java.5</code> it converts the decimal that <code>Double.toString</code> prints, scientific notation included, and drops the decimals beyond the twelfth (toward zero) without an error. A value that is not a finite number throws a <code>ZephyrError</code> &quot;Amount is not a finite number: &quot; with the value; a negative value converts to a negative amount. <strong>Releases up to <code>2.3.0-sec.2-java.4</code></strong> built the amount from the <code>double</code>'s text in a way that failed for scientific notation (below 0.001, and from 10^7) and gave a wrong amount for some values. The results of both:</p>
 <div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="amounts">
 <table>
-<thead><tr><th scope="col">Input</th><th scope="col">Result</th></tr></thead>
+<thead><tr><th scope="col">Input</th><th scope="col"><code>2.3.0-sec.2-java.5</code></th><th scope="col">up to <code>2.3.0-sec.2-java.4</code></th></tr></thead>
 <tbody>
-<tr><td><code>0.0001</code>, <code>0.000999</code></td><td><code>NumberFormatException: Illegal embedded sign character</code></td></tr>
-<tr><td><code>0.001</code></td><td>1,000,000,000</td></tr>
-<tr><td><code>9999999.999</code></td><td>9,999,999,999,000,000,000</td></tr>
-<tr><td><code>1e7</code></td><td><code>NumberFormatException: For input string: &quot;10E7&quot;</code></td></tr>
-<tr><td><code>12345678.9</code></td><td><code>NumberFormatException: For input string: &quot;3456789E7&quot;</code></td></tr>
-<tr><td><code>1.5</code>, <code>0.1</code></td><td>1,500,000,000,000 and 100,000,000,000</td></tr>
-<tr><td><code>1.0000000000001</code> (13 decimals)</td><td>1,000,000,000,000: the 13th decimal is dropped without an error</td></tr>
-<tr><td><code>0.1 + 0.2</code> (that is <code>0.30000000000000004</code>)</td><td>300,000,000,000: truncated without an error</td></tr>
+<tr><td><code>0.0001</code>, <code>0.000999</code></td><td>100,000,000 and 999,000,000</td><td><code>NumberFormatException: Illegal embedded sign character</code></td></tr>
+<tr><td><code>0.001</code></td><td>1,000,000,000</td><td>the same</td></tr>
+<tr><td><code>9999999.999</code></td><td>9,999,999,999,000,000,000</td><td>the same</td></tr>
+<tr><td><code>1e7</code></td><td>10,000,000,000,000,000,000</td><td><code>NumberFormatException: For input string: &quot;10E7&quot;</code></td></tr>
+<tr><td><code>12345678.9</code></td><td>12,345,678,900,000,000,000</td><td><code>NumberFormatException: For input string: &quot;3456789E7&quot;</code></td></tr>
+<tr><td><code>1.5</code>, <code>0.1</code></td><td>1,500,000,000,000 and 100,000,000,000</td><td>the same</td></tr>
+<tr><td><code>1.0000000000001</code> (13 decimals)</td><td>1,000,000,000,000: the 13th decimal is dropped without an error</td><td>the same</td></tr>
+<tr><td><code>0.1 + 0.2</code> (that is <code>0.30000000000000004</code>)</td><td>300,000,000,000: truncated without an error</td><td>the same</td></tr>
+<tr><td><code>0.0033783819253452307</code> (19 decimals)</td><td>3,378,381,925</td><td>3,662,849,022, about 8 % too high</td></tr>
+<tr><td><code>NaN</code>, <code>Infinity</code></td><td><code>ZephyrError</code> &quot;Amount is not a finite number: &quot; and the value</td><td><code>NumberFormatException</code></td></tr>
 </tbody>
 </table>
 </div>
-<p><code>ZephyrUtils.fromAtomicUnits(BigInteger)</code> returns a <code>double</code>. One atomic unit gives <code>1.0E-12</code>, which <code>toAtomicUnits</code> then rejects. The round trip is exact only while the amount fits a double's precision and prints in plain notation. For example, 123,456,789,012,345,678 atomic units come back as 123,456,789,012,345,670. These results follow from <code>Double.toString</code>, which is specified Java behaviour; they were run on desktop Java 21 on 2026-11-17, not on Android.</p>
+<p>In <code>java.4</code> a value printed with 19 or more decimals, which happens between 0.001 and 0.01, came out too high: the divisor of its algorithm overflowed. A comparison of 2,000,000 random values found 12 such cases, all in that range; <code>2.3.0-sec.2-java.5</code> converts them right.</p>
+<p><code>ZephyrUtils.fromAtomicUnits(BigInteger)</code> returns a <code>double</code>. One atomic unit gives <code>1.0E-12</code>, which <code>toAtomicUnits</code> converts back to 1 in <code>java.5</code> and rejected in <code>java.4</code>. The round trip is exact only while the amount fits a double's precision. For example, 123,456,789,012,345,678 atomic units come back as 123,456,789,012,345,670, in both releases. These results follow from <code>Double.toString</code>, which is specified Java behaviour. They were run on desktop Java 21, from 2026-11-17 to 2026-11-19, not on Android. Before JDK 19, and on Android, <code>Double.toString</code> does not always print the shortest decimal, so a rare value can convert differently there.</p>
 <p><code>ZephyrTxConfig.setAmount(String)</code> takes atomic units, not coins: <code>setAmount(&quot;1.5&quot;)</code> throws a <code>NumberFormatException</code>, and <code>setAmount(&quot;1&quot;)</code> sets one atomic unit.</p>
 <h2 id="zephyrbalance">ZephyrBalance<a class="heading-anchor" href="#zephyrbalance" aria-label="Link to this section">#</a></h2>
 <p><code>ZephyrBalance</code> is a small map from asset name to amount:</p>
@@ -206,7 +210,7 @@ wallet.setSubaddressLabel(0, invoice.getIndex(), &quot;Invoice 0001, paid&quot;)
 </main>
 <footer class="lt-footer">
 <div class="lt-wrap lt-wrap-wide">
-<p>Guide for zephyr-java 2.3.0-sec.2-java.4, built from commit <code>7b926ce9</code> (2026-11-18 UTC).</p>
+<p>Guide for zephyr-java 2.3.0-sec.2-java.5, built from commit <code>cb78099a</code> (2026-11-20 UTC).</p>
 <p>zephyr-java and this site are a <a href="https://lateo.dev/">lateo</a> project by an independent operator, not affiliated with or endorsed by ZephyrProtocol. Source: <a href="https://github.com/loki-notfound/myzephyr-java">github.com/loki-notfound/myzephyr-java</a>.</p>
 <p>The library and the guide are under the MIT licence of the repository; the stylesheet is BSD 3-Clause; the lateo name, mark and favicons are not covered by either and all rights in them are reserved by their owner (<a href="../assets/NOTICE.txt">notice</a>).</p>
 </div>

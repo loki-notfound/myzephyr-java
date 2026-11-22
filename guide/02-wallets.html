@@ -141,13 +141,14 @@ String mnemonic = wallet.getMnemonic();  // 25 words; show it to the user once, 
 <pre><code>if (ZephyrWalletFull.walletExists(path)) {
   try {
     wallet = ZephyrWalletFull.openWallet(path, password, ZephyrNetworkType.MAINNET, nodeUri);
-  } catch (Exception e) {  // &quot;invalid password&quot; arrives as java.lang.Exception
+  } catch (ZephyrError e) {  // &quot;invalid password&quot;; up to java.4 a java.lang.Exception
     messages.show(&quot;The wallet could not be opened: &quot; + e.getMessage());
   }
 }</code></pre>
 </div>
 <p>The network type must match the one the wallet was created with. A path without a wallet throws a <code>ZephyrError</code> &quot;Wallet does not exist at path: &quot; with the path.</p>
-<p><strong>A wrong password is not a <code>ZephyrError</code>.</strong> Observed on 2026-11-17, also with the released JAR: <code>openWallet</code> with a wrong password threw <code>java.lang.Exception</code> with the message &quot;invalid password&quot;. A <code>catch (ZephyrError e)</code> does not catch it; catch <code>Exception</code> around <code>openWallet</code> (<a href="09-errors.html">Errors and exceptions</a>).</p>
+<p>A wrong password throws a <code>ZephyrError</code> &quot;invalid password&quot; in <code>2.3.0-sec.2-java.5</code> (one of the library's offline tests checks it). <strong>Releases up to <code>2.3.0-sec.2-java.4</code> threw <code>java.lang.Exception</code> instead</strong>, observed on 2026-11-17 with the released JAR. On those releases a <code>catch (ZephyrError e)</code> does not catch it; catch <code>Exception</code> around <code>openWallet</code> there (<a href="09-errors.html">Errors and exceptions</a>).</p>
+<p>Each failed open, such as one with a wrong password, leaks the half-built wallet inside the core (read in the core's code). In a process that runs for long, limit the password retries.</p>
 <h2 id="wallet-bytes">Wallet bytes<a class="heading-anchor" href="#wallet-bytes" aria-label="Link to this section">#</a></h2>
 <p>Apps that keep their own storage (an encrypted database, Android's private files) need no wallet files at all. <code>getData()</code> returns the keys and the cache as two byte arrays:</p>
 <div class="lt-code-block">
@@ -174,33 +175,37 @@ store.put(&quot;cache&quot;, data[1]);</code></pre>
 </div>
 <p>The keys array is encrypted with the wallet password. The cache array, which holds the synced history, is encrypted with a key derived from it. The files are encrypted the same way.</p>
 <p>A wallet opened this way has no path (<code>getPath()</code> returns <code>null</code>). <code>save()</code> and <code>close(true)</code> then write nothing and report no error (read in the core's code). Call <code>getData()</code> again and store the result whenever you would otherwise save, and before <code>close()</code>. <code>changePassword</code> does not work for such a wallet; <a href="#the-password">The password</a> has the details.</p>
+<p><code>getData()</code> is refused inside a listener callback, like <code>save()</code>: its cache array is what a save would write (<a href="04-threads-and-listeners.html#what-a-callback-may-call">What a callback may call</a>).</p>
 <p><code>moveTo(path)</code> gives a wallet held in memory its files:</p>
 <div class="lt-code-block">
 <div class="lt-code-head"><span>Java, compiled</span></div>
 <pre><code>wallet.moveTo(&quot;wallets/main&quot;);
 wallet.save();  // writes to the new files from now on</code></pre>
 </div>
-<p>Observed on 2026-11-17 with a wallet opened from bytes: <code>moveTo</code> wrote <code>&lt;path&gt;</code> (the cache) and <code>&lt;path&gt;.keys</code>, and no <code>.address.txt</code>. Then <code>getPath()</code> returned the new path, <code>save()</code> worked, and the wallet opened again from that path at the same height. Moving onto an existing file, into a missing directory or onto another file system was not tried.</p>
+<p>Observed on 2026-11-17 with a wallet opened from bytes: <code>moveTo</code> wrote <code>&lt;path&gt;</code> (the cache) and <code>&lt;path&gt;.keys</code>, and no <code>.address.txt</code>. Then <code>getPath()</code> returned the new path, <code>save()</code> worked, and the wallet opened again from that path at the same height. Moving onto an existing file, into a missing directory or onto another file system was not tried. <code>moveTo</code> writes the files as <code>save()</code> does, so the same rules apply: not inside a listener callback, and not while background syncing runs (<a href="#when-to-save">When to save</a>).</p>
 <h2 id="the-password">The password<a class="heading-anchor" href="#the-password" aria-label="Link to this section">#</a></h2>
 <p><strong><code>changePassword</code> fails for a wallet opened from bytes.</strong> On a wallet opened with <code>openWalletData</code> (or created without a path), <code>changePassword</code> throws <code>failed to read file &quot;.keys&quot;</code>. The core verifies the old password against the keys file on disk, which such a wallet does not have. The same call on a wallet with files is not affected. No stray file is written. <em>Status:</em> core behaviour (the core took only half of a later monero-cpp fix), confirmed on mainnet. Apps that store bytes can keep the password stable, or restore the wallet from its mnemonic under the new password (which costs a re-sync).</p>
-<p>A wrong old password is refused before the core is asked, with a <code>ZephyrError</code> &quot;Invalid original password.&quot;.</p>
+<p>A wrong old password is refused before the core is asked, with a <code>ZephyrError</code> &quot;Invalid original password.&quot;. <code>changePassword</code> saves the wallet, so it follows the rules of <code>save()</code> below.</p>
 <h2 id="when-to-save">When to save<a class="heading-anchor" href="#when-to-save" aria-label="Link to this section">#</a></h2>
-<p><code>save()</code> writes the cache (and the keys) to the wallet's files. A cache that was not saved only costs a re-sync of the blocks since the last save. But transaction notes and the secret keys of sent transactions exist only in the cache. Save, or with bytes call <code>getData()</code> and store the arrays again:</p>
+<p><code>save()</code> writes the cache to the wallet's files. The keys file is written when the wallet is created, moved, made multisig or its password changed. A cache that was not saved only costs a re-sync of the blocks since the last save. But transaction notes and the secret keys of sent transactions exist only in the cache. Save, or with bytes call <code>getData()</code> and store the arrays again:</p>
 <ul><li>after each sync;</li><li>after each send;</li><li>after <code>setTxNote</code> and other changes the wallet keeps for you;</li><li>before your process can be stopped, on Android when the app goes to the background (<a href="10-android.html#lifecycle-and-threads">Lifecycle and threads</a>).</li></ul>
+<p>Two rules from <code>2.3.0-sec.2-java.5</code> on (read in the core's code):</p>
+<ul><li><strong>Never from inside a listener callback.</strong> <code>save()</code>, <code>moveTo()</code>, <code>changePassword()</code> and <code>getData()</code> throw a <code>ZephyrError</code> there. A callback runs in the middle of a refresh, and a save from an output callback would write a transaction half processed. Save after <code>sync()</code> has returned, or hand the event to a thread of your own.</li><li><strong>Not while background syncing runs.</strong> A save is not exclusive with the core's sync thread, and after <code>stopSyncing()</code> that thread may still finish its current sync. <code>close(true)</code> saves after that thread has ended. A wallet that stays open and must be saved regularly can sync with <code>sync()</code> on its own thread instead, and save between two syncs (<a href="04-threads-and-listeners.html#what-a-callback-may-call">What a callback may call</a>).</li></ul>
 <h2 id="closing">Closing<a class="heading-anchor" href="#closing" aria-label="Link to this section">#</a></h2>
-<p><code>close()</code> closes without saving; <code>close(true)</code> saves first. After <code>close</code> the object must not be used again: <code>isClosed()</code> returns <code>true</code>, and most other calls throw a <code>ZephyrError</code> &quot;Wallet is closed&quot;. A few have no such check; <code>changePassword</code> after <code>close()</code> fails with an unrelated error. Closing a closed wallet has no effect.</p>
-<p><code>close(true)</code> saves in native code that does not catch a failure of the save (read in the bridge's code; not run). Call <code>save()</code> first, which reports a failure as an exception, then <code>close()</code>.</p>
+<p><code>close()</code> closes without saving; <code>close(true)</code> saves first. After <code>close</code> the object must not be used again: <code>isClosed()</code> returns <code>true</code>, and every other call throws a <code>ZephyrError</code> &quot;Wallet is closed&quot;. One of the library's offline tests calls every public method of a closed wallet and checks this. Closing a closed wallet has no effect.</p>
+<p><code>close()</code> returns only when the wallet is closed. It stops a sync that runs, waits for the calls of other threads and for the core's background sync thread, and has no time limit. So call it off the main thread of an app. <code>close()</code> from inside a listener callback is refused (<a href="04-threads-and-listeners.html#closing-a-wallet-that-syncs">Closing a wallet that syncs</a>).</p>
+<p><code>close(true)</code> saves after the core's background sync thread has ended, so the save never meets a refresh:</p>
+<ul><li><strong>A failed save still closes the wallet.</strong> When the save fails (a full disk, a directory that cannot be written), the wallet is closed and freed all the same. <code>close(true)</code> then throws a <code>ZephyrError</code> &quot;Wallet was closed, but saving it failed: &quot; with the core's reason. A save never writes the keys file, so only what changed since the last save is lost.</li><li><strong>The keys file is not locked during that save.</strong> Do not open the same wallet elsewhere before <code>close(true)</code> has returned.</li><li><strong>A wallet without a file</strong> is not written, and nothing says so (<a href="#wallet-bytes">Wallet bytes</a>).</li></ul>
 <div class="lt-code-block">
 <div class="lt-code-head"><span>Java, compiled</span></div>
 <pre><code>try {
   wallet.sync();
   System.out.println(wallet.getBalance());
-  wallet.save();     // reports a failure; close(true) would not
 } finally {
-  wallet.close();
+  wallet.close(true);  // saves and closes; a failed save throws, the wallet is closed anyway
 }</code></pre>
 </div>
-<p>Never call <code>close()</code> while another thread may be inside <code>sync()</code>. Observed on 2026-11-17 with the released JAR, such a <code>close()</code> crashed the process in 4 of 4 runs. With background syncing, <code>stopSyncing()</code> alone is not enough: let its scan stop before you close (<a href="04-threads-and-listeners.html#closing-a-wallet-that-syncs">Closing a wallet that syncs</a>).</p>
+<p>A <code>close()</code> from another thread during a <code>sync()</code> is safe from <code>2.3.0-sec.2-java.5</code> on: the sync throws a <code>ZephyrError</code> &quot;Wallet is closed&quot;. In releases up to <code>2.3.0-sec.2-java.4</code> such a <code>close()</code> crashed the process (4 of 4 runs with the released JAR, 2026-11-17). On those releases, never call <code>close()</code> while another thread may be inside <code>sync()</code>. In <code>java.4</code>, <code>close(true)</code> also did not catch a failure of the save in native code (read in the bridge's code); call <code>save()</code> first there, then <code>close()</code>.</p>
 <h2 id="addresses-and-keys">Addresses and keys<a class="heading-anchor" href="#addresses-and-keys" aria-label="Link to this section">#</a></h2>
 <div class="lt-table-scroll" tabindex="0" role="region" aria-labelledby="addresses-and-keys">
 <table>
@@ -231,7 +236,7 @@ wallet.save();  // writes to the new files from now on</code></pre>
 </main>
 <footer class="lt-footer">
 <div class="lt-wrap lt-wrap-wide">
-<p>Guide for zephyr-java 2.3.0-sec.2-java.4, built from commit <code>7b926ce9</code> (2026-11-18 UTC).</p>
+<p>Guide for zephyr-java 2.3.0-sec.2-java.5, built from commit <code>cb78099a</code> (2026-11-20 UTC).</p>
 <p>zephyr-java and this site are a <a href="https://lateo.dev/">lateo</a> project by an independent operator, not affiliated with or endorsed by ZephyrProtocol. Source: <a href="https://github.com/loki-notfound/myzephyr-java">github.com/loki-notfound/myzephyr-java</a>.</p>
 <p>The library and the guide are under the MIT licence of the repository; the stylesheet is BSD 3-Clause; the lateo name, mark and favicons are not covered by either and all rights in them are reserved by their owner (<a href="../assets/NOTICE.txt">notice</a>).</p>
 </div>
